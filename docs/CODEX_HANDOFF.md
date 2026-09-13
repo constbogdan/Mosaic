@@ -8,9 +8,13 @@
 
 `Baseline T0 — IN PROGRESS`
 
-`T0-1 CP4B.1 — IMPLEMENTED / FOCUSED VALIDATED / HOSTED ACCEPTANCE PENDING`
+`T0-1 CP4B.1 — COMPLETE / HOSTED VALIDATED`
 
-`Next: hosted exact-tree reuse acceptance; then CP4B.2 evidence-model design`
+`Next: T0-1 CP4B.2 — Authoritative PR Validation Model`
+
+Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
+VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
+`CP4B.2 NEXT`.
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -45,11 +49,37 @@ Missing, failed, expired, ambiguous, foreign, non-Full, parent/tree-mismatched, 
 evidence still falls back to protected-main Full. No workflow YAML, validation scope, permissions,
 ruleset/check names, or Build/Sign/Publish behavior changed.
 
-Focused evidence: all 12 reuse fixtures and all 10 adjacent delivery/presentation fixtures pass.
-The branch classifies `tooling-only / high`, requires no Development release, and selects Full. It is
-itself a natural hosted acceptance vehicle: PR Full must emit exact-tree evidence, and—if the final
-merge tree is identical—protected main must report reuse without executing fallback Gradle Full.
-Do not begin CP4B.2 policy changes until that hosted result is recorded.
+Focused evidence was all 12 reuse fixtures and all 10 adjacent delivery/presentation fixtures.
+PR #60 then completed the hosted contract proof: required PR Full run `34778154476`, attempt `1`,
+passed and emitted exact-tree evidence; its normal two-parent merge retained the tested tree;
+protected main authenticated the evidence and reported `Full validation reused — this exact tree
+already passed on PR #60.` Fallback Gradle Full did not execute. The unpublished range was
+`tooling-only`, so Sign and Publish skipped. Protected-main timing was Full validation 1m35s, Build
+Development Release 10s, Sign/Publish skipped, and 1m51s total. CP4B.1 is therefore **COMPLETE /
+HOSTED VALIDATED** with conservative fallback behavior intact.
+
+### T0-1 CP4B.2 approved boundary
+
+CP4B.2 is next but not implemented. Its goal is the simplest complete authoritative PR evidence
+contract, not optimization of the current duplicate pipeline. The leading model is: every PR runs
+changed-range hygiene and the complete offline tooling suite; Android/build/unknown scope also runs
+Full Debug, while proven non-Android scope does not; every successful path emits exact-tree evidence
+covering its complete required policy; protected main reuses exact matching evidence and otherwise
+runs the complete conservative fallback.
+
+Prefer deleting stages and state over making them smarter. Do not build an authoritative
+fine-grained test catalog while the complete hosted offline suite remains a cheap coarse gate
+(observed around 18–24 seconds for approximately 232 tests, not a guaranteed constant). Android
+remains a coarse relevance gate. Local logs are diagnostics, never authoritative attestations.
+
+Migration order: define complete PR evidence; make PR CI authoritative; teach main to reuse the
+complete policy; live-prove tooling-only and Android paths; only then simplify local/prepare-pr
+validation; remove superseded state/tests/docs afterward; simplify Signing Diagnostic separately.
+Preserve exact scope/tree review, required PR CI, exact-tree authentication, main fallback,
+final-context Release Build, version allocation, signing and artifact boundaries, Publish
+freshness/idempotency, Stable/Hold authorization, upstream native topology/human authority, and
+native failed-job recovery. See the
+[authoritative ledger](T0_1_OPERATOR_UX_INVENTORY.md#t0-1-cp4b2-boundary-and-approved-direction).
 
 ### T0-1 CP4A behavioral execution audit
 
@@ -88,7 +118,7 @@ sanitized upstream-push diagnostics remain T0-2/CP7 concerns rather than CP4A im
 
 ### T0-1 CP3 low-risk names and summaries
 
-CP3 is implemented locally on `chore/t0-1-low-risk-presentation`. The five supported Actions
+CP3 is **COMPLETE / HOSTED VALIDATED**. The five supported Actions
 display names are now `CI`, `Hold Release`, `Signing Diagnostic`, `Stable Promotion`, and
 `Upstream Synchronization`. These are presentation-only changes: workflow paths, triggers, job
 IDs, required checks, permissions, Environments, artifact/tag/version identities, provenance,
@@ -112,8 +142,9 @@ Static/output fixtures preserve the live machine contracts `CI`, `Full validatio
 `Build Development Release`, `Sign Development`, and `Publish Development`. The initially
 low-risk upstream push diagnostic was reclassified: preserving and sanitizing captured Git push
 stderr/stdout changes operational error handling, so it remains CP6 or T0-2 security work.
-Repository Full validation and hosted rendering/sidebar evidence are still required before CP3 is
-accepted as complete and CP4 begins.
+Repository Full validation passed, the branch merged, and the supported hosted presentation/sidebar
+was observed. Rare alternate-path presentation remains protected by fixtures and may be recorded
+opportunistically; it does not keep CP3 open.
 
 ### T0-1 CP2 obsolete-surface removal
 
@@ -852,7 +883,7 @@ PREPARE_PR.md current-workflow-continuity anchor is missing. No live retry was d
 
 All six release milestones are COMPLETE / LIVE VALIDATED: permanent signing; updater
 routing; rolling Development; device in-place updates; Stable promotion + channel UX;
-and automatic Development delivery. User-supplied [automatic delivery evidence](MOSAIC_DEVELOPMENT_RELEASE.md#automatic-development-and-channel-migration-acceptance)
+and automatic Development delivery. User-supplied [automatic delivery evidence](MOSAIC_DEVELOPMENT_RELEASE.md#historical-automatic-development-and-channel-migration-acceptance)
 records PR #20/main `5818b605fe64fae97bdd20feed7b1df60600d08a`, automatic release #2,
 v1.0.8/downstream-build-8, exact signed hash, 9m55s build / 37s sign / 18s publish / 11m02s
 total, and no manual dispatch or Environment approval. The Environment still isolates keys.
@@ -908,7 +939,7 @@ Secrets stay step-only. No Stable workflow, signing action, app, CI graph or dev
 Separate Release compilation still follows Full Debug CI; measured item-6 optimization remains
 pending. CI re-runs cannot replace an already published identity with new bytes/run provenance.
 
-[Development contract](MOSAIC_DEVELOPMENT_RELEASE.md#trusted-build-sign-and-publish) records
+[Development contract](MOSAIC_DEVELOPMENT_RELEASE.md#current-trusted-build-sign-and-publish) records
 race behavior and first live acceptance. No new secrets/settings are required or configured.
 Existing Environment reviewer policies, if any, still apply; they are not bypassed.
 
@@ -969,7 +1000,7 @@ change. Live stable promotion and selector/device acceptance remain pending.
 
 User-supplied acceptance establishes operational downstream delivery and Mosaic-driven
 1.0.3 -> 1.0.5 updating. Full evidence, hash, recovery boundaries and timing observations
-are in [the delivery acceptance record](MOSAIC_DEVELOPMENT_RELEASE.md#development-delivery-and-in-place-updater-acceptance---complete--live-validated).
+are in [the delivery acceptance record](MOSAIC_DEVELOPMENT_RELEASE.md#historical-development-delivery-and-in-place-updater-acceptance---complete--live-validated).
 
 The initial normal run built source `41f9f83c36b8866211c9680d3b416d5ebede4888`, version
 1.0.5/code 5, unsigned artifact `10099950969`; signing-secret availability failed and
@@ -1029,7 +1060,7 @@ implementation limitation, not a GitHub security constraint. Original run 343409
 failed only after successful build/artifact transfer for main source
 41f9f83c36b8866211c9680d3b416d5ebede4888, version 1.0.5. Read-only GitHub metadata confirmed
 its unexpired artifact/digest and successful producing job; hosted content checks remain
-mandatory. See [audit evidence and exact recovery commands](MOSAIC_DEVELOPMENT_RELEASE.md#manual-post-build-recovery).
+mandatory. See [historical audit evidence](MOSAIC_DEVELOPMENT_RELEASE.md#historical-manual-post-build-recovery-removed).
 
 The manual resume workflow runs current approved protected-main tooling against the exact
 approved old source/artifact. It validates original workflow/run/job/attempt ownership,

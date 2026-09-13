@@ -10,10 +10,14 @@ authoritative; the obsolete Issue/journal/finalizer lifecycle is removed.
 **I07 — COMPLETE / LIVE VALIDATED.** Development uses forward-fix recovery. Stable supports the
 minimal emergency Hold Release followed by forward-fix and zero-input Stable Promotion.
 
-**Baseline T0 — IN PROGRESS. T0-1 CP4B.1 exact-tree reuse contract repair is implemented and
-focused validated; hosted acceptance is required before CP4B.2 defines authoritative evidence or
-simplifies any validation path.** Baseline T0 is an
+**Baseline T0 — IN PROGRESS. T0-1 CP4B.1 exact-tree reuse contract repair is COMPLETE / HOSTED
+VALIDATED. CP4B.2 — Authoritative PR Validation Model — is next; it must define and prove complete
+PR policy evidence before simplifying any validation path.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
+
+Checkpoint sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
+VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
+CP4B.2 NEXT.**
 
 1. **T0-1 — Cleanup & Operator Experience:** inventory every human-facing surface and machine
    contract before simplifying validation duplication, workflow/operator presentation, obsolete
@@ -69,11 +73,28 @@ CP4A established that the clearest removable duplication is an explicit local Fu
 followed by prepare-pr Full against the same mutable snapshot. Hosted PR validation remains the
 authoritative committed/synthetic-merge gate; exact-tree reuse on protected main is already proven.
 CP4B.1 repaired the case-sensitive `Run Full validation` versus `Run full validation` reuse-step
-contract and added independent workflow-YAML-to-consumer coverage. Hosted exact-tree reuse remains
-the completion gate. CP4B.2 must then decide how complete offline-tooling evidence is authenticated,
+contract and added independent workflow-YAML-to-consumer coverage. PR #60 and required PR Full run
+`34778154476` attempt `1` live-proved exact-tree evidence reuse: protected main reported that the
+exact tree had passed, skipped fallback Gradle Full, classified the range tooling-only, and skipped
+Sign/Publish. CP4B.2 must now define complete policy evidence for both non-Android and Full PR paths,
 because PR Full may currently select a mapped offline subset while main runs all offline tests.
 Release assembly, isolated signing, Stable/Hold reauthentication, and fail-closed publication checks
 remain distinct authority boundaries rather than duplicate validation.
+
+The approved CP4B.2 direction is broad hosted authority with coarse gates: every PR runs
+changed-range hygiene and the complete offline suite; Android/build/unknown scope also runs Full
+Debug; every successful path emits exact tested-tree policy evidence; protected main reuses an exact
+match and otherwise runs the complete conservative fallback. Prefer deleting duplicate stages and
+state over making them smarter. The observed hosted offline suite is commonly tens of seconds
+(approximately 18–24 seconds for about 232 tests), so an authoritative fine-grained test catalog is
+not currently justified; retain Android as the materially expensive coarse gate.
+
+Migration order is fixed: define complete PR evidence; make PR CI authoritative; teach main to reuse
+it; live-prove tooling-only and Android paths; only then simplify local/prepare-pr validation; remove
+superseded state/tests/docs afterward; simplify Signing Diagnostic separately. Preserve exact-tree
+and required-CI trust, main fallback, final Release Build, version/sign/artifact/publication
+boundaries, Stable/Hold authorization, upstream native Git/human authority, and native failed-job
+recovery. Performance incidents and optimization remain CP7/T0-2 evidence, not CP4B.2 scope.
 
 Hosted CP2 evidence also establishes bounded later work: CP7 must separate runner queue, setup,
 cache/tool installation, test/build execution, Environment wait, and publication timing, and must
@@ -746,14 +767,14 @@ Current Mosaic release sequence:
 Next plumbing: Upstream Sync publication credential binding. The historical Item 6
 optimization/refactor/cleanup workstream follows; it is distinct from release milestone 6.
 
-[Automatic acceptance](MOSAIC_DEVELOPMENT_RELEASE.md#automatic-development-and-channel-migration-acceptance)
+[Automatic acceptance](MOSAIC_DEVELOPMENT_RELEASE.md#historical-automatic-development-and-channel-migration-acceptance)
 records PR #20, automatic release #2, v1.0.8/build-8 and in-app 1.0.5 -> 1.0.8 with preserved
 settings and Development migration. Stable build-5 promotion is live validated and remains
 manual; Development is continuous after authoritative main CI. See the follow-up phase below.
 Completed evidence and remaining work:
 
 - [x] Merge hosted upstream detection/candidate preparation on `main`, with isolated normal merges, exact-SHA deduplication, durable blocked issues, and offline safety tests.
-- [x] Establish **Detection: OPERATIONAL**. First manual smoke [run 34281315948](https://github.com/constbogdan/Wholphin/actions/runs/34281315948) succeeded with `no_delta`, zero incoming commits and successful ancestry validation. Exact SHAs and external App setup are recorded in [UPSTREAM_SYNC](UPSTREAM_SYNC.md#hosted-upstream-synchronization-v1).
+- [x] Establish **Detection: OPERATIONAL**. First manual smoke [run 34281315948](https://github.com/constbogdan/Wholphin/actions/runs/34281315948) succeeded with `no_delta`, zero incoming commits and successful ancestry validation. Exact SHAs and external App setup are recorded in [UPSTREAM_SYNC](UPSTREAM_SYNC.md#hosted-upstream-synchronization-v2).
 - [x] **I06 native Upstream Sync: COMPLETE / LIVE VALIDATED.** PR #55 proved a genuine clean FOLLOW range through native two-parent candidate, required PR Full, human merge, unchanged candidate/tested/main tree, accepted upstream ancestry, exact-tree protected-main reuse, Development publication, and subsequent quiet `no_delta`. Checkpoint 5 removed the duplicated Issue/journal/finalizer/priority lifecycle while preserving ownership, Draft/conflict, orphan, retry, provenance, least-privilege and required-CI safety. Natural textual-conflict live acceptance remains opportunistic evidence, not an I06 completion blocker.
 - [x] Implement PR-only universal defaultDebug artifacts from successful Full CI, reusing its existing APK with seven-day retention, head/tested/base SHA metadata and a job-summary download link. OPERATIONAL + LIVE VALIDATED through PR #12 / run 34284819578: the exact artifact was downloaded, installed and run on the emulator after removing an old Debug installation. See [retrieval and install instructions](CODEX_HANDOFF.md#pr-debug-apk-artifacts-2026-09-09).
 - [x] Implement approved Mosaic technical identity (`io.github.constbogdan.mosaic`, Debug `.debug`, upstream Kotlin namespace retained) and frozen-epoch first-parent versions (`1.0.N`). Signing is live-validated below; updater routing and rolling development delivery are live validated; stable promotion is live validated; visual branding remains pending. See [implementation boundaries](CODEX_HANDOFF.md#mosaic-technical-identity-and-versions-implemented-2026-09-09).
@@ -929,7 +950,7 @@ versions if required. No README, assets, labels, Issues, Project or GitHub chang
 Live run/artifact audit corrected the earlier credential-binding hypothesis: read-only
 observation found SeriesOverview.kt / SeriesViewModel.kt conflicts; the ready-only App
 mint step correctly skipped. Durable issue recording failed and repository Issues are
-currently disabled. See [diagnosis](CODEX_HANDOFF.md#upstream-publication-diagnosis-conflict-and-disabled-issues).
+currently disabled. See [historical diagnosis](CODEX_HANDOFF.md#historical-v1-upstream-publication-diagnosis-superseded-by-i06).
 This evidence is retained only to explain the path to I06. The completed native lifecycle no
 longer depends on Issues or journal reporting; current behavior and remaining natural-conflict
 acceptance are documented in [UPSTREAM_SYNC](UPSTREAM_SYNC.md) and
