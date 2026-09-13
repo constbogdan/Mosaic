@@ -8,9 +8,9 @@
 
 `Baseline T0 — IN PROGRESS`
 
-`T0-1 CP3 — IMPLEMENTED / FOCUSED VALIDATED`
+`T0-1 CP4B.1 — IMPLEMENTED / FOCUSED VALIDATED / HOSTED ACCEPTANCE PENDING`
 
-`Next: operator Full validation and hosted CP3 presentation acceptance; then T0-1 CP4`
+`Next: hosted exact-tree reuse acceptance; then CP4B.2 evidence-model design`
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -28,6 +28,63 @@ audited seven workflows, 145 YAML/generated presentation labels or families, 52 
 presentation surfaces, 20 multiline outputs, timing/conditional explanations, PR/Release/artifact
 presentation, validation duplication, signing diagnostics, and performance evidence. It defines 40
 finite implementation items across CP2–CP8.
+
+### T0-1 CP4B.1 exact-tree reuse contract repair
+
+CP4B.1 fixes only the case-sensitive selector mismatch found by CP4A. The workflow step remains
+`Run Full validation`; the reuse consumer now expects that exact value. Its focused fixture parses
+the actual `.github/workflows/ci.yml`, locates the `full-validation` job and step by their YAML IDs,
+and compares the real names with the consumer selectors. It also checks the repository boundary and
+the record-to-upload artifact wiring. This avoids the former false confidence where fixtures used
+the same stale Python constant on both sides. A deliberately wrong lowercase step remains rejected.
+
+The adjacent audit found no second behavioral defect. The Actions API endpoint did redundantly name
+`ci.yml` apart from the `WORKFLOW` constant, so it now derives the endpoint filename from that path.
+Repository, workflow path, job, required step, and artifact selectors retain their exact meanings.
+Missing, failed, expired, ambiguous, foreign, non-Full, parent/tree-mismatched, and API-uncertain
+evidence still falls back to protected-main Full. No workflow YAML, validation scope, permissions,
+ruleset/check names, or Build/Sign/Publish behavior changed.
+
+Focused evidence: all 12 reuse fixtures and all 10 adjacent delivery/presentation fixtures pass.
+The branch classifies `tooling-only / high`, requires no Development release, and selects Full. It is
+itself a natural hosted acceptance vehicle: PR Full must emit exact-tree evidence, and—if the final
+merge tree is identical—protected main must report reuse without executing fallback Gradle Full.
+Do not begin CP4B.2 policy changes until that hosted result is recorded.
+
+### T0-1 CP4A behavioral execution audit
+
+CP4A is complete as an analysis-only checkpoint in the
+[authoritative T0-1 ledger](T0_1_OPERATOR_UX_INVENTORY.md#t0-1-cp4a-behavioral-execution-audit).
+It traces every surviving local and hosted path from `validate-local.ps1` and `prepare-pr.ps1`
+through PR/protected-main CI, Development Build/Sign/Publish, Stable Promotion, Hold Release,
+Signing Diagnostic, and native Upstream Synchronization. Its matrices record exact commands,
+trusted identities, evidence, consumers, retry/skip behavior, task graphs, measured timings, and
+the boundary between duplicate computation and required independent authentication.
+
+For the correlated APK lifecycle ending at PR #46 / protected-main run `34673534555` /
+`downstream-build-29`, repository pre-commit ran four times, complete local offline tooling ran
+twice, Debug Full ran three times, and Release assembly ran once. The immediate operator Full plus
+prepare-pr Full duplicated the same hooks, exact 218-test offline suite, and Gradle goals against
+the same mutable snapshot; the prepare invocation gained snapshot sequencing but no reusable
+validation evidence. Hosted PR validation remained authoritative because it tested the committed
+synthetic merge in a clean environment and produced exact-tree evidence. Protected main then
+authenticated and reused that evidence. Release assembly, signing, APK verification, and
+publication checks protect different variant or trust boundaries and are not duplicate testing.
+
+The no-APK PR #59 control remained `tooling-only / high` and correctly skipped Development Build,
+Sign, and Publish, but protected-main run `34771225286` reran Full. The first failed reuse predicate
+was a live string-contract mismatch: `ci.yml` named the step `Run Full validation`, while
+`mosaic_validation_reuse.py` required `Run full validation`. The fallback was safe. CP4B.1 repaired
+this contract and added a YAML-to-consumer regression test. CP4B must still decide
+where the all-offline evidence lives: PR Full currently means the full Android graph but may run a
+mapped offline subset, whereas protected main always runs all offline tests.
+
+The measured direction is fast relevant local feedback, an exact stable commit/tree as the
+authoritative hosted validation boundary, downstream reuse of authenticated evidence, and
+conservative final-main fallback whenever equivalence is uncertain. Do not invent a local
+attestation or remove main broad validation before the remaining evidence contracts are explicit.
+Gradle/setup/cache performance, dependency-repository hardening, runner queue behavior, and richer
+sanitized upstream-push diagnostics remain T0-2/CP7 concerns rather than CP4A implementation.
 
 ### T0-1 CP3 low-risk names and summaries
 

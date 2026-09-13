@@ -20,14 +20,29 @@ TREE = "e" * 40
 
 
 class FakeGitHub:
-    def __init__(self, *, full="success", runs=1, artifacts=1, tested_tree=TREE):
+    def __init__(
+        self,
+        *,
+        full="success",
+        full_step=None,
+        runs=1,
+        artifacts=1,
+        artifact_expired=False,
+        run_path=None,
+        run_repository=None,
+        tested_tree=TREE,
+    ):
         self.full = full
+        self.full_step = full_step or reuse.FULL_STEP
         self.run_count = runs
         self.artifact_count = artifacts
+        self.artifact_expired = artifact_expired
+        self.run_path = run_path or reuse.WORKFLOW
+        self.run_repository = run_repository or reuse.REPOSITORY
         self.tested_tree = tested_tree
 
     def call(self, path):
-        if path == "actions/workflows/ci.yml":
+        if path == f"actions/workflows/{Path(reuse.WORKFLOW).name}":
             return {"id": 42}
         if path == f"git/commits/{TESTED}":
             return {
@@ -47,17 +62,17 @@ class FakeGitHub:
                     "head": {"sha": HEAD, "ref": "feature", "repo": {"full_name": reuse.REPOSITORY}},
                 }
             ]
-        if path.startswith("actions/workflows/ci.yml/runs?"):
+        if path.startswith(f"actions/workflows/{Path(reuse.WORKFLOW).name}/runs?"):
             return [
                 {
                     "id": 100 + index,
                     "run_attempt": 1,
                     "workflow_id": 42,
-                    "path": reuse.WORKFLOW,
+                    "path": self.run_path,
                     "event": "pull_request",
                     "head_sha": HEAD,
                     "head_branch": "feature",
-                    "head_repository": {"full_name": reuse.REPOSITORY},
+                    "head_repository": {"full_name": self.run_repository},
                     "status": "completed",
                     "conclusion": "success",
                 }
@@ -73,7 +88,7 @@ class FakeGitHub:
                     "head_sha": HEAD,
                     "steps": [
                         {"name": "Classify PR validation", "conclusion": "success"},
-                        {"name": reuse.FULL_STEP, "conclusion": self.full},
+                        {"name": self.full_step, "conclusion": self.full},
                     ],
                 }
             ]
@@ -85,7 +100,7 @@ class FakeGitHub:
                 {
                     "id": 500 + index,
                     "name": name,
-                    "expired": False,
+                    "expired": self.artifact_expired,
                     "digest": "sha256:" + "f" * 64,
                     "workflow_run": {
                         "id": run,
@@ -133,6 +148,44 @@ class ValidationReuseTests(unittest.TestCase):
         self.assertEqual(result["mainTree"], TREE)
         self.assertEqual(result["runId"], "100")
 
+    def test_actual_ci_workflow_matches_reuse_consumer_contract(self):
+        workflow_path = ROOT / reuse.WORKFLOW
+        workflow = workflow_path.read_text(encoding="utf-8")
+        lines = workflow.splitlines()
+
+        job_start = lines.index("  full-validation:")
+        job_end = next(
+            (
+                index
+                for index in range(job_start + 1, len(lines))
+                if lines[index].startswith("  ")
+                and not lines[index].startswith("    ")
+                and lines[index].endswith(":")
+            ),
+            len(lines),
+        )
+        job_lines = lines[job_start:job_end]
+        job_name = next(line.removeprefix("    name: ") for line in job_lines
+                        if line.startswith("    name: "))
+
+        step_id = job_lines.index("        id: full-validation")
+        step_name = next(
+            line.removeprefix("      - name: ")
+            for line in reversed(job_lines[:step_id])
+            if line.startswith("      - name: ")
+        )
+
+        self.assertEqual(reuse.JOB, job_name)
+        self.assertEqual(reuse.FULL_STEP, step_name)
+        self.assertIn(f"github.repository == '{reuse.REPOSITORY}'", workflow)
+        self.assertIn("python -B scripts/mosaic_validation_reuse.py record", workflow)
+        self.assertIn("name: ${{ steps.pr-full-evidence.outputs.artifact_name }}", workflow)
+
+    def test_wrong_required_step_name_falls_back(self):
+        result = self.decide(FakeGitHub(full_step="Run full validation"))
+        self.assertFalse(result["reuseFull"])
+        self.assertIn("missing or ambiguous", result["reason"])
+
     def test_different_tree_falls_back(self):
         result = self.decide(FakeGitHub(tested_tree="1" * 40))
         self.assertFalse(result["reuseFull"])
@@ -147,6 +200,7 @@ class ValidationReuseTests(unittest.TestCase):
 
     def test_missing_failed_or_cancelled_pr_full_falls_back(self):
         self.assertFalse(self.decide(FakeGitHub(runs=0))["reuseFull"])
+        self.assertFalse(self.decide(FakeGitHub(artifacts=0))["reuseFull"])
         for conclusion in ("failure", "cancelled"):
             with self.subTest(conclusion=conclusion):
                 self.assertFalse(self.decide(FakeGitHub(full=conclusion))["reuseFull"])
@@ -154,6 +208,15 @@ class ValidationReuseTests(unittest.TestCase):
     def test_ambiguous_runs_or_artifacts_fall_back(self):
         self.assertFalse(self.decide(FakeGitHub(runs=2))["reuseFull"])
         self.assertFalse(self.decide(FakeGitHub(artifacts=2))["reuseFull"])
+
+    def test_expired_or_foreign_evidence_falls_back(self):
+        self.assertFalse(self.decide(FakeGitHub(artifact_expired=True))["reuseFull"])
+        self.assertFalse(
+            self.decide(FakeGitHub(run_path=".github/workflows/foreign.yml"))["reuseFull"]
+        )
+        self.assertFalse(
+            self.decide(FakeGitHub(run_repository="foreign/Wholphin"))["reuseFull"]
+        )
 
     def test_direct_main_or_non_pr_merge_falls_back(self):
         def one_parent(root, *args):

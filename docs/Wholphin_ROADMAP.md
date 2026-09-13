@@ -10,8 +10,9 @@ authoritative; the obsolete Issue/journal/finalizer lifecycle is removed.
 **I07 — COMPLETE / LIVE VALIDATED.** Development uses forward-fix recovery. Stable supports the
 minimal emergency Hold Release followed by forward-fix and zero-input Stable Promotion.
 
-**Baseline T0 — IN PROGRESS. T0-1 CP3 low-risk names and summaries is implemented and focused
-validated; operator Full and hosted presentation acceptance are next.** Baseline T0 is an
+**Baseline T0 — IN PROGRESS. T0-1 CP4B.1 exact-tree reuse contract repair is implemented and
+focused validated; hosted acceptance is required before CP4B.2 defines authoritative evidence or
+simplifies any validation path.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 1. **T0-1 — Cleanup & Operator Experience:** inventory every human-facing surface and machine
@@ -28,7 +29,10 @@ backlog, operating principles, audit scope, and acceptance criteria follow below
 
 The authoritative [T0-1 inventory and implementation ledger](T0_1_OPERATOR_UX_INVENTORY.md)
 maps all current workflows, presentation/output/timing/conditional surfaces, machine-contract
-risks, 40 implementation items, and the bounded CP2–CP8 sequence.
+risks, 40 implementation items, and the bounded CP2–CP8 sequence. Its
+[CP4A behavioral audit](T0_1_OPERATOR_UX_INVENTORY.md#t0-1-cp4a-behavioral-execution-audit)
+adds the measured local-edit-to-Development lifecycle, exact command/task/evidence matrices,
+duplicate-work counts, exact-tree reuse rules, targeted-validation safety map, and CP4B blockers.
 
 ### T0-1 scope and operator presentation principles
 
@@ -60,6 +64,16 @@ inherited Development Build and Create release surfaces; Baseline T0 deliberatel
 Appstore or Fire TV AAB distribution. Later, audit compatibility for human Development versions such as
 `v1.0.34-1-g<sha>` while retaining `downstream-build-N` machine identity, and add Compare Changes
 links.
+
+CP4A established that the clearest removable duplication is an explicit local Full immediately
+followed by prepare-pr Full against the same mutable snapshot. Hosted PR validation remains the
+authoritative committed/synthetic-merge gate; exact-tree reuse on protected main is already proven.
+CP4B.1 repaired the case-sensitive `Run Full validation` versus `Run full validation` reuse-step
+contract and added independent workflow-YAML-to-consumer coverage. Hosted exact-tree reuse remains
+the completion gate. CP4B.2 must then decide how complete offline-tooling evidence is authenticated,
+because PR Full may currently select a mapped offline subset while main runs all offline tests.
+Release assembly, isolated signing, Stable/Hold reauthentication, and fail-closed publication checks
+remain distinct authority boundaries rather than duplicate validation.
 
 Hosted CP2 evidence also establishes bounded later work: CP7 must separate runner queue, setup,
 cache/tool installation, test/build execution, Environment wait, and publication timing, and must
