@@ -1,18 +1,26 @@
 # Baseline T0-1 operator UX, workflow, and presentation inventory
 
-Status: **CP4B.1 IMPLEMENTED / FOCUSED VALIDATED — HOSTED ACCEPTANCE PENDING**
-Next: **prove exact-tree reuse on protected main, then begin CP4B.2 evidence-model design**
+Status: **CP4B.2 IMPLEMENTED / HOSTED ACCEPTANCE PENDING**
+Next: **live-prove NON_ANDROID and ANDROID_FULL reuse before simplifying local validation**
+
+Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
+VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
+CP4B.2 IMPLEMENTED / HOSTED ACCEPTANCE PENDING.**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
 baseline; historical names in acceptance records are evidence, not active UX. CP2 removed only
 the two obsolete inherited workflow surfaces and updated their ownership contract. CP3 changed
-operator presentation without changing machine contracts. CP4A now records the measured behavior
-from local edits through hosted validation and Development publication. CP4B.1 repairs only the
-exact-tree reuse selector contract exposed by that audit.
+operator presentation without changing machine contracts. CP4A records the measured behavior
+from local edits through hosted validation and Development publication. CP4B.1 repaired and
+live-proved the exact-tree reuse selector contract exposed by that audit. CP4B.2 implements the
+complete two-class PR policy contract; hosted acceptance is still required before later validation
+simplification begins.
 
 ## T0-1 CP4B.1 exact-tree reuse contract repair
 
-The fail-safe PR-to-main reuse defect is repaired locally. The actual `ci.yml` step is
+Status: **COMPLETE / HOSTED VALIDATED**
+
+The fail-safe PR-to-main reuse defect is repaired. The actual `ci.yml` step is
 `Run Full validation`; `mosaic_validation_reuse.py` now requires that exact case-sensitive value.
 No workflow, check, job, step, artifact, permission, validation-scope, fallback, or release name was
 changed.
@@ -32,15 +40,104 @@ lookup behind. The repository literal remains an intentional trust boundary; the
 remain GitHub API selectors; and the artifact producer/parser remains one shared implementation with
 workflow YAML transporting its exact output. No adjacent behavior change was required.
 
-Focused local evidence is 12/12 reuse fixtures plus 10/10 delivery/presentation contract fixtures.
-Hosted acceptance remains necessary: a qualifying PR must run Full and emit reusable evidence, its
-final merge must preserve the exact tested tree, protected main must report reuse, and the fallback
-Gradle Full step must not execute. This high-risk tooling-only branch is a natural qualifying case
-because the reuse helper itself forces PR Full; no APK-relevant change should be manufactured.
+Focused local evidence was 12/12 reuse fixtures plus 10/10 delivery/presentation contract fixtures.
+PR #60 then supplied the required hosted acceptance. Required PR Full run `34778154476`, attempt
+`1`, passed and emitted exact-tree evidence. The normal two-parent merge preserved that tested tree;
+protected main authenticated the PR evidence, reported `Full validation reused — this exact tree
+already passed on PR #60.`, and did not execute fallback Gradle Full. The protected-main workflow
+classified the unpublished range `tooling-only`, checked Development eligibility, and skipped Sign
+and Publish. Observed protected-main timing was Full validation 1m35s, Build Development Release
+10s, Sign and Publish skipped, and 1m51s total. This closes CP4B.1 without changing validation scope
+or weakening the conservative fallback.
+
+## T0-1 CP4B.2 boundary and approved direction
+
+Status: **IMPLEMENTED / HOSTED ACCEPTANCE PENDING**
+
+CP4B.2 establishes the simplest complete PR evidence contract before removing any later local gate.
+The implemented architecture is broad hosted authority with coarse relevance gates:
+
+```text
+Working tree
+  -> optional fast/relevant developer checks
+prepare-pr
+  -> exact scope/tree audit, cheap hygiene and relevant feedback, commit/push/PR
+PR CI (authoritative)
+  -> trusted-base classification and changed-range pre-commit
+  -> complete offline tooling suite for every PR
+  -> Full Debug for Android/build/unknown scope
+  -> no Android Full for proven non-Android scope
+  -> exact tested-tree evidence for the complete required policy
+protected main
+  -> authenticate PR policy evidence and exact final tree
+     -> match: reuse the complete PR result
+     -> uncertainty/direct/ambiguous: run the complete conservative fallback
+  -> classify the unpublished Development range
+     -> non-APK: stop
+     -> APK: Release Build -> Sign -> Publish
+```
+
+This direction prefers deleting stages and local state over making duplicate execution smarter.
+Existing scripts, fixtures, or documentation are not by themselves evidence that a mechanism must
+remain. Local logs remain diagnostics, not authoritative attestations. Complete hosted offline
+tooling has been observed in the tens-of-seconds range (about 18–24 seconds for approximately 232
+tests), but that is measured evidence rather than a guaranteed duration. A sophisticated
+authoritative test catalog or dependency-query system is therefore not justified today: run the
+complete offline suite once in authoritative PR CI and reconsider only if future hosted measurements
+justify the maintenance burden. Android is materially expensive and retains a coarse relevance gate.
+
+The versioned `pr-policy-v1` evidence contract has two classes. `NON_ANDROID` proves changed-range
+pre-commit plus the complete offline tooling suite. `ANDROID_FULL` proves those checks plus the
+complete defaultDebug compile, unit-test, and APK graph, and retains the validated Debug APK in the
+same evidence artifact. Unknown/unclassified, Android, and build scope map conservatively to
+`ANDROID_FULL`; only proven non-Android scope maps to `NON_ANDROID`.
+
+Evidence is accepted only from the exact repository and workflow, the unique successful PR run and
+`Full validation` job, the exact required step conclusions, and one unexpired artifact whose name,
+numeric identity, archive digest, run/attempt, PR/head, tested synthetic merge, parents, and tree all
+authenticate. The final protected-main tree must equal the tested tree. On an exact match, protected
+main may skip repository pre-commit, the complete offline suite, Android setup, and Gradle because
+the accepted PR class already proved its complete required policy. Any missing, failed, cancelled,
+expired, ambiguous, foreign, stale, mismatched, or otherwise uncertain evidence retains the complete
+protected-main fallback.
+
+Later simplification candidates, after replacement evidence is implemented and hosted-proven, are:
+remove operator Full from the normal publication recipe while retaining it on demand; remove
+mandatory prepare-pr Full and mandatory complete local offline execution; avoid authoritative
+fine-grained offline/Android mapping; make blanket protected-main validation a fallback rather than
+the normal exact-tree path; move Android setup behind a failed reuse decision; avoid a local
+attestation subsystem; challenge prepare-pr resumable validation state where Git/GitHub state is
+sufficient; remove the Signing Diagnostic manual SHA separately; and remove root compatibility logs
+only if no consumer remains.
+
+The simplification must preserve exact prepare-pr scope/tree verification, required PR CI,
+exact-tree authentication, protected-main fail-safe fallback, final-context Release Build,
+first-parent publication version allocation, `release-sign` isolation, unsigned/signed artifact
+authentication, Publish freshness/idempotency, Stable Promotion and Hold Release authorization,
+upstream ownership/native topology, human REVIEW/conflict authority, and native failed-job recovery.
+These are distinct trust, byte, and authority boundaries rather than duplicate tests.
+
+The controlled migration order is:
+
+1. CP4B.1 reuse contract proven — **COMPLETE**.
+2. Define the complete PR evidence contract — **IMPLEMENTED**.
+3. Make PR CI authoritative for that contract — **IMPLEMENTED**.
+4. Teach protected main to reuse complete PR policy evidence — **IMPLEMENTED**.
+5. Live-prove tooling-only and Android paths — **NEXT**.
+6. Only then simplify local and prepare-pr validation.
+7. Remove superseded state, catalog, tests, and documentation.
+8. Simplify Signing Diagnostic separately.
+
+No safety mechanism is removed before its replacement is implemented and hosted-proven. Performance
+work remains CP7/T0-2: retain the observed 6+ minute local versus tens-of-seconds hosted offline gap,
+external queue latency, transient Maven dependency-resolution incident, Windows Application
+Control/pre-commit incident, Android setup/cache overhead, 9–10 minute Release Build, upstream
+workflow-file publication permission mismatch, and missing sanitized `git push --porcelain`
+diagnostics as evidence rather than folding them into CP4B.2.
 
 ## T0-1 CP4A behavioral execution audit
 
-Status: **COMPLETE — ANALYSIS ONLY**
+Status: **COMPLETE — BEHAVIORAL EXECUTION AUDITED**
 
 Repository baseline: `d36f39342d1d2a003a6e52fca30d4d11a65391ba`
 
@@ -86,7 +183,7 @@ access was used read-only.
 |---|---|---|---|
 | APK-producing, high risk | validation `20260912-020713-19588`; prepare `20260912-021616-20800` and child validation `20260912-021622-20800` | PR #46 run `34657784835`; main/release run `34673534555`; immutable `downstream-build-29` | Complete working-tree-to-published-APK chain plus failed-job rerun |
 | Normal application, targeted PR | validation `20260912-145800-24548` | PR #51 run `34692407899`; main/release run `34692693013` | Shows targeted PR followed by authoritative main Full and Release |
-| Non-APK high-risk control | validation `20260913-195152-21292`; prepare `20260913-200344-12912` and child `20260913-200359-12912` | PR #59 run `34770840853`; main run `34771225286` | Shows release skip and current exact-tree reuse defect |
+| Non-APK high-risk control | validation `20260913-195152-21292`; prepare `20260913-200344-12912` and child `20260913-200359-12912` | PR #59 run `34770840853`; main run `34771225286` | Shows release skip and the historical fail-safe exact-tree reuse defect repaired in CP4B.1 |
 | Successful exact-tree reuse | n/a | PR #42 evidence; main run `34613938306` | Proves reuse is implemented, not hypothetical |
 | Stable | n/a | run `34694610864` | Exact-byte Development-to-Stable promotion |
 | Hold | n/a | run `34690727709` | Emergency Stable withdrawal without rebuild/resign |
@@ -426,7 +523,7 @@ of the graph. Debug execution cannot substitute for Release assembly.
 |---|---|---|---|
 | Docs-only PR | PR changed-range hooks; usually no offline/Android; main all-hooks + all-offline + setup + Debug Full; release eligibility skips | Main Full cannot reuse because PR emitted no Full artifact | Safe but expensive |
 | Tooling-only normal risk | PR hooks + mapped offline, no Android; main broad suite + Debug Full; release skips | Main work is broader than PR and not reusable | Safe, conservative |
-| Tooling-only high risk | local/prepare often Full; PR Full; main should reuse; release skips | Local twice; PR/main broad tooling repeats; current name drift forces main Android rerun | Safe fallback; current efficiency defect |
+| Tooling-only high risk | local/prepare often Full; PR Full; main should reuse; release skips | Local twice; PR/main broad tooling repeats; the historical name drift forced main Android rerun before CP4B.1 | Safe fallback preserved; CP4B.1 restored exact-tree reuse |
 | Normal application change | local/prepare Standard targeted; PR targeted; main Full; Release if unpublished range is APK-relevant | Debug compile/tests run local, PR, main; no exact Full artifact from PR | Correct current model; candidate for authoritative PR Full when `releaseRequired=true` |
 | High-risk application/security change | local/prepare Full; PR Full; main exact-tree reuse/fallback | local broad repetition | Correct conservative boundary |
 | APK-producing change | main Full/reuse, then distinct Release Build, isolated Sign, Publish | Release is not Debug duplication; handoff checks are security-essential | Correct and live proven |
@@ -562,8 +659,9 @@ of the graph. Debug execution cannot substitute for Release assembly.
 
 ### Preconditions and blockers for CP4B
 
-1. **COMPLETE IN CP4B.1:** correct the reuse step-name contract and add YAML-to-consumer regression
-   coverage. Hosted exact-tree acceptance remains pending before the repair is declared live proven.
+1. **COMPLETE / HOSTED VALIDATED IN CP4B.1:** correct the reuse step-name contract, add
+   YAML-to-consumer regression coverage, and prove exact-tree reuse through PR #60 and protected
+   main without fallback Gradle Full.
 2. Decide the intended authoritative composition of “Full”: PR Full currently means full Android
    but can run only a mapped offline suite, while main always supplies the all-offline layer. Any
    removal of main broad tooling must first move or authenticate that evidence.
@@ -574,9 +672,10 @@ of the graph. Debug execution cannot substitute for Release assembly.
    only if a distinct remaining consumer is demonstrated.
 5. Keep Release/Sign/Publish and Stable/Hold boundary checks out of the duplicate-test cleanup.
 
-The narrow exact-tree reuse contract repair is implemented. After hosted acceptance, the smallest
-safe CP4B.2 step is the design decision for which committed PR paths must produce authoritative Full
-evidence. Only then should local/prepare duplication or blanket main execution change.
+The narrow exact-tree reuse contract repair is complete and hosted validated. The smallest safe
+CP4B.2 step is defining complete policy evidence for both non-Android and Full committed PR paths.
+Only after that replacement is implemented and hosted-proven may local/prepare duplication or
+blanket main execution change.
 
 
 ---
@@ -1031,19 +1130,19 @@ external action, and owner checkpoint.
 
 | ID | Source / current problem | Target and dependency/risk | Validation / external action | CP |
 |---|---|---|---|---|
-| L01 — IMPLEMENTED / FOCUSED VALIDATED | Stable workflow display repeats repository prefix | `Stable Promotion`; tests/docs only, file unchanged | Focused presentation tests pass; hosted display acceptance pending | CP3 |
-| L02 — IMPLEMENTED / FOCUSED VALIDATED | Upstream workflow display repeats prefix and run exposes raw `workflow_dispatch` | `Upstream Synchronization`; `Upstream check · Manual/Scheduled` | Focused presentation tests pass; natural/manual hosted acceptance pending | CP3 |
-| L03 — IMPLEMENTED / FOCUSED VALIDATED | Signing Diagnostic repeats prefix | `Signing Diagnostic`; artifacts/file unchanged | Focused signing/presentation tests pass; hosted display acceptance pending | CP3 |
-| L04 — IMPLEMENTED / FOCUSED VALIDATED | Setup/composite and safe step labels are inconsistent (`Setup`, `Get Release`) | Natural verb/object labels without changing action paths or job IDs | YAML/static tests pass | CP3 |
+| L01 — CP3 COMPLETE / HOSTED VALIDATED | Stable workflow display repeats repository prefix | `Stable Promotion`; tests/docs only, file unchanged | Focused presentation tests pass; supported hosted display observed | CP3 |
+| L02 — CP3 COMPLETE / HOSTED VALIDATED | Upstream workflow display repeats prefix and run exposes raw `workflow_dispatch` | `Upstream Synchronization`; `Upstream check · Manual/Scheduled` | Focused presentation tests pass; supported hosted display observed | CP3 |
+| L03 — CP3 COMPLETE / HOSTED VALIDATED | Signing Diagnostic repeats prefix | `Signing Diagnostic`; artifacts/file unchanged | Focused signing/presentation tests pass; supported hosted display observed | CP3 |
+| L04 — CP3 COMPLETE / HOSTED VALIDATED | Setup/composite and safe step labels are inconsistent (`Setup`, `Get Release`) | Natural verb/object labels without changing action paths or job IDs | YAML/static tests pass; hosted presentation accepted at checkpoint level | CP3 |
 
 ### SUMMARY / COLLAPSE (7)
 
 | ID | Source / current problem | Target and dependency/risk | Validation / external action | CP |
 |---|---|---|---|---|
-| S01 — IMPLEMENTED / FOCUSED VALIDATED | `ci.yml` PR policy summary is late and classifier-centric | Early plain-language plan + final result; raw policy in details | Static/output tests pass; hosted PR rendering pending | CP3 |
-| S02 — IMPLEMENTED / FOCUSED VALIDATED | PR APK/main reuse summaries expose all identities equally | Main result/link visible; SHA/tree/run/artifact in `<details>` | Exact evidence assertions pass; hosted reuse/fallback rendering pending | CP3 |
-| S03 — IMPLEMENTED / FOCUSED VALIDATED | `mosaic_development_release.record_eligibility` emits full paths/default | One build/no-build sentence; paths and policy evidence collapsed | Release classifier/output tests pass; live non-APK/APK presentation pending | CP3 |
-| S04 — IMPLEMENTED / FOCUSED VALIDATED | `hosted_upstream.upstream_summary` exposes policy tables and full JSON | Counts/attention/action first; lists/navigation/details collapsed; artifact remains complete | Hostile-input, quiet-surface and outcome tests pass; natural run pending | CP3 |
+| S01 — CP3 COMPLETE / HOSTED VALIDATED | `ci.yml` PR policy summary is late and classifier-centric | Early plain-language plan + final result; raw policy in details | Static/output tests pass; hosted PR rendering observed | CP3 |
+| S02 — CP3 COMPLETE / HOSTED VALIDATED | PR APK/main reuse summaries expose all identities equally | Main result/link visible; SHA/tree/run/artifact in `<details>` | Exact evidence assertions pass; hosted exact-tree reuse observed, with fallback retained by fixtures | CP3 |
+| S03 — CP3 COMPLETE / HOSTED VALIDATED | `mosaic_development_release.record_eligibility` emits full paths/default | One build/no-build sentence; paths and policy evidence collapsed | Release classifier/output tests pass; hosted non-APK presentation observed and APK paths remain live-proven elsewhere | CP3 |
+| S04 — CP3 COMPLETE / HOSTED VALIDATED | `hosted_upstream.upstream_summary` exposes policy tables and full JSON | Counts/attention/action first; lists/navigation/details collapsed; artifact remains complete | Hostile-input/quiet-surface fixtures and natural hosted Upstream runs observed | CP3 |
 | S05 | prepare-pr console and PR body repeat raw scope | `PR scope: N files`; paths/stats in logs and collapsed PR details | Disposable prepare-pr tests; no snapshot weakening | CP6 |
 | S06 — CP3 PRESENTATION IMPLEMENTED / CP8 SWEEP REMAINS | failure summaries name `$GITHUB_JOB` but not always action/remedy | Plain refusal/failure, mutation status, retry/forward-fix action visible | Current Stable/Hold/Signing/CI failures now state action; final cross-surface sweep remains CP8 | CP3/CP8 |
 | S07 — RECLASSIFIED AS OPERATIONAL | Upstream publication hides the actionable `git push --porcelain` rejection because stdout/stderr are captured but discarded | Bounded sanitized failure detail: operation, remote/refspec, exit, destination existence, rejection category/excerpt from both streams; never credentials | Requires subprocess/error-contract tests, not cosmetic summary editing | CP6 or T0-2 security |
@@ -1109,10 +1208,10 @@ DEFER TO T0-2 5** — **40 finite items**.
 2. **CP2 — Remove obsolete surfaces (complete / hosted validated):** deleted `main.yml` and
    `release.yml`, explicitly deferred AAB/store distribution, updated ownership/tests/docs
    atomically, and confirmed the resulting five-workflow Actions sidebar and non-APK main path.
-3. **CP3 — Low-risk names and summaries (implemented / focused validated):** removed redundant
+3. **CP3 — Low-risk names and summaries (complete / hosted validated):** removed redundant
    prefixes, translated primary decisions, added early summary lines, and collapsed technical
-   detail without touching `CI / Full validation`. Operator Full and hosted rendering/sidebar
-   acceptance remain before this checkpoint is accepted as complete.
+   detail without touching `CI / Full validation`. Repository Full passed, the change merged, and
+   the supported hosted rendering/sidebar presentation was observed.
 4. **CP4 — Process simplification:** eliminate redundant validation paths, simplify Signing
    Diagnostic input, and arm native auto-merge. This depends on CP3’s clear explanations and
    requires GitHub auto-merge enablement plus hosted exact-tree/fallback acceptance.
@@ -1162,10 +1261,11 @@ with the coordinated `CI / Full validation` machine-contract migration reserved 
 
 ## CP3 completion statement
 
-The low-risk presentation implementation is complete locally. The supported workflows now lead
+The low-risk presentation checkpoint is **COMPLETE / HOSTED VALIDATED**. The supported workflows now lead
 with intent, result, operator action, and next step, while technical classifier/provenance/path
 evidence remains available under collapsible details or in the existing machine artifact. The
 required check and delivery identities `CI`, `Full validation`, `Build Development Release`,
 `Sign Development`, and `Publish Development` are unchanged, as are all execution and security
-semantics. A repository Full run and hosted rendering/sidebar observation are the remaining
-acceptance evidence. Begin CP4 only after that gate is green and the CP3 branch is merged.
+semantics. Repository Full passed, the CP3 branch merged, and hosted rendering/sidebar presentation
+was observed. Alternate rare-path presentation remains fixture-protected and may be recorded
+opportunistically without reopening CP3.

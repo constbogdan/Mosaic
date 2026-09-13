@@ -1,10 +1,11 @@
-"""Reuse PR Full evidence only when GitHub and Git prove exact main-tree equality."""
+"""Reuse complete PR policy evidence only when GitHub and Git prove exact equality."""
 
 import argparse
 import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import urllib.error
 import urllib.parse
@@ -14,9 +15,19 @@ import urllib.request
 REPOSITORY = "constbogdan/Wholphin"
 WORKFLOW = ".github/workflows/ci.yml"
 JOB = "Full validation"
+CONTRACT = "pr-policy-v1"
+NON_ANDROID = "NON_ANDROID"
+ANDROID_FULL = "ANDROID_FULL"
+VALIDATION_CLASSES = {NON_ANDROID, ANDROID_FULL}
+CLASSIFY_STEP = "Choose PR validation path"
+PRE_COMMIT_STEP = "Check changed files"
+OFFLINE_STEP = "Run offline tooling checks"
 FULL_STEP = "Run Full validation"
+RECORD_STEP = "Record reusable PR validation evidence"
+UPLOAD_STEP = "Upload PR validation evidence"
 ARTIFACT_RE = re.compile(
-    r"wholphin-pr-(?P<pr>[1-9][0-9]*)-(?P<head>[0-9a-f]{40})-"
+    rf"wholphin-{CONTRACT}-(?P<class>non-android|android-full)-"
+    r"pr-(?P<pr>[1-9][0-9]*)-(?P<head>[0-9a-f]{40})-"
     r"tested-(?P<tested>[0-9a-f]{40})-tree-(?P<tree>[0-9a-f]{40})-"
     r"run-(?P<run>[1-9][0-9]*)-attempt-(?P<attempt>[1-9][0-9]*)"
 )
@@ -64,14 +75,18 @@ class GitHub:
         raise ValueError("GitHub validation-evidence pagination was incomplete")
 
 
-def artifact_name(pr, head, tested, tree, run, attempt):
+def artifact_name(validation_class, pr, head, tested, tree, run, attempt):
+    if validation_class not in VALIDATION_CLASSES:
+        raise ValueError("PR validation evidence requires a known validation class")
     values = (head, tested, tree)
     if any(not re.fullmatch(r"[0-9a-f]{40}", value) for value in values):
         raise ValueError("PR validation evidence requires exact Git identities")
     if any(not re.fullmatch(r"[1-9][0-9]*", str(value)) for value in (pr, run, attempt)):
         raise ValueError("PR validation evidence requires numeric PR/run identity")
+    class_name = validation_class.lower().replace("_", "-")
     return (
-        f"wholphin-pr-{pr}-{head}-tested-{tested}-tree-{tree}-"
+        f"wholphin-{CONTRACT}-{class_name}-pr-{pr}-{head}-"
+        f"tested-{tested}-tree-{tree}-"
         f"run-{run}-attempt-{attempt}"
     )
 
@@ -85,19 +100,57 @@ def record(root, env):
     if any(env.get(key) != value for key, value in expected.items()):
         raise ValueError("PR evidence requires the repository pull_request workflow")
     pr = env.get("PR_NUMBER", "")
+    base = env.get("PR_BASE_SHA", "")
     head = env.get("PR_HEAD_SHA", "")
     tested = env.get("GITHUB_SHA", "")
     run = env.get("GITHUB_RUN_ID", "")
     attempt = env.get("GITHUB_RUN_ATTEMPT", "")
+    validation_class = env.get("VALIDATION_CLASS", "")
+    if not re.fullmatch(r"[0-9a-f]{40}", base):
+        raise ValueError("PR validation evidence requires the exact base SHA")
     if env.get("GITHUB_REF") != f"refs/pull/{pr}/merge" or git(root, "rev-parse", "HEAD") != tested:
         raise ValueError("PR evidence checkout is not the exact synthetic merge ref")
+    if git(root, "show", "-s", "--format=%P", "HEAD").split() != [base, head]:
+        raise ValueError("PR evidence merge parents differ from the event base/head")
     tree = git(root, "rev-parse", "HEAD^{tree}")
-    name = artifact_name(pr, head, tested, tree, run, attempt)
+    name = artifact_name(validation_class, pr, head, tested, tree, run, attempt)
+    evidence = {
+        "contract": CONTRACT,
+        "repository": REPOSITORY,
+        "workflow": WORKFLOW,
+        "job": JOB,
+        "validationClass": validation_class,
+        "prNumber": int(pr),
+        "baseSha": base,
+        "headSha": head,
+        "testedSha": tested,
+        "testedTree": tree,
+        "runId": int(run),
+        "runAttempt": int(attempt),
+    }
+    evidence_path = Path(env["RUNNER_TEMP"]) / "mosaic-pr-validation-evidence"
+    evidence_path.mkdir(parents=True, exist_ok=False)
+    (evidence_path / "validation-evidence.json").write_text(
+        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    apk_path = env.get("PR_APK_PATH", "")
+    if validation_class == ANDROID_FULL:
+        apk = Path(apk_path)
+        if not apk.is_file() or not re.fullmatch(
+            r"Wholphin-default-debug-[A-Za-z0-9.-]+\.apk", apk.name
+        ):
+            raise ValueError("ANDROID_FULL evidence requires the validated universal Debug APK")
+        shutil.copy2(apk, evidence_path / apk.name)
+    elif apk_path:
+        raise ValueError("NON_ANDROID evidence must not include an Android APK")
     with Path(env["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
         output.write(f"artifact_name={name}\n")
+        output.write(f"evidence_path={evidence_path}\n")
+        output.write(f"validation_class={validation_class}\n")
+        output.write(f"validation_contract={CONTRACT}\n")
         output.write(f"tested_sha={tested}\n")
         output.write(f"tested_tree={tree}\n")
-    return {"artifactName": name, "testedSha": tested, "testedTree": tree}
+    return evidence | {"artifactName": name, "evidencePath": str(evidence_path)}
 
 
 def _single(items, reason):
@@ -176,9 +229,6 @@ def reuse_decision(root, api, env):
         ]
         if len(jobs) != 1:
             continue
-        steps = {step.get("name"): step.get("conclusion") for step in jobs[0].get("steps", [])}
-        if steps.get(FULL_STEP) != "success":
-            continue
         artifacts = api.pages(f"actions/runs/{run['id']}/artifacts", "artifacts")
         matches = []
         for artifact in artifacts:
@@ -199,9 +249,31 @@ def reuse_decision(root, api, env):
             ):
                 matches.append((artifact, match))
         if len(matches) == 1:
-            accepted.append((run, matches[0][0], matches[0][1]))
+            artifact, match = matches[0]
+            validation_class = match["class"].upper().replace("-", "_")
+            step_entries = jobs[0].get("steps", [])
 
-    run, artifact, match = _single(accepted, "required PR Full evidence is missing or ambiguous")
+            def conclusion(name):
+                values = [step.get("conclusion") for step in step_entries if step.get("name") == name]
+                return values[0] if len(values) == 1 else None
+
+            if any(
+                conclusion(name) != "success"
+                for name in (CLASSIFY_STEP, PRE_COMMIT_STEP, OFFLINE_STEP, RECORD_STEP, UPLOAD_STEP)
+            ):
+                continue
+            full_result = conclusion(FULL_STEP)
+            if (
+                validation_class == ANDROID_FULL and full_result != "success"
+            ) or (
+                validation_class == NON_ANDROID and full_result != "skipped"
+            ):
+                continue
+            accepted.append((run, artifact, match, validation_class))
+
+    run, artifact, match, validation_class = _single(
+        accepted, "required PR validation evidence is missing or ambiguous"
+    )
     tested_commit = api.call(f"git/commits/{match['tested']}")
     tested_parents = [item.get("sha") for item in tested_commit.get("parents", [])]
     if tested_parents != [pull["base"]["sha"], pull["head"]["sha"]]:
@@ -211,8 +283,12 @@ def reuse_decision(root, api, env):
     if match["tree"] != main_tree:
         raise ValueError("final main tree differs from the tested PR tree")
     return {
-        "reuseFull": True,
-        "reason": "authenticated successful PR Full tested the exact final main tree",
+        "reuseValidation": True,
+        "reason": (
+            f"authenticated successful PR {validation_class} policy tested the exact final main tree"
+        ),
+        "validationClass": validation_class,
+        "validationContract": CONTRACT,
         "mainTree": main_tree,
         "testedTree": match["tree"],
         "testedSha": match["tested"],
@@ -220,6 +296,7 @@ def reuse_decision(root, api, env):
         "runId": str(run["id"]),
         "runAttempt": str(run["run_attempt"]),
         "artifactId": str(artifact["id"]),
+        "artifactDigest": artifact["digest"],
     }
 
 
@@ -228,7 +305,7 @@ def decide(root, api, env):
         return reuse_decision(root, api, env)
     except (KeyError, OSError, TypeError, UnicodeError, ValueError) as error:
         return {
-            "reuseFull": False,
+            "reuseValidation": False,
             "reason": str(error),
             "mainTree": git(root, "rev-parse", "HEAD^{tree}"),
         }
@@ -236,11 +313,15 @@ def decide(root, api, env):
 
 def write_decision(result, env):
     with Path(env["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
-        output.write(f"reuse_full={str(result['reuseFull']).lower()}\n")
+        output.write(f"reuse_validation={str(result['reuseValidation']).lower()}\n")
         output.write(f"reason={result['reason']}\n")
         for source, target in (("mainTree", "main_tree"), ("testedTree", "tested_tree"),
                                ("testedSha", "tested_sha"), ("prNumber", "pr_number"),
-                               ("runId", "run_id"), ("runAttempt", "run_attempt")):
+                               ("runId", "run_id"), ("runAttempt", "run_attempt"),
+                               ("validationClass", "validation_class"),
+                               ("validationContract", "validation_contract"),
+                               ("artifactId", "artifact_id"),
+                               ("artifactDigest", "artifact_digest")):
             if result.get(source):
                 output.write(f"{target}={result[source]}\n")
 
