@@ -14,7 +14,7 @@ import urllib.request
 REPOSITORY = "constbogdan/Wholphin"
 WORKFLOW = ".github/workflows/ci.yml"
 JOB = "Full validation"
-FULL_STEP = "Run full validation"
+FULL_STEP = "Run Full validation"
 ARTIFACT_RE = re.compile(
     r"wholphin-pr-(?P<pr>[1-9][0-9]*)-(?P<head>[0-9a-f]{40})-"
     r"tested-(?P<tested>[0-9a-f]{40})-tree-(?P<tree>[0-9a-f]{40})-"
@@ -140,10 +140,11 @@ def reuse_decision(root, api, env):
     if parents != [pull["base"]["sha"], pull["head"]["sha"]]:
         raise ValueError("main merge parents differ from the associated PR")
 
-    workflow = api.call("actions/workflows/ci.yml")
+    workflow_endpoint = f"actions/workflows/{Path(WORKFLOW).name}"
+    workflow = api.call(workflow_endpoint)
     encoded_head = urllib.parse.quote(pull["head"]["sha"])
     runs = api.pages(
-        f"actions/workflows/ci.yml/runs?event=pull_request&head_sha={encoded_head}",
+        f"{workflow_endpoint}/runs?event=pull_request&head_sha={encoded_head}",
         "workflow_runs",
     )
     candidates = [
