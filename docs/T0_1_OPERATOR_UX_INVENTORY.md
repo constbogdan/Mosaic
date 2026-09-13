@@ -1,19 +1,20 @@
 # Baseline T0-1 operator UX, workflow, and presentation inventory
 
-Status: **CP4B.1 COMPLETE / HOSTED VALIDATED**
-Next: **CP4B.2 — define the authoritative PR validation evidence model**
+Status: **CP4B.2 IMPLEMENTED / HOSTED ACCEPTANCE PENDING**
+Next: **live-prove NON_ANDROID and ANDROID_FULL reuse before simplifying local validation**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
-CP4B.2 NEXT.**
+CP4B.2 IMPLEMENTED / HOSTED ACCEPTANCE PENDING.**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
 baseline; historical names in acceptance records are evidence, not active UX. CP2 removed only
 the two obsolete inherited workflow surfaces and updated their ownership contract. CP3 changed
 operator presentation without changing machine contracts. CP4A records the measured behavior
 from local edits through hosted validation and Development publication. CP4B.1 repaired and
-live-proved the exact-tree reuse selector contract exposed by that audit. CP4B.2 is the next
-checkpoint; no CP4B.2 behavior is implemented by this documentation update.
+live-proved the exact-tree reuse selector contract exposed by that audit. CP4B.2 implements the
+complete two-class PR policy contract; hosted acceptance is still required before later validation
+simplification begins.
 
 ## T0-1 CP4B.1 exact-tree reuse contract repair
 
@@ -51,10 +52,10 @@ or weakening the conservative fallback.
 
 ## T0-1 CP4B.2 boundary and approved direction
 
-Status: **NEXT — DESIGN/IMPLEMENTATION NOT STARTED**
+Status: **IMPLEMENTED / HOSTED ACCEPTANCE PENDING**
 
-CP4B.2 must establish the simplest complete PR evidence contract before removing any existing gate.
-The preferred architecture is broad hosted authority with coarse relevance gates:
+CP4B.2 establishes the simplest complete PR evidence contract before removing any later local gate.
+The implemented architecture is broad hosted authority with coarse relevance gates:
 
 ```text
 Working tree
@@ -85,6 +86,21 @@ authoritative test catalog or dependency-query system is therefore not justified
 complete offline suite once in authoritative PR CI and reconsider only if future hosted measurements
 justify the maintenance burden. Android is materially expensive and retains a coarse relevance gate.
 
+The versioned `pr-policy-v1` evidence contract has two classes. `NON_ANDROID` proves changed-range
+pre-commit plus the complete offline tooling suite. `ANDROID_FULL` proves those checks plus the
+complete defaultDebug compile, unit-test, and APK graph, and retains the validated Debug APK in the
+same evidence artifact. Unknown/unclassified, Android, and build scope map conservatively to
+`ANDROID_FULL`; only proven non-Android scope maps to `NON_ANDROID`.
+
+Evidence is accepted only from the exact repository and workflow, the unique successful PR run and
+`Full validation` job, the exact required step conclusions, and one unexpired artifact whose name,
+numeric identity, archive digest, run/attempt, PR/head, tested synthetic merge, parents, and tree all
+authenticate. The final protected-main tree must equal the tested tree. On an exact match, protected
+main may skip repository pre-commit, the complete offline suite, Android setup, and Gradle because
+the accepted PR class already proved its complete required policy. Any missing, failed, cancelled,
+expired, ambiguous, foreign, stale, mismatched, or otherwise uncertain evidence retains the complete
+protected-main fallback.
+
 Later simplification candidates, after replacement evidence is implemented and hosted-proven, are:
 remove operator Full from the normal publication recipe while retaining it on demand; remove
 mandatory prepare-pr Full and mandatory complete local offline execution; avoid authoritative
@@ -101,14 +117,13 @@ authentication, Publish freshness/idempotency, Stable Promotion and Hold Release
 upstream ownership/native topology, human REVIEW/conflict authority, and native failed-job recovery.
 These are distinct trust, byte, and authority boundaries rather than duplicate tests.
 
-CP4B.2 must define evidence for both non-Android and Full PR paths before blanket main validation can
-be removed. The controlled migration order is:
+The controlled migration order is:
 
 1. CP4B.1 reuse contract proven — **COMPLETE**.
-2. Define the complete PR evidence contract.
-3. Make PR CI authoritative for that contract.
-4. Teach protected main to reuse complete PR policy evidence.
-5. Live-prove tooling-only and Android paths.
+2. Define the complete PR evidence contract — **IMPLEMENTED**.
+3. Make PR CI authoritative for that contract — **IMPLEMENTED**.
+4. Teach protected main to reuse complete PR policy evidence — **IMPLEMENTED**.
+5. Live-prove tooling-only and Android paths — **NEXT**.
 6. Only then simplify local and prepare-pr validation.
 7. Remove superseded state, catalog, tests, and documentation.
 8. Simplify Signing Diagnostic separately.

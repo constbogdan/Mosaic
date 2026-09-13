@@ -11,13 +11,13 @@ authoritative; the obsolete Issue/journal/finalizer lifecycle is removed.
 minimal emergency Hold Release followed by forward-fix and zero-input Stable Promotion.
 
 **Baseline T0 — IN PROGRESS. T0-1 CP4B.1 exact-tree reuse contract repair is COMPLETE / HOSTED
-VALIDATED. CP4B.2 — Authoritative PR Validation Model — is next; it must define and prove complete
-PR policy evidence before simplifying any validation path.** Baseline T0 is an
+VALIDATED. CP4B.2 — Authoritative PR Validation Model — is IMPLEMENTED / HOSTED ACCEPTANCE PENDING;
+both evidence classes must be live-proven before simplifying any local validation path.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 Checkpoint sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
-CP4B.2 NEXT.**
+CP4B.2 IMPLEMENTED / HOSTED ACCEPTANCE PENDING.**
 
 1. **T0-1 — Cleanup & Operator Experience:** inventory every human-facing surface and machine
    contract before simplifying validation duplication, workflow/operator presentation, obsolete
@@ -76,21 +76,22 @@ CP4B.1 repaired the case-sensitive `Run Full validation` versus `Run full valida
 contract and added independent workflow-YAML-to-consumer coverage. PR #60 and required PR Full run
 `34778154476` attempt `1` live-proved exact-tree evidence reuse: protected main reported that the
 exact tree had passed, skipped fallback Gradle Full, classified the range tooling-only, and skipped
-Sign/Publish. CP4B.2 must now define complete policy evidence for both non-Android and Full PR paths,
-because PR Full may currently select a mapped offline subset while main runs all offline tests.
+Sign/Publish. CP4B.2 now defines complete `NON_ANDROID` and `ANDROID_FULL` policy evidence, and every
+PR runs the complete offline suite rather than a mapped subset.
 Release assembly, isolated signing, Stable/Hold reauthentication, and fail-closed publication checks
 remain distinct authority boundaries rather than duplicate validation.
 
-The approved CP4B.2 direction is broad hosted authority with coarse gates: every PR runs
+The implemented CP4B.2 model is broad hosted authority with coarse gates: every PR runs
 changed-range hygiene and the complete offline suite; Android/build/unknown scope also runs Full
-Debug; every successful path emits exact tested-tree policy evidence; protected main reuses an exact
-match and otherwise runs the complete conservative fallback. Prefer deleting duplicate stages and
+Debug; successful PRs emit versioned exact tested-tree policy evidence as `NON_ANDROID` or
+`ANDROID_FULL`; protected main reuses an exact authenticated match and otherwise runs the complete
+conservative fallback. Prefer deleting duplicate stages and
 state over making them smarter. The observed hosted offline suite is commonly tens of seconds
 (approximately 18–24 seconds for about 232 tests), so an authoritative fine-grained test catalog is
 not currently justified; retain Android as the materially expensive coarse gate.
 
-Migration order is fixed: define complete PR evidence; make PR CI authoritative; teach main to reuse
-it; live-prove tooling-only and Android paths; only then simplify local/prepare-pr validation; remove
+Migration order is fixed: complete PR evidence, authoritative PR CI, and main reuse are implemented;
+live-prove tooling-only and Android paths; only then simplify local/prepare-pr validation; remove
 superseded state/tests/docs afterward; simplify Signing Diagnostic separately. Preserve exact-tree
 and required-CI trust, main fallback, final Release Build, version/sign/artifact/publication
 boundaries, Stable/Hold authorization, upstream native Git/human authority, and native failed-job

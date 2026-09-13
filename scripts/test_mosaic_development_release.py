@@ -367,9 +367,14 @@ class PublisherTests(unittest.TestCase):
         self.assertIn('mosaic_development_release.py ci-manifest', publish)
         self.assertIn('mosaic_development_release.py ci-publish', publish)
         self.assertNotIn('Build unsigned Development Release APK', validation)
-        self.assertEqual(ci.count('./gradlew '), 3)
-        self.assertIn("steps.main-validation-reuse.outputs.reuse_full != 'true'", ci)
-        self.assertIn("if: github.event_name == 'pull_request' && steps.pr-validation.outputs.validation_mode == 'targeted-android'", ci)
+        self.assertEqual(ci.count('./gradlew '), 2)
+        self.assertIn(
+            "steps.main-validation-reuse.outputs.reuse_validation != 'true'", ci
+        )
+        self.assertNotIn('Run targeted Android validation', ci)
+        self.assertIn(
+            "steps.pr-validation.outputs.validation_mode != 'non-android'", ci
+        )
         self.assertIn(':app:assembleDefaultRelease -PmosaicPublication=true --no-daemon --no-parallel --max-workers=1', ci)
         self.assertIn('MOSAIC_ARTIFACT_PREFIX: mosaic-main-ci', ci)
 

@@ -8,13 +8,13 @@
 
 `Baseline T0 — IN PROGRESS`
 
-`T0-1 CP4B.1 — COMPLETE / HOSTED VALIDATED`
+`T0-1 CP4B.2 — IMPLEMENTED / HOSTED ACCEPTANCE PENDING`
 
-`Next: T0-1 CP4B.2 — Authoritative PR Validation Model`
+`Next: live-prove NON_ANDROID and ANDROID_FULL exact-tree reuse`
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
-`CP4B.2 NEXT`.
+`CP4B.2 IMPLEMENTED / HOSTED ACCEPTANCE PENDING`.
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -58,22 +58,30 @@ already passed on PR #60.` Fallback Gradle Full did not execute. The unpublished
 Development Release 10s, Sign/Publish skipped, and 1m51s total. CP4B.1 is therefore **COMPLETE /
 HOSTED VALIDATED** with conservative fallback behavior intact.
 
-### T0-1 CP4B.2 approved boundary
+### T0-1 CP4B.2 authoritative PR policy
 
-CP4B.2 is next but not implemented. Its goal is the simplest complete authoritative PR evidence
-contract, not optimization of the current duplicate pipeline. The leading model is: every PR runs
+CP4B.2 implements the simplest complete authoritative PR evidence contract without changing later
+Release, signing, publication, Stable, Hold, or upstream boundaries. Every PR runs
 changed-range hygiene and the complete offline tooling suite; Android/build/unknown scope also runs
 Full Debug, while proven non-Android scope does not; every successful path emits exact-tree evidence
 covering its complete required policy; protected main reuses exact matching evidence and otherwise
 runs the complete conservative fallback.
+
+The `pr-policy-v1` contract has two evidence classes: `NON_ANDROID` covers changed-range pre-commit
+and the complete offline suite; `ANDROID_FULL` adds complete defaultDebug compile, unit tests, and
+APK assembly and carries the validated Debug APK. Evidence binds repository, workflow/job and
+required step results, class, PR/base/head, synthetic merge SHA/tree/parents, run/attempt, and the
+unique unexpired artifact identity/digest. Main accepts it only when the final tree is identical.
+Any uncertainty runs the existing all-files pre-commit, all-offline, Android setup, and Full Gradle
+fallback.
 
 Prefer deleting stages and state over making them smarter. Do not build an authoritative
 fine-grained test catalog while the complete hosted offline suite remains a cheap coarse gate
 (observed around 18–24 seconds for approximately 232 tests, not a guaranteed constant). Android
 remains a coarse relevance gate. Local logs are diagnostics, never authoritative attestations.
 
-Migration order: define complete PR evidence; make PR CI authoritative; teach main to reuse the
-complete policy; live-prove tooling-only and Android paths; only then simplify local/prepare-pr
+The implementation is ready for focused/offline verification, then one natural non-Android PR and
+one natural Android/build PR must live-prove both classes. Only then simplify local/prepare-pr
 validation; remove superseded state/tests/docs afterward; simplify Signing Diagnostic separately.
 Preserve exact scope/tree review, required PR CI, exact-tree authentication, main fallback,
 final-context Release Build, version allocation, signing and artifact boundaries, Publish
@@ -1764,13 +1772,16 @@ fail the step instead of silently claiming availability. The upload follows succ
 Full validation and retains the APK for seven days with no extra ZIP compression.
 
 Artifact name:
-`wholphin-pr-<PR>-<head-SHA>-tested-<merge-SHA>-tree-<tree-SHA>-run-<run-ID>-attempt-<run-attempt>`.
+`wholphin-pr-policy-v1-android-full-pr-<PR>-<head-SHA>-tested-<merge-SHA>-tree-<tree-SHA>-run-<run-ID>-attempt-<run-attempt>`.
 Head SHA identifies the proposal; the tested SHA is `github.sha`, the default PR merge
 checkout, and may differ. The tested tree is retained for protected-main Full-evidence reuse
 and independently authenticated before use. The job summary records these values, PR base SHA, PR number, run
 ID/attempt, APK path, retention and Debug installation caveats. Its download link
 comes directly from upload-artifact's artifact-url output and requires GitHub access.
 Find it through the PR's Full validation check / Actions run summary.
+
+The Android artifact also contains `validation-evidence.json`. Proven non-Android PRs emit the
+corresponding `wholphin-pr-policy-v1-non-android-...` artifact with the manifest but no APK.
 
 ```text
 gh run download <run-id> --repo constbogdan/Wholphin --name <artifact-name>

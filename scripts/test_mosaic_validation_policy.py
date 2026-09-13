@@ -97,7 +97,8 @@ class ValidationPolicyTest(unittest.TestCase):
             "app/src/release/java/com/github/damontecres/wholphin/services/RealProvider.kt",
         ):
             with self.subTest(path=path):
-                self.assertEqual(policy.FULL, policy.plan_paths([path])["validationMode"])
+                plan = policy.plan_paths([path])
+                self.assertEqual(policy.FULL, plan["validationMode"])
 
     def test_unknown_path_uses_conservative_full(self):
         plan = policy.plan_paths(["unexpected/new-boundary.file"])
@@ -214,21 +215,30 @@ class ValidationIntegrationContractTest(unittest.TestCase):
         self.assertEqual(1, sum(line == ".logs/" for line in ignore.splitlines()))
         self.assertIn("!.vscode/tasks.json", ignore)
 
-    def test_ci_has_tiered_pr_summary_and_keeps_main_i02_boundary(self):
+    def test_ci_has_authoritative_pr_policy_and_keeps_main_i02_boundary(self):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text()
         self.assertIn("Choose PR validation path", workflow)
         self.assertIn("Explain PR validation plan", workflow)
-        self.assertIn("Full validation required", workflow)
-        self.assertIn("complete release validation is still needed.", workflow)
+        self.assertIn("Android Full validation required", workflow)
         self.assertIn("No Development release is expected from this PR alone.", workflow)
         self.assertIn("Selected PR checks passed", workflow)
         self.assertIn("Confirm this required job is green", workflow)
         self.assertIn("<summary>Technical details</summary>", workflow)
         self.assertIn('git show "$BASE_SHA:scripts/mosaic_validation_policy.py"', workflow)
         self.assertIn("First rollout cannot trust a policy absent from base; require Full.", workflow)
-        self.assertIn("Run targeted Android validation", workflow)
+        self.assertNotIn("Run targeted Android validation", workflow)
+        self.assertIn(
+            "python -B scripts/run_offline_tests.py --pattern 'test_*.py'", workflow
+        )
+        self.assertIn(
+            "steps.pr-validation.outputs.validation_mode != 'non-android'", workflow
+        )
+        self.assertIn("Record reusable PR validation evidence", workflow)
+        self.assertIn("Upload PR validation evidence", workflow)
         self.assertIn("GITHUB_STEP_SUMMARY", workflow)
-        self.assertIn("steps.main-validation-reuse.outputs.reuse_full != 'true'", workflow)
+        self.assertIn(
+            "steps.main-validation-reuse.outputs.reuse_validation != 'true'", workflow
+        )
         self.assertIn("Build unsigned Development Release APK", workflow)
         self.assertIn("needs.release-build.outputs.release_required == 'true'", workflow)
         self.assertFalse((ROOT / ".github/workflows/mosaic-development-release.yml").exists())
