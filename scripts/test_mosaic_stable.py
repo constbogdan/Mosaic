@@ -318,9 +318,11 @@ class StableTests(unittest.TestCase):
         self.assertNotIn('MOSAIC_BUILD', workflow)
         self.assertNotIn('MOSAIC_SOURCE_SHA', workflow)
         self.assertNotIn('MOSAIC_APK_SHA256', workflow)
-        self.assertIn('Ready to release: [%s](%s) · ✓ Authenticated', verify)
+        self.assertIn('## Ready to release: [%s](%s)', verify)
+        self.assertIn('Waiting for approval — authorization is required before Stable publication.', verify)
+        self.assertIn('<summary>Technical details</summary>', verify)
         self.assertIn('environment: release-promote', publisher)
-        self.assertIn('Reauthenticate current Development', publisher)
+        self.assertIn('Reauthenticate Development', publisher)
 
 
 if __name__ == '__main__':

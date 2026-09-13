@@ -42,7 +42,7 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: '3.14'
-      - name: Classify PR validation
+      - name: Choose PR validation path
         if: github.event_name == 'pull_request'
         id: pr-validation
         env:
@@ -67,19 +67,66 @@ jobs:
             # First rollout cannot trust a policy absent from base; require Full.
             python -B scripts/mosaic_validation_policy.py "${policy_args[@]}" --force-full
           fi
-      - name: Run changed-range pre-commit
+      - name: Explain PR validation plan
+        if: github.event_name == 'pull_request' && steps.pr-validation.outcome == 'success'
+        env:
+          RELEASE_RELEVANCE: ${{ steps.pr-validation.outputs.release_relevance }}
+          RELEASE_REQUIRED: ${{ steps.pr-validation.outputs.release_required }}
+          VALIDATION_RISK: ${{ steps.pr-validation.outputs.validation_risk }}
+          VALIDATION_MODE: ${{ steps.pr-validation.outputs.validation_mode }}
+          CHANGED_PATH_COUNT: ${{ steps.pr-validation.outputs.changed_path_count }}
+          REASON: ${{ steps.pr-validation.outputs.reason }}
+        run: |
+          python - <<'PY'
+          import os
+
+          e = os.environ
+          mode = e['VALIDATION_MODE']
+          relevance = e['RELEASE_RELEVANCE']
+          if mode == 'full':
+              headline = 'Full validation required — complete release validation is still needed.'
+              next_step = 'Next: check changed files, run offline tooling tests, then run Full validation.'
+          elif mode == 'targeted-android':
+              headline = 'Focused Android validation selected — relevant Kotlin and JVM checks will run.'
+              next_step = 'Next: check changed files, run mapped offline tests, then compile and test the affected Android behavior.'
+          else:
+              headline = 'Application validation not required — this change does not affect Android application code.'
+              next_step = 'Next: check the changed files and run any mapped offline tooling tests.'
+          if relevance == 'apk-relevant':
+              change = 'This change can affect the installed application.'
+          elif relevance == 'android-validation-only':
+              change = 'This change needs Android checks but does not change the published APK.'
+          elif relevance in {'docs-only', 'tooling-only'}:
+              change = 'This change does not affect the published application.'
+          else:
+              change = 'The change type is uncertain, so validation remains conservative.'
+          release = ('A Development release is expected after merge.' if e['RELEASE_REQUIRED'] == 'true'
+                     else 'No Development release is expected from this PR alone.')
+          lines = [
+              '## Validation plan', '', headline, '', change, release, '', next_step, '',
+              '<details>', '<summary>Technical details</summary>', '',
+              f"Release relevance: `{relevance}`  ",
+              f"Validation risk: `{e['VALIDATION_RISK']}`  ",
+              f"Selected path: `{mode}`  ",
+              f"Changed paths: `{e['CHANGED_PATH_COUNT']}`  ",
+              f"Policy reason: {e['REASON']}", '', '</details>',
+          ]
+          with open(e['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write('\n'.join(lines) + '\n')
+          PY
+      - name: Check changed files
         if: github.event_name == 'pull_request'
         id: pr-pre-commit
         uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
         with:
           extra_args: --from-ref ${{ github.event.pull_request.base.sha }} --to-ref ${{ github.sha }}
-      - name: Run repository-wide pre-commit
+      - name: Check repository formatting
         if: github.event_name != 'pull_request'
         id: full-pre-commit
         uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
         with:
           extra_args: --all-files
-      - name: Test hosted upstream safety and version allocation (offline fixtures)
+      - name: Run offline tooling checks
         if: github.event_name != 'pull_request' || steps.pr-validation.outputs.validation_mode == 'full' || steps.pr-validation.outputs.offline_test_pattern != ''
         id: offline-tests
         env:
@@ -87,17 +134,17 @@ jobs:
         run: |
           pattern="${OFFLINE_TEST_PATTERN:-test_*.py}"
           python -B scripts/run_offline_tests.py --pattern "$pattern"
-      - name: Determine protected-main Debug validation path
+      - name: Check for reusable PR Full validation
         if: github.repository == 'constbogdan/Wholphin' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_protected
         id: main-validation-reuse
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: python -B scripts/mosaic_validation_reuse.py reuse
-      - name: Setup
+      - name: Set up Android validation
         if: github.event_name != 'pull_request' || steps.pr-validation.outputs.validation_mode != 'non-android'
         uses: ./.github/actions/setup
-      - name: Run full validation
+      - name: Run Full validation
         if: >-
           (github.event_name == 'pull_request' && steps.pr-validation.outputs.validation_mode == 'full') ||
           (github.event_name != 'pull_request' && steps.main-validation-reuse.outputs.reuse_full != 'true')
@@ -120,7 +167,7 @@ jobs:
             [[ -n "$test_filter" ]] && args+=(--tests "$test_filter")
           done
           ./gradlew "${args[@]}" --no-daemon
-      - name: Locate validated PR universal Debug APK
+      - name: Locate validated PR test APK
         if: success() && github.event_name == 'pull_request' && steps.pr-validation.outputs.validation_mode == 'full'
         id: pr-apk
         run: |
@@ -149,7 +196,7 @@ jobs:
               output.write(f'tested_sha={tested_sha}\n')
               output.write(f'tested_tree={tested_tree}\n')
           PY
-      - name: Record exact PR Full evidence identity
+      - name: Record reusable PR Full evidence
         if: success() && github.event_name == 'pull_request' && steps.pr-validation.outputs.validation_mode == 'full'
         id: pr-full-evidence
         env:
@@ -166,7 +213,7 @@ jobs:
           retention-days: 7
           compression-level: 0
           if-no-files-found: error
-      - name: Summarize PR test APK
+      - name: Show PR test APK
         if: success() && github.event_name == 'pull_request' && steps.pr-validation.outputs.validation_mode == 'full'
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -183,28 +230,30 @@ jobs:
           e = os.environ
           name = e['ARTIFACT_NAME']
           lines = [
-              '## PR test APK available',
-              f'Artifact: [{name}]({e["ARTIFACT_URL"]})',
-              f'PR: {e["PR_NUMBER"]}',
-              f'Source/head SHA: `{e["PR_HEAD_SHA"]}`',
-              f'Tested SHA: `{e["GITHUB_SHA"]}` (PR merge checkout)',
-              f'Tested tree: `{e["TESTED_TREE"]}`',
-              f'Base SHA: `{e["PR_BASE_SHA"]}`',
-              f'Workflow run: {e["GITHUB_RUN_ID"]}, attempt: {e["GITHUB_RUN_ATTEMPT"]}',
-              f'APK: `{e["APK_PATH"]}`',
-              'Retention: 7 days',
-              'Universal defaultDebug APK reused from successful Full validation; no rebuild.',
-              'Debug installs separately from Release Wholphin. Debug signing keys may differ between builds; an in-place Debug update is not guaranteed.',
-              'Download the artifact from this link or the Actions run, extract it, then install the APK:',
-              '```text',
+              '## PR test APK ready', '',
+              f'[Download the universal Debug APK]({e["ARTIFACT_URL"]})', '',
+              'This is the APK produced by successful Full validation; it was not rebuilt.', '',
+              ('Debug installs separately from Release Wholphin. Debug signing keys may differ '
+               'between builds, so an in-place Debug update is not guaranteed.'), '',
+              '<details>', '<summary>Install commands</summary>', '', '```text',
               f'gh run download {e["GITHUB_RUN_ID"]} --repo {e["GITHUB_REPOSITORY"]} --name {name}',
               f'adb install -r "{e["APK_PATH"].rsplit("/", 1)[-1]}"',
-              '```',
+              '```', '', '</details>', '',
+              '<details>', '<summary>Technical details</summary>', '',
+              f'Artifact: `{name}`  ',
+              f'PR: `{e["PR_NUMBER"]}`  ',
+              f'Source/head SHA: `{e["PR_HEAD_SHA"]}`  ',
+              f'Tested SHA: `{e["GITHUB_SHA"]}` (PR merge checkout)  ',
+              f'Tested tree: `{e["TESTED_TREE"]}`  ',
+              f'Base SHA: `{e["PR_BASE_SHA"]}`  ',
+              f'Workflow run: `{e["GITHUB_RUN_ID"]}`, attempt `{e["GITHUB_RUN_ATTEMPT"]}`  ',
+              f'APK: `{e["APK_PATH"]}`  ',
+              'Retention: 7 days', '', '</details>',
           ]
           with open(e['GITHUB_STEP_SUMMARY'], 'a') as summary:
-              summary.write('\n\n'.join(lines[:-4]) + '\n\n' + '\n'.join(lines[-4:]) + '\n')
+              summary.write('\n'.join(lines) + '\n')
           PY
-      - name: Summarize protected-main Debug validation decision
+      - name: Explain protected-main validation result
         if: always() && github.event_name != 'pull_request'
         env:
           REUSE: ${{ steps.main-validation-reuse.outputs.reuse_full }}
@@ -225,24 +274,37 @@ jobs:
               lines = [
                   '## Protected-main validation',
                   '',
-                  'Debug Full validation: **reused from PR**',
-                  f"Tested tree: `{e['TESTED_TREE']}`",
-                  f"Main tree: `{e['MAIN_TREE']}`",
-                  f"Required PR Full: PR #{e['PR_NUMBER']}, run `{e['RUN_ID']}`, attempt `{e['RUN_ATTEMPT']}`",
+                  f"Full validation reused — this exact tree already passed on PR #{e['PR_NUMBER']}.",
+                  '',
+                  'No action is required. Development release eligibility will be checked next.',
+                  '',
+                  '<details>', '<summary>Technical details</summary>', '',
+                  f"Tested tree: `{e['TESTED_TREE']}`  ",
+                  f"Main tree: `{e['MAIN_TREE']}`  ",
+                  f"Required PR Full: run `{e['RUN_ID']}`, attempt `{e['RUN_ATTEMPT']}`",
+                  '', '</details>',
               ]
           else:
               reason = e['REASON'] or ('reuse inspection failed; conservative fallback' if e['REUSE_STEP'] == 'failure' else 'event is not an eligible PR merge')
+              result = e['FULL_RESULT'] or 'not completed'
               lines = [
                   '## Protected-main validation',
                   '',
-                  'Debug Full validation: **executed on main**',
+                  ('Full validation passed on protected main.' if result == 'success'
+                   else 'Full validation was required on protected main and did not pass.'),
+                  '',
                   f'Reason: {reason}',
-                  f"Full result: `{e['FULL_RESULT']}`",
+                  '',
+                  ('No action is required. Development release eligibility will be checked next.'
+                   if result == 'success' else 'Fix the failed validation step before publication can continue.'),
+                  '',
+                  '<details>', '<summary>Technical details</summary>', '',
+                  f"Full result: `{result}`", '', '</details>',
               ]
           with open(e['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
               summary.write('\n'.join(lines) + '\n')
           PY
-      - name: Summarize PR validation policy
+      - name: Show PR validation result
         if: always() && github.event_name == 'pull_request'
         env:
           RELEASE_RELEVANCE: ${{ steps.pr-validation.outputs.release_relevance }}
@@ -261,28 +323,46 @@ jobs:
           mode = e['VALIDATION_MODE'] or 'classification-failed'
           def mark(value):
               return 'PASS' if value == 'success' else ('SKIP' if value in {'', 'skipped'} else value.upper())
+          results = [e['PRE_COMMIT_RESULT']]
+          if e['OFFLINE_RESULT'] not in {'', 'skipped'}:
+              results.append(e['OFFLINE_RESULT'])
+          if mode == 'targeted-android':
+              results.append(e['TARGETED_RESULT'])
+          elif mode == 'full':
+              results.append(e['FULL_RESULT'])
+          passed = mode != 'classification-failed' and all(value == 'success' for value in results)
           lines = [
-              '## Mosaic PR validation',
+              '## Selected PR checks passed' if passed else '## PR validation needs attention',
               '',
-              f"Release relevance: **{e['RELEASE_RELEVANCE'] or 'unknown'}**  ",
-              f"Validation risk: **{e['VALIDATION_RISK'] or 'high'}**  ",
-              f"Selected path: **{mode}**  ",
-              f"Changed paths: **{e['CHANGED_PATH_COUNT'] or 'unknown'}**",
+              ('The selected checks completed successfully.' if passed
+               else 'One or more required checks did not complete successfully.'),
               '',
-              '### Checks',
+              ('Confirm this required job is green, then review the PR and merge only when satisfied.' if passed
+               else 'Inspect the failed check, correct the problem, and rerun validation.'),
+              '',
+              '### Results',
               f"- {mark(e['PRE_COMMIT_RESULT'])}: changed-range pre-commit",
-              f"- {mark(e['OFFLINE_RESULT'])}: offline workflow/Python tests",
           ]
+          if e['OFFLINE_RESULT'] not in {'', 'skipped'}:
+              lines.append(f"- {mark(e['OFFLINE_RESULT'])}: offline workflow/Python tests")
           if mode == 'targeted-android':
               lines.append(f"- {mark(e['TARGETED_RESULT'])}: Kotlin compile + focused JVM tests")
-              lines.append('- DEFERRED: Full defaultDebug validation remains authoritative on protected main')
+              lines.append('- Protected main will run or authenticate the authoritative Full validation gate')
           elif mode == 'full':
               lines.append(f"- {mark(e['FULL_RESULT'])}: Full defaultDebug validation")
           elif mode == 'non-android':
-              lines.append('- NOT REQUIRED: Android validation')
-              lines.append('- DEFERRED: protected main remains the authoritative Full gate')
+              lines.append('- NOT REQUIRED: Android application validation')
+              lines.append('- Protected main remains the authoritative Full validation gate')
           else:
               lines.append('- FAIL: conservative validation selection was unavailable')
+          lines += [
+              '', '<details>', '<summary>Technical details</summary>', '',
+              f"Release relevance: `{e['RELEASE_RELEVANCE'] or 'unknown'}`  ",
+              f"Validation risk: `{e['VALIDATION_RISK'] or 'high'}`  ",
+              f"Selected path: `{mode}`  ",
+              f"Changed paths: `{e['CHANGED_PATH_COUNT'] or 'unknown'}`",
+              '', '</details>',
+          ]
           with open(e['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
               summary.write('\n'.join(lines) + '\n')
           PY
@@ -324,24 +404,24 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: '3.14'
-      - name: Classify complete unpublished Development range
+      - name: Decide whether a Development build is required
         id: eligibility
         env:
           GH_TOKEN: ${{ github.token }}
         run: python -B scripts/mosaic_development_release.py ci-eligibility
-      - name: Setup Release build
+      - name: Set up Release build
         if: steps.eligibility.outputs.release_required == 'true'
         uses: ./.github/actions/setup
-      - name: Build authoritative unsigned Release after validation
+      - name: Build unsigned Development Release APK
         if: steps.eligibility.outputs.release_required == 'true'
         run: ./gradlew :app:assembleDefaultRelease -PmosaicPublication=true --no-daemon --no-parallel --max-workers=1
-      - name: Prepare authoritative unsigned Release artifact
+      - name: Prepare authenticated unsigned APK
         if: steps.eligibility.outputs.release_required == 'true'
         id: prepared
         env:
           MOSAIC_ARTIFACT_PREFIX: mosaic-main-ci
         run: python -B scripts/mosaic_signing_exercise.py prepare --directory "$RUNNER_TEMP/mosaic-main-release"
-      - name: Upload authoritative unsigned Release artifact
+      - name: Upload authenticated unsigned APK
         if: steps.eligibility.outputs.release_required == 'true'
         id: unsigned
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -351,7 +431,7 @@ jobs:
           retention-days: 7
           compression-level: 0
           if-no-files-found: error
-      - name: Retain authoritative Release mapping and identity
+      - name: Prepare Release mapping diagnostic
         if: steps.eligibility.outputs.release_required == 'true'
         run: |
           python -B - <<'PY'
@@ -373,7 +453,7 @@ jobs:
           retention-days: 7
           compression-level: 6
           if-no-files-found: error
-      - name: Summarize Release mapping diagnostic
+      - name: Show Release mapping diagnostic
         if: steps.eligibility.outputs.release_required == 'true'
         env:
           MAPPING_URL: ${{ steps.upload-main-mapping.outputs.artifact-url }}
@@ -405,7 +485,7 @@ jobs:
       - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
         with:
           packages: 'platform-tools build-tools;36.0.0'
-      - name: Require exact same-run unsigned artifact ID
+      - name: Require exact unsigned artifact ID
         env:
           INPUT_ARTIFACT_ID: ${{ needs.release-build.outputs.artifact_id }}
         run: '[[ "$INPUT_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]'
@@ -415,7 +495,7 @@ jobs:
           digest-mismatch: error
           merge-multiple: true
           path: ${{ runner.temp }}/mosaic-input
-      - name: Verify trusted same-run unsigned input
+      - name: Verify trusted unsigned APK
         env:
           MOSAIC_ARTIFACT_ID: ${{ needs.release-build.outputs.artifact_id }}
           MOSAIC_ARTIFACT_NAME: ${{ needs.release-build.outputs.artifact_name }}
@@ -428,14 +508,14 @@ jobs:
             echo 'Refusing already signed input' >&2
             exit 1
           fi
-      - name: Sign exact input without rebuilding
+      - name: Sign exact APK without rebuilding
         env:
           MOSAIC_SIGNING_KEY: ${{ secrets.MOSAIC_SIGNING_KEY }}
           MOSAIC_KEY_ALIAS: ${{ secrets.MOSAIC_KEY_ALIAS }}
           MOSAIC_KEYSTORE_PASSWORD: ${{ secrets.MOSAIC_KEYSTORE_PASSWORD }}
           MOSAIC_KEY_PASSWORD: ${{ secrets.MOSAIC_KEY_PASSWORD }}
         uses: ./.github/actions/mosaic-sign-apk
-      - name: Verify signed identity and unchanged payload
+      - name: Verify signed APK identity and unchanged payload
         run: |
           python3 -B scripts/mosaic_signing_exercise.py compare --directory "$RUNNER_TEMP/mosaic-input"
           mkdir "$RUNNER_TEMP/mosaic-result"
@@ -465,7 +545,7 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Require exact same-run signed artifact ID
+      - name: Require exact signed artifact ID
         env:
           INPUT_ARTIFACT_ID: ${{ needs.sign-development.outputs.artifact_id }}
         run: '[[ "$INPUT_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]'
@@ -475,12 +555,12 @@ jobs:
           digest-mismatch: error
           merge-multiple: true
           path: ${{ runner.temp }}/mosaic-result
-      - name: Validate manifest before publication credential use
+      - name: Validate publication manifest before using write authority
         env:
           MOSAIC_BUILD_RUN_ID: ${{ needs.release-build.outputs.build_run_id }}
           MOSAIC_BUILD_RUN_ATTEMPT: ${{ needs.release-build.outputs.build_run_attempt }}
         run: python -B scripts/mosaic_development_release.py ci-manifest --directory "$RUNNER_TEMP/mosaic-result"
-      - name: Publish verified development bytes
+      - name: Publish verified Development APK
         env:
           GH_TOKEN: ${{ github.token }}
           MOSAIC_BUILD_RUN_ID: ${{ needs.release-build.outputs.build_run_id }}

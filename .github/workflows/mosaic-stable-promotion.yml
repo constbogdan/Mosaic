@@ -1,4 +1,4 @@
-name: Mosaic — Stable Promotion
+name: Stable Promotion
 run-name: Stable Promotion
 
 on:
@@ -40,23 +40,24 @@ jobs:
       - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
         with:
           packages: 'platform-tools build-tools;36.0.0'
-      - name: Resolve and authenticate current Development candidate
+      - name: Resolve and authenticate current Development release
         id: prepare
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 -B scripts/mosaic_stable.py prepare --directory "$RUNNER_TEMP/mosaic-stable"
-      - name: Fresh public certificate package and version verification
+      - name: Verify APK package, version, signer, and provenance
         run: python3 -B scripts/verify_mosaic_apk.py --apk "$RUNNER_TEMP/mosaic-stable/Wholphin-release.apk" --provenance "$RUNNER_TEMP/mosaic-stable/provenance.json" --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" --output "$RUNNER_TEMP/mosaic-stable/verification.json"
-      - name: Require unchanged development manifest and exact signed hash
+      - name: Confirm exact Development manifest and APK digest
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 -B scripts/mosaic_stable.py verify --directory "$RUNNER_TEMP/mosaic-stable"
-      - name: Summarize prepared Release
+      - name: Show release approval request
         env:
           VERSION: ${{ steps.prepare.outputs.version }}
+          BUILD: ${{ steps.prepare.outputs.build }}
           APK_URL: ${{ steps.prepare.outputs.apk_url }}
         run: |
-          printf '## Stable Promotion\n\nReady to release: [%s](%s) · ✓ Authenticated\n' "$VERSION" "$APK_URL" >> "$GITHUB_STEP_SUMMARY"
+          printf '## Ready to release: [%s](%s)\n\nWaiting for approval — authorization is required before Stable publication.\n\nNothing has been published by this run.\n\n<details>\n<summary>Technical details</summary>\n\nAuthenticated Development build: <code>%s</code>\n\n</details>\n' "$VERSION" "$APK_URL" "$BUILD" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         id: verified
         with:
@@ -68,7 +69,7 @@ jobs:
       - name: Summarize failed stage
         if: failure()
         run: |
-          printf "## Failed · Stable promotion\n\nStage: %s. Inspect the failed step before retrying; publication completion is not confirmed by this stage.\n" "$GITHUB_JOB" >> "$GITHUB_STEP_SUMMARY"
+          printf "## Stable release preparation failed\n\nNothing was published. Inspect the failed step, correct the problem, and retry.\n\n<details>\n<summary>Technical details</summary>\n\nJob: <code>%s</code>\n\n</details>\n" "$GITHUB_JOB" >> "$GITHUB_STEP_SUMMARY"
 
   publish:
     name: Release
@@ -96,11 +97,11 @@ jobs:
           digest-mismatch: error
           merge-multiple: true
           path: ${{ runner.temp }}/mosaic-stable
-      - name: Reauthenticate current Development and release exact verified bytes
+      - name: Reauthenticate Development and publish exact verified bytes
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 -B scripts/mosaic_stable.py publish --directory "$RUNNER_TEMP/mosaic-stable"
       - name: Summarize failed stage
         if: failure()
         run: |
-          printf "## Failed · Stable promotion\n\nStage: %s. Inspect the failed step before retrying; publication completion is not confirmed by this stage.\n" "$GITHUB_JOB" >> "$GITHUB_STEP_SUMMARY"
+          printf "## Stable release refused or failed\n\nPublication completion is not confirmed. Inspect the failed step and current Stable state before retrying.\n\n<details>\n<summary>Technical details</summary>\n\nJob: <code>%s</code>\n\n</details>\n" "$GITHUB_JOB" >> "$GITHUB_STEP_SUMMARY"

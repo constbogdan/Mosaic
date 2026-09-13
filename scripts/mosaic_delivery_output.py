@@ -39,13 +39,15 @@ def release_body(m, channel, *, archive=False):
 def publication_summary(m, operation, env, ci=None):
     version, build, source = m['versionName'], m['immutableIdentity'], m['sourceSha']
     if operation == 'promote':
-        heading = f'Promoted · Mosaic v{version}'
-        details = [f'From: {build}', 'Channel: Stable', 'Exact Development bytes reused',
-                   f'Stable release: {REPOSITORY_URL}/releases/tag/mosaic-v{version}']
+        heading = f'Released: v{version}'
+        result = (f'[Open Stable release]({REPOSITORY_URL}/releases/tag/mosaic-v{version})\n\n'
+                  f'Promoted unchanged from `{build}`. No further action is required.')
+        details = ['Channel: Stable', 'Exact Development bytes reused']
     elif operation == 'publish':
-        heading = f'Published · Mosaic v{version}'
-        details = ['Channel: Development', f'Build: {build}',
-                   f'Development release: {REPOSITORY_URL}/releases/tag/develop']
+        heading = f'Published: v{version} to Development'
+        result = (f'[Open Development release]({REPOSITORY_URL}/releases/tag/develop)\n\n'
+                  'The update is available to Development-channel clients. No further action is required.')
+        details = ['Channel: Development', f'Build: {build}']
     else:
         raise ValueError('Unknown presentation operation')
     details += [f'Source: [{source}]({REPOSITORY_URL}/commit/{source})',
@@ -54,4 +56,5 @@ def publication_summary(m, operation, env, ci=None):
                 f"Original build run: {m['buildRunId']} / attempt {m['buildRunAttempt']}"]
     if ci:
         details.append('Authoritative CI: ' + json.dumps(ci, sort_keys=True))
-    return '## ' + heading + '\n\n' + '\n\n'.join(details) + '\n'
+    return ('## ' + heading + '\n\n' + result + '\n\n<details>\n'
+            '<summary>Technical details</summary>\n\n' + '\n\n'.join(details) + '\n\n</details>\n')

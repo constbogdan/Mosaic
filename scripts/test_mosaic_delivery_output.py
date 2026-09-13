@@ -70,12 +70,15 @@ class DeliveryOutputTests(unittest.TestCase):
 
     def test_publication_summaries_preserve_original_identity(self):
         env = {}
-        for operation, heading in [('publish', 'Published'), ('promote', 'Promoted')]:
+        for operation, heading in [('publish', 'Published: v1.0.5 to Development'),
+                                   ('promote', 'Released: v1.0.5')]:
             text = output.publication_summary(self.m, operation, env)
             self.assertTrue(text.startswith('## ' + heading))
             for value in (self.m['sourceSha'], self.m['signedApkSha256'], self.m['immutableIdentity']):
                 self.assertIn(value, text)
             self.assertIn('Original build run: ' + self.m['buildRunId'], text)
+            self.assertIn('<summary>Technical details</summary>', text)
+            self.assertLess(text.index('No further action is required'), text.index('<details>'))
         promoted = output.publication_summary(self.m, 'promote', env)
         self.assertIn('Exact Development bytes reused', promoted)
         self.assertIn('/releases/tag/mosaic-v1.0.5', promoted)
@@ -91,24 +94,34 @@ class DeliveryOutputTests(unittest.TestCase):
             summary = Path(env['GITHUB_STEP_SUMMARY']).read_text(encoding='utf-8')
         self.assertEqual('skipped_non_apk', values['outcome'])
         self.assertEqual('false', values['release_required'])
-        self.assertTrue(summary.startswith('## Skipped'))
+        self.assertTrue(summary.startswith('## No build required'))
+        self.assertIn('This change does not affect the application.', summary)
         self.assertIn('tooling-only', summary)
         self.assertIn('high', summary)
         self.assertIn('Changed paths: 24', summary)
-        self.assertIn('build/sign/publish not required', summary)
+        self.assertIn('Development build, signing, and publication are skipped', summary)
         self.assertIn('/compare/' + 'a' * 40 + '...' + 'b' * 40, summary)
+        self.assertIn('<summary>Technical details</summary>', summary)
+        self.assertLess(summary.index('This change does not affect the application.'),
+                        summary.index('Release relevance:'))
 
     def test_sync_heading_distinguishes_conflict_and_operational_failure_without_changing_json(self):
-        for outcome, conflict, error, label in [('no_delta', False, False, 'No upstream delta'),
-                                               ('ready', False, False, 'Ready candidate'),
-                                               ('blocked', True, False, 'Blocked · semantic conflicts'),
-                                               ('blocked', False, True, 'Publication error')]:
+        for outcome, conflict, error, label in [('no_delta', False, False, 'No upstream changes'),
+                                               ('ready', False, False, '0 upstream changes · none require attention'),
+                                               ('blocked', True, False, '0 upstream changes · review required'),
+                                               ('blocked', False, True, 'Upstream publication failed')]:
             record = dict(outcome=outcome, textual_conflicts=conflict, reason='<untrusted>')
             before = copy.deepcopy(record)
             summary = upstream.upstream_summary(record, publication=True, operation_error=error)
             self.assertTrue(summary.startswith('## ' + label))
-            self.assertIn('&lt;untrusted&gt;', summary)
+            if outcome == 'blocked' or error:
+                self.assertIn('&lt;untrusted&gt;', summary)
+            else:
+                operator_text = summary.split('<summary>Technical details</summary>', maxsplit=1)[0]
+                self.assertNotIn('&lt;untrusted&gt;', operator_text)
             self.assertNotIn('<untrusted>', summary)
+            self.assertIn('<summary>Operator navigation</summary>', summary)
+            self.assertIn('<summary>Technical details</summary>', summary)
             self.assertEqual(before, record)
         with patch.object(upstream.subprocess, 'run', return_value=Mock(returncode=1)):
             with self.assertRaises(upstream.OperationError) as error:
@@ -147,9 +160,9 @@ class DeliveryOutputTests(unittest.TestCase):
              'mosaic-stable-promotion.yml', 'upstream-sync.yml'},
             {path.name for path in workflows.glob('*.yml')},
         )
-        expected = {'mosaic-stable-promotion.yml': 'Mosaic — Stable Promotion',
-                    'mosaic-signing-exercise.yml': 'Mosaic — Signing Diagnostic',
-                    'upstream-sync.yml': 'Upstream — Synchronization'}
+        expected = {'mosaic-stable-promotion.yml': 'Stable Promotion',
+                    'mosaic-signing-exercise.yml': 'Signing Diagnostic',
+                    'upstream-sync.yml': 'Upstream Synchronization'}
         for file, name in expected.items():
             source = (ROOT / '.github/workflows' / file).read_text(encoding='utf-8')
             self.assertEqual('name: ' + name, source.splitlines()[0])
@@ -160,14 +173,21 @@ class DeliveryOutputTests(unittest.TestCase):
                 self.assertNotIn(forbidden, run_name_source)
         ci = (ROOT / development.CI_WORKFLOW).read_text(encoding='utf-8')
         self.assertEqual('name: CI', ci.splitlines()[0])
+        hold = (workflows / 'hold-release.yml').read_text(encoding='utf-8')
+        self.assertEqual('name: Hold Release', hold.splitlines()[0])
         self.assertIn('    name: Full validation', ci)
         self.assertIn('    name: Build Development Release', ci)
         self.assertIn('    name: Sign Development', ci)
         self.assertIn('    name: Publish Development', ci)
         self.assertEqual('Full validation', development.CI_JOB)
         diagnostic = (ROOT / '.github/workflows/mosaic-signing-exercise.yml').read_text(encoding='utf-8')
-        self.assertIn('no GitHub Release publication', diagnostic)
+        self.assertIn('Nothing will be published.', diagnostic)
         self.assertNotIn('publication is a separate job', diagnostic.lower())
+        setup = (ROOT / '.github/actions/setup/action.yml').read_text(encoding='utf-8')
+        self.assertEqual('name: Set up Android build', setup.splitlines()[0])
+        self.assertIn('name: Set up JDK', setup)
+        self.assertIn('name: Set up Android SDK', setup)
+        self.assertIn('name: Resolve current Stable release', hold)
 
     def test_lifecycle_run_names_use_best_trigger_time_human_identity(self):
         ci = (ROOT / '.github/workflows/ci.yml').read_text(encoding='utf-8')
@@ -181,10 +201,15 @@ class DeliveryOutputTests(unittest.TestCase):
 
         stable = (ROOT / '.github/workflows/mosaic-stable-promotion.yml').read_text(encoding='utf-8')
         self.assertEqual('run-name: Stable Promotion', stable.splitlines()[1])
+        signing = (ROOT / '.github/workflows/mosaic-signing-exercise.yml').read_text(encoding='utf-8')
+        self.assertEqual('run-name: Signing Diagnostic', signing.splitlines()[1])
+        upstream_workflow = (ROOT / '.github/workflows/upstream-sync.yml').read_text(encoding='utf-8')
+        self.assertIn("github.event_name == 'schedule' && 'Scheduled' || 'Manual'",
+                      upstream_workflow.split('\non:\n', 1)[0])
 
     def test_mapping_workflow_is_conditional_separate_and_never_rebuilds(self):
         ci = (ROOT / development.CI_WORKFLOW).read_text(encoding='utf-8')
-        mapping = ci.split('      - name: Retain authoritative Release mapping and identity')[1].split('\n  sign-development:')[0]
+        mapping = ci.split('      - name: Prepare Release mapping diagnostic')[1].split('\n  sign-development:')[0]
         self.assertEqual(3, mapping.count("if: steps.eligibility.outputs.release_required == 'true'"))
         self.assertIn('mapping-${{ steps.prepared.outputs.name }}', mapping)
         self.assertIn('compression-level: 6', mapping)

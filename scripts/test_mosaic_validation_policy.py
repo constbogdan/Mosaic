@@ -137,6 +137,7 @@ class ValidationPolicyTest(unittest.TestCase):
             values = dict(line.split("=", 1) for line in output.read_text().splitlines())
         self.assertEqual("non-android", values["validation_mode"])
         self.assertEqual("docs-only", values["release_relevance"])
+        self.assertEqual("false", values["release_required"])
 
     def test_reviewed_untracked_candidates_are_reported_separately(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -215,13 +216,20 @@ class ValidationIntegrationContractTest(unittest.TestCase):
 
     def test_ci_has_tiered_pr_summary_and_keeps_main_i02_boundary(self):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text()
-        self.assertIn("Classify PR validation", workflow)
+        self.assertIn("Choose PR validation path", workflow)
+        self.assertIn("Explain PR validation plan", workflow)
+        self.assertIn("Full validation required", workflow)
+        self.assertIn("complete release validation is still needed.", workflow)
+        self.assertIn("No Development release is expected from this PR alone.", workflow)
+        self.assertIn("Selected PR checks passed", workflow)
+        self.assertIn("Confirm this required job is green", workflow)
+        self.assertIn("<summary>Technical details</summary>", workflow)
         self.assertIn('git show "$BASE_SHA:scripts/mosaic_validation_policy.py"', workflow)
         self.assertIn("First rollout cannot trust a policy absent from base; require Full.", workflow)
         self.assertIn("Run targeted Android validation", workflow)
         self.assertIn("GITHUB_STEP_SUMMARY", workflow)
         self.assertIn("steps.main-validation-reuse.outputs.reuse_full != 'true'", workflow)
-        self.assertIn("Build authoritative unsigned Release after validation", workflow)
+        self.assertIn("Build unsigned Development Release APK", workflow)
         self.assertIn("needs.release-build.outputs.release_required == 'true'", workflow)
         self.assertFalse((ROOT / ".github/workflows/mosaic-development-release.yml").exists())
         self.assertFalse((ROOT / ".github/workflows/mosaic-development-resume.yml").exists())

@@ -22,9 +22,10 @@ I07 forward-recovery acceptance promoted `downstream-build-34` unchanged in run
 `1d84dfb922765b28f75e422e25b7fbdc5123beb86fc0148d5e324f5547514e5d`, identical to
 Development. The held v1.0.5 release remains preserved as a prerelease.
 
-The workflow displays **Mosaic — Stable Promotion** and uses the fixed run identity
-**Stable Promotion**. Its successful summary leads with the exact authenticated candidate
-and APK link. API title `v1.0.N`, workflow path, verification/publisher separation, manual
+The workflow displays **Stable Promotion** and uses the same fixed run identity.
+Prepare leads with `Ready to release: v1.0.N`, the exact authenticated APK link, and the pending
+approval action; successful publication leads with `Released: v1.0.N`. Exact provenance stays in
+collapsed technical details. API title `v1.0.N`, workflow path, verification/publisher separation, manual
 authorization and assets remain unchanged. New bodies use a branded Stable heading;
 historical bodies are not changed. See the [I05 ledger](ITEM_6_I05_PRESENTATION.md).
 

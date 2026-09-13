@@ -1,5 +1,5 @@
-name: Mosaic — Signing Diagnostic
-run-name: Diagnose signing from ${{ inputs.expected_sha }}
+name: Signing Diagnostic
+run-name: Signing Diagnostic
 
 on:
   workflow_dispatch:
@@ -33,6 +33,9 @@ jobs:
       artifact_id: ${{ steps.upload.outputs.artifact-id }}
       name: ${{ steps.prepare.outputs.name }}
     steps:
+      - name: Explain diagnostic purpose
+        run: |
+          printf '## Signing Diagnostic\n\nValidates the signing configuration for the selected protected-main source.\n\n**Nothing will be published.**\n\nFull validation and an unsigned Release build run first. Signing then waits for <code>release-sign</code> authorization.\n\n<details>\n<summary>Technical details</summary>\n\nSource: <code>%s</code>\n\n</details>\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.sha }}
@@ -40,17 +43,17 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
       - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
-      - name: Offline acceptance
+      - name: Run offline tooling checks
         run: python -B scripts/run_offline_tests.py --pattern 'test_*.py'
       # Separate processes prevent Debug and Release compiler work from overlapping.
       # Bound worker concurrency here only; normal PR CI keeps its existing settings.
-      - name: Full Debug validation
+      - name: Run Full Debug validation
         run: |
           ./gradlew :app:compileDefaultDebugKotlin :app:testDefaultDebugUnitTest :app:assembleDefaultDebug -PmosaicPublication=true --no-daemon --no-parallel --max-workers=1
-      - name: Build unsigned Release after validation
+      - name: Build unsigned Release APK
         run: |
           ./gradlew :app:assembleDefaultRelease -PmosaicPublication=true --no-daemon --no-parallel --max-workers=1
-      - name: Prepare exact universal unsigned input
+      - name: Prepare exact unsigned APK
         id: prepare
         run: python -B scripts/mosaic_signing_exercise.py prepare --directory "$RUNNER_TEMP/mosaic-input"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -64,7 +67,7 @@ jobs:
       - name: Summarize failed stage
         if: failure()
         run: |
-          printf "## Failed · Signing diagnostic\n\nStage: %s. Inspect the failed step before retrying; publication completion is not confirmed by this stage.\n" "$GITHUB_JOB" >> "$GITHUB_STEP_SUMMARY"
+          printf "## Signing Diagnostic failed\n\nNothing was published. Inspect the failed step, correct the problem, and retry.\n\n<details>\n<summary>Technical details</summary>\n\nJob: <code>%s</code>\n\n</details>\n" "$GITHUB_JOB" >> "$GITHUB_STEP_SUMMARY"
 
   sign:
     name: Sign and verify diagnostic APK
@@ -109,14 +112,14 @@ jobs:
             echo 'Refusing already signed input' >&2
             exit 1
           fi
-      - name: Sign exact input without rebuilding
+      - name: Sign exact APK without rebuilding
         env:
           MOSAIC_SIGNING_KEY: ${{ secrets.MOSAIC_SIGNING_KEY }}
           MOSAIC_KEY_ALIAS: ${{ secrets.MOSAIC_KEY_ALIAS }}
           MOSAIC_KEYSTORE_PASSWORD: ${{ secrets.MOSAIC_KEYSTORE_PASSWORD }}
           MOSAIC_KEY_PASSWORD: ${{ secrets.MOSAIC_KEY_PASSWORD }}
         uses: ./.github/actions/mosaic-sign-apk
-      - name: Verify signed identity and unchanged payload
+      - name: Verify signed APK identity and unchanged payload
         run: |
           python3 -B scripts/mosaic_signing_exercise.py compare --directory "$RUNNER_TEMP/mosaic-input"
           mkdir "$RUNNER_TEMP/mosaic-result"
@@ -130,13 +133,13 @@ jobs:
           retention-days: 7
           if-no-files-found: error
           compression-level: 0
-      - name: Summarize signing diagnostic
+      - name: Show diagnostic result
         env:
           ARTIFACT_NAME: signed-${{ needs.build.outputs.name }}
           ARTIFACT_URL: ${{ steps.signed.outputs.artifact-url }}
         run: |
-          printf '## Mosaic signing diagnostic verified\n\nArtifact: %s\n\nDownload: %s\n\nSource: %s\n\nRetention: 7 days. Diagnostic only; no GitHub Release publication or Stable/Development mutation.\n' "$ARTIFACT_NAME" "$ARTIFACT_URL" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          printf '## Signing configuration verified\n\nThe selected APK was signed and its identity and payload were verified. **Nothing was published.**\n\n[Download diagnostic APK](%s) · retained for 7 days\n\n<details>\n<summary>Technical details</summary>\n\nArtifact: <code>%s</code>\n\nSource: <code>%s</code>\n\n</details>\n' "$ARTIFACT_URL" "$ARTIFACT_NAME" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
       - name: Summarize failed stage
         if: failure()
         run: |
-          printf "## Failed · Signing diagnostic\n\nStage: %s. Inspect the failed step before retrying; publication completion is not confirmed by this stage.\n" "$GITHUB_JOB" >> "$GITHUB_STEP_SUMMARY"
+          printf "## Signing Diagnostic failed\n\nNothing was published. Inspect the failed step, correct the problem, and retry.\n\n<details>\n<summary>Technical details</summary>\n\nJob: <code>%s</code>\n\n</details>\n" "$GITHUB_JOB" >> "$GITHUB_STEP_SUMMARY"
