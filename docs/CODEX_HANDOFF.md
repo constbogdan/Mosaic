@@ -8,13 +8,13 @@
 
 `Baseline T0 — IN PROGRESS`
 
-`T0-1 CP4B.2 — IMPLEMENTED / HOSTED ACCEPTANCE PENDING`
+`T0-1 CP4B.2 — IMPLEMENTED; ANDROID_FULL HOSTED VALIDATED; NON_ANDROID HOSTED ACCEPTANCE PENDING`
 
-`Next: live-prove NON_ANDROID and ANDROID_FULL exact-tree reuse`
+`Next: live-prove NON_ANDROID exact-tree reuse`
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
-`CP4B.2 IMPLEMENTED / HOSTED ACCEPTANCE PENDING`.
+`CP4B.2 IMPLEMENTED; ANDROID_FULL HOSTED VALIDATED; NON_ANDROID HOSTED ACCEPTANCE PENDING`.
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -73,16 +73,37 @@ APK assembly and carries the validated Debug APK. Evidence binds repository, wor
 required step results, class, PR/base/head, synthetic merge SHA/tree/parents, run/attempt, and the
 unique unexpired artifact identity/digest. Main accepts it only when the final tree is identical.
 Any uncertainty runs the existing all-files pre-commit, all-offline, Android setup, and Full Gradle
-fallback.
+fallback. In particular, missing, failed, cancelled, expired, ambiguous, foreign, stale,
+parent-mismatched, tree-mismatched, class-mismatched, and contract-mismatched evidence all fail
+closed to that path.
+
+PR #61 supplies the first live CP4B.2 class acceptance. Required PR run `34783794209`, attempt `1`,
+successfully ran changed-range pre-commit, the complete offline suite, Android setup, and complete
+defaultDebug validation. Its unique `ANDROID_FULL` evidence artifact was ID `10325034747`, bound to
+head `8694bea0871435a2fce6c132c54458bccd965534`, synthetic merge
+`765eca782048c2532f6ddd998a25b95ae6166d72`, tree
+`3f43d70060ebeb3c292d55b969b52bb770aceb6e`, and archive digest
+`sha256:0d7e89d63d37f9acfa76e4e63452e607166c8a502c01532abc1ef158bac5f446`.
+
+Protected-main SHA `6e62b5a2e45968a07fd4859582eba5bfe370407f` then ran CI `34784224595`,
+attempt `1`, and reported `PR validation reused — this exact tree passed ANDROID_FULL on PR #61.`
+The reuse step succeeded; repository pre-commit, complete offline tooling, Android setup, and Gradle
+Full were skipped. The Full-validation job took about 11 seconds, Development eligibility took about
+12 seconds and independently classified the range non-release/tooling-only, Sign/Publish skipped,
+and the complete run took about 28 seconds. This validates `ANDROID_FULL` without merging or
+weakening Release Build, Sign, Publish, Stable, Hold, permissions, Environments, or upstream safety.
 
 Prefer deleting stages and state over making them smarter. Do not build an authoritative
 fine-grained test catalog while the complete hosted offline suite remains a cheap coarse gate
 (observed around 18–24 seconds for approximately 232 tests, not a guaranteed constant). Android
 remains a coarse relevance gate. Local logs are diagnostics, never authoritative attestations.
 
-The implementation is ready for focused/offline verification, then one natural non-Android PR and
-one natural Android/build PR must live-prove both classes. Only then simplify local/prepare-pr
-validation; remove superseded state/tests/docs afterward; simplify Signing Diagnostic separately.
+`ANDROID_FULL` is hosted validated. This documentation-only checkpoint is the intended natural
+`NON_ANDROID` acceptance vehicle: it should run changed-range pre-commit and the complete offline
+suite, skip Android Full, and emit exact-tree `NON_ANDROID` evidence. After an exact-tree merge, main
+should authenticate that evidence, skip the four already-proven validation stages, check Development
+eligibility, and produce no APK. Only after that acceptance may local/prepare-pr validation be
+simplified; remove superseded state/tests/docs afterward and simplify Signing Diagnostic separately.
 Preserve exact scope/tree review, required PR CI, exact-tree authentication, main fallback,
 final-context Release Build, version allocation, signing and artifact boundaries, Publish
 freshness/idempotency, Stable/Hold authorization, upstream native topology/human authority, and
