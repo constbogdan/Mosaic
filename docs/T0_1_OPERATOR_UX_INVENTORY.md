@@ -1,11 +1,11 @@
 # Baseline T0-1 operator UX, workflow, and presentation inventory
 
-Status: **CP4B.2 IMPLEMENTED / HOSTED ACCEPTANCE PENDING**
-Next: **live-prove NON_ANDROID and ANDROID_FULL reuse before simplifying local validation**
+Status: **CP4B.2 IMPLEMENTED; ANDROID_FULL HOSTED VALIDATED; NON_ANDROID HOSTED ACCEPTANCE PENDING**
+Next: **live-prove NON_ANDROID reuse before simplifying local validation**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
-CP4B.2 IMPLEMENTED / HOSTED ACCEPTANCE PENDING.**
+CP4B.2 IMPLEMENTED; ANDROID_FULL HOSTED VALIDATED; NON_ANDROID HOSTED ACCEPTANCE PENDING.**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
 baseline; historical names in acceptance records are evidence, not active UX. CP2 removed only
@@ -13,8 +13,8 @@ the two obsolete inherited workflow surfaces and updated their ownership contrac
 operator presentation without changing machine contracts. CP4A records the measured behavior
 from local edits through hosted validation and Development publication. CP4B.1 repaired and
 live-proved the exact-tree reuse selector contract exposed by that audit. CP4B.2 implements the
-complete two-class PR policy contract; hosted acceptance is still required before later validation
-simplification begins.
+complete two-class PR policy contract. `ANDROID_FULL` is hosted validated; `NON_ANDROID` remains the
+last acceptance requirement before later validation simplification begins.
 
 ## T0-1 CP4B.1 exact-tree reuse contract repair
 
@@ -52,7 +52,7 @@ or weakening the conservative fallback.
 
 ## T0-1 CP4B.2 boundary and approved direction
 
-Status: **IMPLEMENTED / HOSTED ACCEPTANCE PENDING**
+Status: **IMPLEMENTED; ANDROID_FULL HOSTED VALIDATED; NON_ANDROID HOSTED ACCEPTANCE PENDING**
 
 CP4B.2 establishes the simplest complete PR evidence contract before removing any later local gate.
 The implemented architecture is broad hosted authority with coarse relevance gates:
@@ -84,7 +84,9 @@ tooling has been observed in the tens-of-seconds range (about 18–24 seconds fo
 tests), but that is measured evidence rather than a guaranteed duration. A sophisticated
 authoritative test catalog or dependency-query system is therefore not justified today: run the
 complete offline suite once in authoritative PR CI and reconsider only if future hosted measurements
-justify the maintenance burden. Android is materially expensive and retains a coarse relevance gate.
+justify the maintenance burden. Fine-grained or targeted tests remain useful for fast developer
+feedback, but they are not the authoritative integration contract. Android is materially expensive
+and retains a coarse relevance gate.
 
 The versioned `pr-policy-v1` evidence contract has two classes. `NON_ANDROID` proves changed-range
 pre-commit plus the complete offline tooling suite. `ANDROID_FULL` proves those checks plus the
@@ -98,8 +100,34 @@ numeric identity, archive digest, run/attempt, PR/head, tested synthetic merge, 
 authenticate. The final protected-main tree must equal the tested tree. On an exact match, protected
 main may skip repository pre-commit, the complete offline suite, Android setup, and Gradle because
 the accepted PR class already proved its complete required policy. Any missing, failed, cancelled,
-expired, ambiguous, foreign, stale, mismatched, or otherwise uncertain evidence retains the complete
-protected-main fallback.
+expired, ambiguous, foreign, stale, parent-mismatched, tree-mismatched, class-mismatched,
+contract-mismatched, or otherwise uncertain evidence retains the complete protected-main fallback.
+
+### ANDROID_FULL hosted acceptance — PR #61
+
+PR #61 naturally exercised the new `ANDROID_FULL` authority contract. Required PR run
+`34783794209`, attempt `1`, ran changed-range pre-commit, the complete offline tooling suite, Android
+setup, and complete defaultDebug validation successfully. It emitted the single unexpired
+`pr-policy-v1` artifact `10325034747`, bound to PR head
+`8694bea0871435a2fce6c132c54458bccd965534`, synthetic merge
+`765eca782048c2532f6ddd998a25b95ae6166d72`, tested tree
+`3f43d70060ebeb3c292d55b969b52bb770aceb6e`, run/attempt, class, and archive digest
+`sha256:0d7e89d63d37f9acfa76e4e63452e607166c8a502c01532abc1ef158bac5f446`.
+
+After the normal merge produced protected-main SHA
+`6e62b5a2e45968a07fd4859582eba5bfe370407f`, run `34784224595`, attempt `1`, reported:
+
+```text
+PR validation reused — this exact tree passed ANDROID_FULL on PR #61.
+```
+
+The API evidence confirms the reuse inspection succeeded and repository pre-commit, the complete
+offline tooling suite, Android setup, and Gradle Full validation were all skipped. The `Full
+validation` job completed in about 11 seconds. Development eligibility then ran independently in
+the 12-second `Build Development Release` job, classified the unpublished scope as non-release
+tooling, and skipped Release setup/build, Sign, and Publish. The complete protected-main run took
+about 28 seconds. Release Build, signing, publication, Stable, Hold, permissions, Environments, and
+upstream authority remained separate and unchanged.
 
 Later simplification candidates, after replacement evidence is implemented and hosted-proven, are:
 remove operator Full from the normal publication recipe while retaining it on demand; remove
@@ -123,10 +151,11 @@ The controlled migration order is:
 2. Define the complete PR evidence contract — **IMPLEMENTED**.
 3. Make PR CI authoritative for that contract — **IMPLEMENTED**.
 4. Teach protected main to reuse complete PR policy evidence — **IMPLEMENTED**.
-5. Live-prove tooling-only and Android paths — **NEXT**.
-6. Only then simplify local and prepare-pr validation.
-7. Remove superseded state, catalog, tests, and documentation.
-8. Simplify Signing Diagnostic separately.
+5. Live-prove the Android path — **COMPLETE (`ANDROID_FULL`, PR #61)**.
+6. Live-prove the non-Android path — **NEXT (`NON_ANDROID`)**.
+7. Only then simplify local and prepare-pr validation.
+8. Remove superseded state, catalog, tests, and documentation.
+9. Simplify Signing Diagnostic separately.
 
 No safety mechanism is removed before its replacement is implemented and hosted-proven. Performance
 work remains CP7/T0-2: retain the observed 6+ minute local versus tens-of-seconds hosted offline gap,
@@ -672,10 +701,10 @@ of the graph. Debug execution cannot substitute for Release assembly.
    only if a distinct remaining consumer is demonstrated.
 5. Keep Release/Sign/Publish and Stable/Hold boundary checks out of the duplicate-test cleanup.
 
-The narrow exact-tree reuse contract repair is complete and hosted validated. The smallest safe
-CP4B.2 step is defining complete policy evidence for both non-Android and Full committed PR paths.
-Only after that replacement is implemented and hosted-proven may local/prepare duplication or
-blanket main execution change.
+The narrow exact-tree reuse contract repair is complete and hosted validated. CP4B.2 defines
+complete policy evidence for both non-Android and Full committed PR paths, and `ANDROID_FULL` is now
+hosted validated. Only after `NON_ANDROID` is also hosted-proven may local/prepare duplication
+change.
 
 
 ---

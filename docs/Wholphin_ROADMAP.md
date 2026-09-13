@@ -11,13 +11,14 @@ authoritative; the obsolete Issue/journal/finalizer lifecycle is removed.
 minimal emergency Hold Release followed by forward-fix and zero-input Stable Promotion.
 
 **Baseline T0 — IN PROGRESS. T0-1 CP4B.1 exact-tree reuse contract repair is COMPLETE / HOSTED
-VALIDATED. CP4B.2 — Authoritative PR Validation Model — is IMPLEMENTED / HOSTED ACCEPTANCE PENDING;
-both evidence classes must be live-proven before simplifying any local validation path.** Baseline T0 is an
+VALIDATED. CP4B.2 — Authoritative PR Validation Model — is IMPLEMENTED; `ANDROID_FULL` is HOSTED
+VALIDATED and `NON_ANDROID` HOSTED ACCEPTANCE is PENDING. Both classes must be live-proven before
+simplifying any local validation path.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 Checkpoint sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
-CP4B.2 IMPLEMENTED / HOSTED ACCEPTANCE PENDING.**
+CP4B.2 IMPLEMENTED; ANDROID_FULL HOSTED VALIDATED; NON_ANDROID HOSTED ACCEPTANCE PENDING.**
 
 1. **T0-1 — Cleanup & Operator Experience:** inventory every human-facing surface and machine
    contract before simplifying validation duplication, workflow/operator presentation, obsolete
@@ -90,8 +91,15 @@ state over making them smarter. The observed hosted offline suite is commonly te
 (approximately 18–24 seconds for about 232 tests), so an authoritative fine-grained test catalog is
 not currently justified; retain Android as the materially expensive coarse gate.
 
+PR #61 and protected-main run `34784224595`, attempt `1`, live-validated `ANDROID_FULL`. The exact
+PR policy artifact from run `34783794209`, attempt `1`, authenticated the final main tree; main
+skipped repository pre-commit, complete offline tooling, Android setup, and Gradle Full. Development
+eligibility remained independent, classified the scope non-release/tooling-only, and produced no
+APK. Full validation took about 11 seconds, Development eligibility about 12 seconds, and the full
+protected-main run about 28 seconds. `NON_ANDROID` remains the only CP4B.2 hosted acceptance gap.
+
 Migration order is fixed: complete PR evidence, authoritative PR CI, and main reuse are implemented;
-live-prove tooling-only and Android paths; only then simplify local/prepare-pr validation; remove
+`ANDROID_FULL` is live-proven; live-prove `NON_ANDROID`; only then simplify local/prepare-pr validation; remove
 superseded state/tests/docs afterward; simplify Signing Diagnostic separately. Preserve exact-tree
 and required-CI trust, main fallback, final Release Build, version/sign/artifact/publication
 boundaries, Stable/Hold authorization, upstream native Git/human authority, and native failed-job
