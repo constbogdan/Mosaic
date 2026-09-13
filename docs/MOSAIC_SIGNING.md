@@ -24,11 +24,12 @@ package, signer, freshness, and conflict checks independently prove what may be 
 
 ## First permanent Release signing acceptance
 
-I05 display update: the standalone workflow is **Mosaic — Signing Diagnostic**, retaining
+The standalone workflow displays **Signing Diagnostic**, retaining
 `mosaic-signing-exercise.yml` and its artifact-prefix/authorization contracts. It performs
 diagnostic validation/build/sign/verify only; it has no GitHub Release publisher and never
-mutates Development/Stable. Production signing summaries now say Mosaic signing verified;
-only the standalone diagnostic uses diagnostic terminology. No signer, package, Environment,
+mutates Development/Stable. Its first summary explicitly says that nothing will be published,
+and exact source/artifact evidence is collapsed beneath the operator result. Production signing
+summaries remain distinct from the standalone diagnostic. No signer, package, Environment,
 key handling, verification or source identity changes. Natural diagnostic acceptance of
 the new presentation is pending; prior signing evidence below remains historical.
 See the [I05 presentation ledger](ITEM_6_I05_PRESENTATION.md).

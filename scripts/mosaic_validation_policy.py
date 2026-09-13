@@ -220,6 +220,7 @@ def reviewed_untracked_paths(root, paths):
 def write_github_outputs(plan, path):
     values = {
         "release_relevance": plan["releaseRelevance"],
+        "release_required": str(plan["releaseRequired"]).lower(),
         "validation_risk": plan["validationRisk"],
         "validation_mode": plan["validationMode"],
         "focused_tests": ",".join(plan["focusedTests"]),

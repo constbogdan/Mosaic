@@ -10,8 +10,8 @@ authoritative; the obsolete Issue/journal/finalizer lifecycle is removed.
 **I07 — COMPLETE / LIVE VALIDATED.** Development uses forward-fix recovery. Stable supports the
 minimal emergency Hold Release followed by forward-fix and zero-input Stable Promotion.
 
-**Baseline T0 — IN PROGRESS. T0-1 CP2 obsolete-surface removal is complete and hosted validated; next is CP3
-low-risk names and summaries.** Baseline T0 is an
+**Baseline T0 — IN PROGRESS. T0-1 CP3 low-risk names and summaries is implemented and focused
+validated; operator Full and hosted presentation acceptance are next.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 1. **T0-1 — Cleanup & Operator Experience:** inventory every human-facing surface and machine
@@ -69,6 +69,14 @@ candidates. The preferred default is manual handling rather than broader App per
 concrete automation requirement is demonstrated. CP3/CP6 own sanitized actionable push diagnostics;
 the current generic publication error is insufficient because `git push --porcelain` rejection detail
 may arrive on stdout as well as stderr.
+
+CP3 removes redundant prefixes from the presentation-only Stable, Signing Diagnostic, and Upstream
+workflow names and gives CI, Development eligibility/publication, Stable, Hold, Signing Diagnostic,
+and Upstream operator-first summaries. Main outcomes, approval/refusal states, and next actions stay
+visible; raw classifier paths and SHA/tree/run/artifact/provenance evidence are collapsed without
+changing their machine forms. `CI`, `Full validation`, and the three Development job/check names
+remain unchanged contracts. Sanitized Git push rejection capture was reclassified as operational
+error-handling work for CP6 or T0-2 security review, not folded into cosmetic CP3 changes.
 
 ### T0-2 audit contract
 

@@ -332,40 +332,74 @@ def candidate_title(observation, draft):
 
 def upstream_summary(observation, *, publication=False, operation_error=False):
     outcome = observation['outcome']
+    changes = observation.get('automation_changes', [])
+    change_count = len(changes)
+    change_word = 'change' if change_count == 1 else 'changes'
+    attention_count = len(attention_paths(observation))
+    attention_verb = 'requires' if attention_count == 1 else 'require'
     if operation_error:
-        heading = 'Publication error' if publication else 'Observation error'
+        heading = 'Upstream publication failed' if publication else 'Upstream observation failed'
+        action = 'No candidate change is confirmed. Inspect the refusal below before retrying.'
     elif outcome in {'blocked', 'semantic_conflict'}:
-        heading = 'Blocked · semantic conflicts' if observation.get('textual_conflicts') else 'Blocked · review required'
+        heading = f'{change_count} upstream {change_word} · review required'
+        action = (f'{attention_count} path{"s" if attention_count != 1 else ""} {attention_verb} semantic resolution. '
+                  'No automatic merge is performed.')
     else:
-        heading = {'no_delta': 'No upstream delta', 'observed_excluded': 'Observed · downstream-owned changes excluded',
-                   'ready': 'Ready candidate', 'review_required': 'Review required · Draft candidate',
-                   'existing_pr': 'Existing candidate PR', 'existing_draft_pr': 'Existing Draft candidate PR',
-                   'pr_created': 'Published candidate PR',
-                   'review_pr_created': 'Draft candidate PR created'}.get(outcome, 'Upstream observation')
+        heading = {
+            'no_delta': 'No upstream changes',
+            'observed_excluded': f'{change_count} upstream {change_word} · observed but excluded',
+            'ready': f'{change_count} upstream {change_word} · none require attention',
+            'review_required': f'{change_count} upstream {change_word} · review required',
+            'existing_pr': f'{change_count} upstream {change_word} · candidate already open',
+            'existing_draft_pr': f'{change_count} upstream {change_word} · review candidate already open',
+            'pr_created': f'{change_count} upstream {change_word} · candidate created',
+            'review_pr_created': f'{change_count} upstream {change_word} · review candidate created',
+        }.get(outcome, 'Upstream check complete')
+        action = {
+            'no_delta': 'No action is required. The existing UTC schedule will check again automatically.',
+            'observed_excluded': ('Downstream-owned changes were observed but excluded; Mosaic state was preserved. '
+                                  'No candidate is required.'),
+            'ready': 'No paths require attention. Candidate publication will run next.',
+            'review_required': (f'{attention_count} path{"s" if attention_count != 1 else ""} {attention_verb} review. '
+                                'A Draft candidate will be prepared next.'),
+            'existing_pr': 'Continue review in the existing candidate PR; no duplicate was created.',
+            'existing_draft_pr': 'Continue semantic resolution in the existing Draft PR; no duplicate was created.',
+            'pr_created': 'Review the candidate PR. Merge or reject remains a human decision.',
+            'review_pr_created': 'Resolve the identified paths in the Draft PR. No automatic merge is performed.',
+        }.get(outcome, 'Inspect the technical details before taking action.')
+    failure_reason = ''
+    if operation_error or outcome in {'blocked', 'semantic_conflict'}:
+        failure_reason = '\n\nReason: ' + display_text(
+            observation.get('reason') or 'Semantic review is required.')
     # Retain full evidence and escape remote/user-controlled strings. Keep this in
     # the existing protected sync helper rather than adding an executable dependency.
     counts = observation.get('ownership_counts') or {}
-    count_text = ''
+    count_text = []
     if counts:
-        count_text = (f"\nUpstream changes: {len(observation.get('automation_changes', []))}\n\n"
-                      f"- FOLLOW: {counts.get('FOLLOW', 0)} — normal candidate integration\n"
-                      f"- REVIEW: {counts.get('REVIEW', 0)} — semantic/manual review required\n"
-                      f"- DOWNSTREAM-OWNED: {counts.get('DOWNSTREAM-OWNED', 0)} — observed, intentionally preserved downstream\n")
+        count_text = [f'Upstream changes: {change_count}', '',
+                      f"- FOLLOW: {counts.get('FOLLOW', 0)} — normal candidate integration",
+                      f"- REVIEW: {counts.get('REVIEW', 0)} — semantic/manual review required",
+                      f"- DOWNSTREAM-OWNED: {counts.get('DOWNSTREAM-OWNED', 0)} — observed but excluded"]
         for category in ("FOLLOW", "REVIEW", "DOWNSTREAM-OWNED"):
-            rows = [change for change in observation.get("automation_changes", [])
+            rows = [change for change in changes
                     if change.get("ownership") == category]
             if rows:
-                count_text += f"\n### {category}\n\n"
+                count_text += ['', f'### {category}', '']
                 for change in rows:
                     path = display_text(change.get("path", "unknown"))
-                    reason = display_text(change.get("reason", ""))
-                    count_text += f"- <code>{path}</code> — {reason}\n"
-        count_text += ("\nConfigured schedule: <code>" + display_text(observation.get("configured_schedule_utc", "unknown")) +
-                       "</code>; observed start: <code>" + display_text(observation.get("observed_at", "unknown")) + "</code>.\n")
+                    change_reason = display_text(change.get("reason", ""))
+                    count_text.append(f'- <code>{path}</code> — {change_reason}')
+        count_text += ['', 'Configured schedule: <code>' +
+                       display_text(observation.get('configured_schedule_utc', 'unknown')) +
+                       '</code>; observed start: <code>' +
+                       display_text(observation.get('observed_at', 'unknown')) + '</code>.']
     navigation = human_evidence(observation, rich_upstream=True, include_technical=False)
-    return ('## ' + heading + '\n' + count_text + '\n## Operator navigation\n\n' + navigation +
-            '\n## Complete machine evidence\n\n<pre>' +
-            html.escape(json.dumps(observation, indent=2, ensure_ascii=True)) + '</pre>\n')
+    return (f'## {heading}\n\n{action}{failure_reason}\n\n'
+            '<details>\n<summary>Operator navigation</summary>\n\n' + navigation + '\n</details>\n\n'
+            '<details>\n<summary>Technical details</summary>\n\n' + '\n'.join(count_text) +
+            '\n\n### Complete machine evidence\n\n<pre>' +
+            html.escape(json.dumps(observation, indent=2, ensure_ascii=True)) +
+            '</pre>\n\n</details>\n')
 
 
 class OperationError(Blocked):

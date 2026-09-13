@@ -153,7 +153,7 @@ class ExerciseTests(unittest.TestCase):
         self.assertIn('[[ "$INPUT_ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]', sign)
         self.assertNotIn('gradlew', sign)
         self.assertNotIn('./.github/actions/setup', sign)
-        secret_step = sign.split('      - name: Sign exact input without rebuilding')[1].split('      - name: Verify signed identity')[0]
+        secret_step = sign.split('      - name: Sign exact APK without rebuilding')[1].split('      - name: Verify signed APK identity')[0]
         self.assertEqual(sign.count('secrets.'), 4)
         self.assertEqual(secret_step.count('secrets.'), 4)
         self.assertIn("trap '", action)
@@ -184,8 +184,8 @@ class ExerciseTests(unittest.TestCase):
         self.assertNotIn('secrets: inherit', exercise + development_sign)
         secret_steps = []
         for job in (sign, development_sign):
-            before, secret = job.split('      - name: Sign exact input without rebuilding')
-            secret, after = secret.split('      - name: Verify signed identity')
+            before, secret = job.split('      - name: Sign exact APK without rebuilding')
+            secret, after = secret.split('      - name: Verify signed APK identity')
             self.assertNotIn('secrets.', before + after)
             self.assertEqual(secret.count('secrets.MOSAIC_'), 4)
             self.assertIn('uses: ./.github/actions/mosaic-sign-apk', secret)
@@ -227,9 +227,9 @@ class ExerciseTests(unittest.TestCase):
     def test_validation_and_release_are_sequential_bounded_steps(self):
         workflow = (Path(__file__).resolve().parent.parent / '.github/workflows/mosaic-signing-exercise.yml').read_text()
         build = workflow.split('\n  sign:\n')[0]
-        debug, release = build.split('      - name: Build unsigned Release after validation\n')
-        debug = debug.split('      - name: Full Debug validation\n')[1]
-        release = release.split('      - name: Prepare exact universal unsigned input\n')[0]
+        debug, release = build.split('      - name: Build unsigned Release APK\n')
+        debug = debug.split('      - name: Run Full Debug validation\n')[1]
+        release = release.split('      - name: Prepare exact unsigned APK\n')[0]
         for phase in (debug, release):
             self.assertEqual(phase.count('./gradlew '), 1)
             for flag in ('-PmosaicPublication=true', '--no-daemon', '--no-parallel', '--max-workers=1'):

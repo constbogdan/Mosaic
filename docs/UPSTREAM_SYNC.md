@@ -142,6 +142,12 @@ This is historical evidence for the process, not a prediction of future conflict
 
 ## Hosted upstream synchronization v2
 
+The Actions workflow displays **Upstream Synchronization**. Its run title distinguishes a
+`Manual` or `Scheduled` check without embedding a future wall-clock time. Summaries lead with a
+plain-language result and action: no changes, attention-free candidate, review required, or
+downstream-owned changes `observed but excluded`. Rich navigation and exact machine evidence stay
+available in collapsible sections and retained JSON; I06 identities and behavior are unchanged.
+
 Hosted observation loads a versioned policy from trusted downstream `main`:
 
 - **FOLLOW**: normal integration candidate, still subject to automation/security review.

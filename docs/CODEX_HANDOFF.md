@@ -8,9 +8,9 @@
 
 `Baseline T0 — IN PROGRESS`
 
-`T0-1 CP2 — COMPLETE / HOSTED VALIDATED`
+`T0-1 CP3 — IMPLEMENTED / FOCUSED VALIDATED`
 
-`Next: T0-1 CP3 — Low-risk names and summaries`
+`Next: operator Full validation and hosted CP3 presentation acceptance; then T0-1 CP4`
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -28,6 +28,35 @@ audited seven workflows, 145 YAML/generated presentation labels or families, 52 
 presentation surfaces, 20 multiline outputs, timing/conditional explanations, PR/Release/artifact
 presentation, validation duplication, signing diagnostics, and performance evidence. It defines 40
 finite implementation items across CP2–CP8.
+
+### T0-1 CP3 low-risk names and summaries
+
+CP3 is implemented locally on `chore/t0-1-low-risk-presentation`. The five supported Actions
+display names are now `CI`, `Hold Release`, `Signing Diagnostic`, `Stable Promotion`, and
+`Upstream Synchronization`. These are presentation-only changes: workflow paths, triggers, job
+IDs, required checks, permissions, Environments, artifact/tag/version identities, provenance,
+signing, release publication, I06 behavior, and application behavior remain unchanged.
+
+Supported workflows now use `main result -> operator action/next step -> technical details`.
+CI explains the selected validation path early, explicitly distinguishes Full execution from
+exact-tree reuse, and explains whether Development work is expected. PR APK, Development
+eligibility/publication, Stable Prepare/Release, Hold Prepare/Hold, Signing Diagnostic, and
+Upstream summaries keep the outcome and required action visible while collapsing classifier,
+path, SHA/tree/run/artifact, ownership, schedule, and provenance evidence. Upstream uses
+`observed but excluded` for downstream-owned changes and a stable UTC next-check statement rather
+than embedding a time-sensitive next run in the immutable title.
+
+Stable now presents `Ready to release: vX` before `release-promote` approval and `Released: vX`
+after publication. Hold uses `Ready to hold: vX` and `Held: vX`. Signing Diagnostic says before
+expensive work that it validates signing only and publishes nothing. The manual signing SHA input
+remains CP4 work.
+
+Static/output fixtures preserve the live machine contracts `CI`, `Full validation`,
+`Build Development Release`, `Sign Development`, and `Publish Development`. The initially
+low-risk upstream push diagnostic was reclassified: preserving and sanitizing captured Git push
+stderr/stdout changes operational error handling, so it remains CP6 or T0-2 security work.
+Repository Full validation and hosted rendering/sidebar evidence are still required before CP3 is
+accepted as complete and CP4 begins.
 
 ### T0-1 CP2 obsolete-surface removal
 
@@ -51,13 +80,13 @@ and all 10 delivery/presentation tests pass. No shared helper was removed; the w
 self-contained. Older Item 6 audit passages about retaining guarded copies are historical and
 superseded by this decision.
 
-Hosted acceptance confirmed the final sidebar: `CI`, `Hold Release`, `Mosaic — Signing
+Hosted CP2 acceptance confirmed the then-current sidebar: `CI`, `Hold Release`, `Mosaic — Signing
 Diagnostic`, `Mosaic — Stable Promotion`, and `Upstream — Synchronization`. The protected-main run
 completed in 1m53s by reusing exact-tree PR Full evidence: Full validation 1m35s, Build Development
 Release 11s, Sign 0s/skipped, Publish 0s/skipped. The range was `tooling-only / high` with
 `releaseRequired=false`; no APK was built, signed, or published. This closes CP2 as
-**COMPLETE / HOSTED VALIDATED**. CP3 low-risk names/summaries is next; it must not migrate the live
-`CI / Full validation` contract.
+**COMPLETE / HOSTED VALIDATED**. CP3 subsequently implemented low-risk names/summaries without
+migrating the live `CI / Full validation` contract.
 
 ### CP2 hosted lessons retained for later checkpoints
 

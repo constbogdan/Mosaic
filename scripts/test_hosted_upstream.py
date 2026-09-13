@@ -122,6 +122,11 @@ class HostedSyncTests(unittest.TestCase):
     def test_no_delta_and_no_remote_mutation(self):
         git, o = self.observe()
         self.assertEqual(o["outcome"], "no_delta")
+        summary = sync.upstream_summary(o)
+        self.assertTrue(summary.startswith("## No upstream changes"))
+        self.assertIn("No action is required.", summary)
+        self.assertIn("existing UTC schedule will check again automatically", summary)
+        self.assertIn("<summary>Technical details</summary>", summary)
         sync.publish(git, self.github, o, o["upstream_sha"], o["downstream_sha"])
         self.assertFalse(git.pushes or self.github.created)
 
@@ -502,6 +507,11 @@ class HostedSyncTests(unittest.TestCase):
         for change in removed.values():
             self.assertEqual("DOWNSTREAM-OWNED", change["ownership"])
             self.assertIsNone(change["downstream_blob"])
+        summary = sync.upstream_summary(observation)
+        self.assertTrue(summary.startswith("## 2 upstream changes · observed but excluded"))
+        self.assertIn("Mosaic state was preserved", summary)
+        self.assertIn("DOWNSTREAM-OWNED: 2 — observed but excluded", summary)
+        self.assertLess(summary.index("observed but excluded"), summary.index("<details>"))
         self.assertFalse(git.pushes)
         sync.publish(git, self.github, observation, observation["upstream_sha"], observation["downstream_sha"])
         self.assertFalse(self.github.created)
@@ -721,6 +731,10 @@ class HostedSyncTests(unittest.TestCase):
         self.assertIn(clean_path, json.dumps(observation))
 
         summary = sync.upstream_summary(observation)
+        self.assertTrue(summary.startswith("## 2 upstream changes · review required"))
+        self.assertIn("1 path requires review", summary)
+        self.assertIn("<summary>Operator navigation</summary>", summary)
+        self.assertIn("<summary>Technical details</summary>", summary)
         self.assertIn("[PR 1946](https://github.com/damontecres/Wholphin/pull/1946)", summary)
         self.assertIn("https://github.com/damontecres/Wholphin/commit/" + "d" * 40, summary)
         self.assertIn("https://github.com/damontecres/Wholphin/blob/" + "b" * 40 + "/" + path, summary)

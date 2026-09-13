@@ -386,9 +386,15 @@ def record_eligibility(result, ci, env, artifact=None):
         for key, value in values.items():
             output.write(f'{key}={value}\n')
     paths = [entry['path'] for entry in result['paths']]
-    summary = [
-        ('## Skipped · ' + result['releaseRelevance'] if not result['releaseRequired']
-         else '## Ready · Development release eligibility'),
+    if result['releaseRequired']:
+        heading = '## Development release required'
+        explanation = ('This protected-main range can affect the application. An unsigned Release APK will be '
+                       'built next, followed by signing authorization and publication.')
+    else:
+        heading = '## No build required'
+        explanation = ('This change does not affect the application. Development build, signing, and publication '
+                       'are skipped; protected-main validation remains authoritative.')
+    details = [
         f"Outcome: `{result['outcome']}`",
         f"Release relevance: `{result['releaseRelevance']}`",
         f"Validation risk: `{result['validationRisk']}`",
@@ -398,19 +404,22 @@ def record_eligibility(result, ci, env, artifact=None):
         f"Reason: {result['reason']}",
         f"Authoritative CI: `{json.dumps(ci, sort_keys=True) if ci else 'current main push run'}`",
     ]
-    if not result['releaseRequired']:
-        summary.append('Release build/sign/publish not required. Protected-main validation remains authoritative.')
     if result.get('baselineSha'):
-        summary.append(f"Compare sources: https://github.com/{REPOSITORY}/compare/{result['baselineSha']}...{result['currentSha']}")
+        details.append(f"Compare sources: https://github.com/{REPOSITORY}/compare/{result['baselineSha']}...{result['currentSha']}")
     if artifact:
-        summary.extend([
+        details.extend([
             f"Unsigned artifact ID: `{artifact['artifactId']}`",
             f"Unsigned artifact: `{artifact['artifactName']}`",
         ])
     if paths:
-        summary.extend(['', 'Changed range:', *[f'- `{path}`' for path in paths]])
+        details.extend(['', 'Changed range:', *[f'- `{path}`' for path in paths]])
+    summary = (f'{heading}\n\n{explanation}\n\n<details>\n'
+               '<summary>Technical details</summary>\n\n' + '\n\n'.join(details[:8]))
+    if len(details) > 8:
+        summary += '\n\n' + '\n'.join(details[8:])
+    summary += '\n\n</details>\n'
     with Path(env['GITHUB_STEP_SUMMARY']).open('a', encoding='utf-8') as output:
-        output.write('\n\n'.join(summary[:8]) + '\n\n' + '\n'.join(summary[8:]) + '\n')
+        output.write(summary)
 
 
 def assets(api, release, expected, allow_upload):
