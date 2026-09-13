@@ -1,6 +1,6 @@
 # Baseline T0-1 operator UX, workflow, and presentation inventory
 
-Status: **CP2 COMPLETE — OBSOLETE SURFACES REMOVED**
+Status: **CP2 COMPLETE / HOSTED VALIDATED — OBSOLETE SURFACES REMOVED**
 Next: **T0-1 CP3 — Low-risk names and summaries**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
@@ -29,9 +29,55 @@ rename a surviving surface, alter GitHub settings, or begin later presentation/p
 - Classification after moving this durable ledger under `docs/`: the complete branch is
   `tooling-only / high`, selects Full validation because it changes security-sensitive workflow
   ownership, and correctly has `releaseRequired=false` because it changes no APK input.
-- The supported Actions surface is now the five workflows listed below. Hosted confirmation that
-  GitHub's sidebar has dropped the deleted workflow entries remains a post-merge observation, not
-  a reason to retain executable dead files.
+- Hosted acceptance confirmed that GitHub's Actions sidebar dropped both deleted entries and now
+  exposes exactly the five supported workflows listed below.
+
+### CP2 hosted acceptance and operational evidence
+
+- The live Actions sidebar is `CI`, `Hold Release`, `Mosaic — Signing Diagnostic`,
+  `Mosaic — Stable Promotion`, and `Upstream — Synchronization`. Ownership is unambiguous:
+  Development delivery belongs to CI; normal Stable publication to Stable Promotion; emergency
+  Stable containment to Hold Release; credential/signature verification to Signing Diagnostic;
+  and upstream integration to Upstream Synchronization.
+- The protected-main acceptance run completed in **1m53s**: `Full validation` **1m35s**, Build
+  Development Release **11s**, and Sign/Publish **0s (skipped)**. Exact-tree PR evidence was reused,
+  and the complete CP2 range remained `tooling-only / high` with `releaseRequired=false`; no APK
+  was built, signed, or published.
+- The first hosted PR attempt failed before compilation while resolving
+  `jellyfin-core-android-debug:1.7.1` and `programguide-android-debug:1.6.0`. Both artifacts exist,
+  local Full had passed, CP2 changed no dependency/Gradle/repository configuration, and an unchanged
+  rerun passed. Treat this as a transient clean-host dependency/cache/repository-resolution incident,
+  not a CP2 regression or evidence for a speculative dependency change.
+- A separate protected-main attempt spent about **20 minutes** waiting for a hosted runner before
+  validation began; its rerun was scheduled normally and completed in 1m53s. Queue time, setup,
+  validation/build execution, and signing/publication waits are distinct measurements.
+- One hosted run measured 232 offline tooling tests in about **18.6s**, while restoring roughly
+  **801 MB** of Gradle cache and **133 MB** of wrapper data. JDK setup took about **15–20s** and
+  Android setup about **20s**, rejected preinstalled command-line tools, installed another toolset,
+  and emitted noisy legacy/preview license output. These are CP7 evidence, not an optimization made
+  by CP2.
+
+### Upstream publication lesson discovered during CP2 acceptance
+
+- A separate Upstream Synchronization observation succeeded, but publication of its pre-CP2
+  candidate failed at `git push`. The candidate included `.github/workflows/release.yml`; the
+  repository-scoped App token intentionally had `contents: write` and `pull-requests: write`, not
+  `workflows: write`. This is the high-confidence refusal cause, although current subprocess
+  diagnostics discard the exact push rejection. The retained outcome recorded only the generic
+  publication error; no candidate branch or PR was created.
+- Do not broaden the App permission or retry that obsolete candidate. After CP2, the deleted
+  workflow is a downstream-owned absence: a fresh observation should record and exclude the path,
+  preserve the deletion, and carry useful non-workflow changes through the normal native candidate.
+  “Observed but excluded” is not “synced”; accepted Git ancestry remains the terminal integration
+  fact.
+- A future policy decision must choose between isolated repository-scoped Workflows write and a
+  narrower manual path for genuine upstream workflow-file candidates. Prefer the narrower manual
+  path unless a concrete automation use case justifies the additional privilege. Retired
+  downstream-owned workflows remain excluded and require no Workflows permission.
+- Later diagnostics should classify `git push --porcelain` using bounded, sanitized stdout and
+  stderr, and report the operation, remote/refspec, exit code, destination existence, and safe
+  rejection excerpt. Credentials remain environment-only and must never appear in summaries or
+  artifacts.
 
 ## Method and boundaries
 
@@ -375,8 +421,8 @@ external action, and owner checkpoint.
 
 | ID | Source / current problem | Target and dependency/risk | Validation / external action | CP |
 |---|---|---|---|---|
-| R01 — COMPLETE | `.github/workflows/main.yml`; dead guarded `Development build` polluted sidebar | Deleted; ownership policy, fixtures and current docs preserve its intended absence. Current CI is sole owner | Focused policy/workflow tests; hosted sidebar observation after merge; no settings | CP2 |
-| R02 — COMPLETE | `.github/workflows/release.yml`; dead guarded `Create release`, but unique AAB knowledge | Baseline T0 declines store/AAB ownership; deleted and marked downstream-owned absence; capability retained in historical audit | Focused ownership/release tests; hosted sidebar observation after merge | CP2 |
+| R01 — COMPLETE / HOSTED VALIDATED | `.github/workflows/main.yml`; dead guarded `Development build` polluted sidebar | Deleted; ownership policy, fixtures and current docs preserve its intended absence. Current CI is sole owner | Focused policy/workflow tests; hosted sidebar confirmed absent; no settings | CP2 |
+| R02 — COMPLETE / HOSTED VALIDATED | `.github/workflows/release.yml`; dead guarded `Create release`, but unique AAB knowledge | Baseline T0 declines store/AAB ownership; deleted and marked downstream-owned absence; capability retained in historical audit | Focused ownership/release tests; hosted sidebar confirmed absent | CP2 |
 | R03 — COMPLETE FOR REMOVED SURFACES | Active docs presented deleted/obsolete workflow surfaces | Current docs point to CI/Stable/Hold; historical evidence is explicitly labeled historical | Link/pre-commit checks; no GitHub change | CP2; final consistency sweep CP8 |
 
 ### LOW-RISK PRESENTATION (4)
@@ -388,7 +434,7 @@ external action, and owner checkpoint.
 | L03 | Signing Diagnostic repeats prefix | `Signing Diagnostic`; artifacts/file unchanged | Signing presentation tests | CP3 |
 | L04 | Setup/composite and safe step labels are inconsistent (`Setup`, `Get Release`) | Natural verb/object labels without changing action paths or job IDs | YAML/static tests | CP3 |
 
-### SUMMARY / COLLAPSE (6)
+### SUMMARY / COLLAPSE (7)
 
 | ID | Source / current problem | Target and dependency/risk | Validation / external action | CP |
 |---|---|---|---|---|
@@ -398,6 +444,7 @@ external action, and owner checkpoint.
 | S04 | `hosted_upstream.upstream_summary` exposes policy tables and full JSON | Counts/attention/action first; lists/navigation/details collapsed; artifact remains complete | Hostile input, quiet-surface, outcome tests; natural run | CP3 |
 | S05 | prepare-pr console and PR body repeat raw scope | `PR scope: N files`; paths/stats in logs and collapsed PR details | Disposable prepare-pr tests; no snapshot weakening | CP6 |
 | S06 | failure summaries name `$GITHUB_JOB` but not always action/remedy | Plain refusal/failure, mutation status, retry/forward-fix action visible | Failure fixtures; no secret/stderr regression | CP3/CP8 |
+| S07 | Upstream publication hides the actionable `git push --porcelain` rejection because stdout/stderr are captured but discarded | Bounded sanitized failure detail: operation, remote/refspec, exit, destination existence, rejection category/excerpt from both streams; never credentials | Push failure fixtures for stdout/stderr and hostile secret-like text | CP3/CP6 |
 
 ### PROCESS SIMPLIFICATION (5)
 
@@ -409,7 +456,7 @@ external action, and owner checkpoint.
 | P04 | prepare-pr stops after PR creation and manual auto-merge click | Authenticate same non-Draft head and arm native auto-merge; never arm upstream Draft | Mocked `gh`, branch/rules tests; enable GitHub auto-merge manually; hosted acceptance | CP4 |
 | P05 | Signing Diagnostic requires repeated SHA | Zero-input authenticated protected-main source; keep Environment approval and no publication | Signing auth/refusal tests + manual hosted diagnostic | CP4 |
 
-### HIGH-RISK CONTRACT MIGRATION (5)
+### HIGH-RISK CONTRACT MIGRATION (6)
 
 | ID | Source / current problem | Target and dependency/risk | Validation / external action | CP |
 |---|---|---|---|---|
@@ -418,14 +465,18 @@ external action, and owner checkpoint.
 | H03 | Artifact names are ugly but authenticated | Do not rename by default; improve surrounding display. Any change needs dual-reader/migration proof | Complete artifact/provenance/Stable/Hold tests | CP5 or reject |
 | H04 | Release names/tags/installer filenames mix human/machine identity | Keep updater contracts; isolate human title changes from machine identity | Updater/version/manifest/device update acceptance | CP5/CP6 |
 | H05 | Ownership path state for removed inherited workflows | Explicit downstream-owned absence so upstream sync cannot resurrect publishers | I06 classification/native candidate fixtures + natural observation | CP2/CP5 |
+| H06 | I06 can construct a genuine `.github/workflows/**` candidate while its least-privilege App token lacks Workflows write | Decide explicitly between manual handling (preferred absent a concrete need) and isolated repo-scoped Workflows write; never silently broaden authority | Permission/threat-model audit plus authorized hosted acceptance only if automation is chosen | CP5 or T0-2 security |
 
-### PERFORMANCE (3)
+### PERFORMANCE (6)
 
 | ID | Source / current problem | Target and dependency/risk | Validation / external action | CP |
 |---|---|---|---|---|
 | F01 | Offline tooling ~6m38s; hosted Git fixtures likely dominate | Per-suite/test profile; share only immutable setup proven isolation-safe; assess process parallelism | Repeated timing + full offline equivalence | CP7 |
 | F02 | Android Full ~3m16s and repeated across paths | Measure Gradle task/cache overlap before changing authoritative validation model | Task graph/cache evidence + complete validation | CP7 after CP4 |
 | F03 | Release Build ~10m+, fresh job after Debug | Profile configuration/task/cache/download time; assess safe cache/artifact reuse without crossing build/sign authority | Hosted timing and provenance/security regression | CP7 |
+| F04 | Hosted duration reports can conflate runner queue, setup, execution and Environment/publication wait | Record those phases separately; never present runner wait as validation/build time | PR/main/rerun samples with job timestamps | CP7 |
+| F05 | One run spent ~18.6s on 232 offline tests but restored ~934 MB of Gradle/wrapper cache and performed heavy Android/JDK setup | Measure cache value, preinstalled-tool rejection, duplicate downloads and license noise before changing setup | Repeated clean/warm hosted runs; preserve pinned/reproducible toolchain | CP7 |
+| F06 | No consolidated real-run corpus yet covers every surviving workflow and alternate path | Analyze PR/main CI, Development Build/Sign/Publish, Stable, Hold, Signing Diagnostic, Upstream Sync, reruns, reuse, queues, transient dependency failures, refusals and skips before optimization | Evidence table from existing hosted logs; no manufactured mutations | CP7; feed CP3/CP6 and T0-2/T0-3 |
 
 ### RELEASE PRESENTATION (4)
 
@@ -436,7 +487,7 @@ external action, and owner checkpoint.
 | V03 | Immutable archive looks like another human release | Mark archive/provenance role; rolling channel is primary | Release body/updater tests | CP6 |
 | V04 | Artifact identities dominate summaries | Human version/channel first; exact artifact in details | Artifact authentication unchanged; summary tests | CP6 |
 
-### DEFER TO T0-2 (4)
+### DEFER TO T0-2 (5)
 
 | ID | Finding | Why deferred | T0-2 evidence needed |
 |---|---|---|---|
@@ -444,17 +495,18 @@ external action, and owner checkpoint.
 | D02 | Whether ruleset, Environment and permission configuration exactly matches documented assumptions | External assurance beyond repository UX | Read-only settings inventory and drift checks |
 | D03 | Previously unknown races/idempotency/security gaps discovered during cleanup | Must not expand T0-1 speculatively | Whole-system adversarial audit and categorization |
 | D04 | Application architecture/test adequacy for resumed features | Product engineering boundary, not operator cleanup | T0-2 architecture and coverage audit |
+| D05 | A clean hosted runner transiently failed to resolve two existing Android debug variants while local cache and an unchanged rerun succeeded | Reproducibility/dependency-resolution assurance, not CP2 presentation work; do not alter dependencies after one transient failure | Compare clean/warm resolution, repository availability and dependency metadata only if recurrence supplies evidence |
 
-Ledger totals: **REMOVE 3; LOW-RISK PRESENTATION 4; SUMMARY/COLLAPSE 6; PROCESS
-SIMPLIFICATION 5; HIGH-RISK CONTRACT MIGRATION 5; PERFORMANCE 3; RELEASE PRESENTATION 4;
-DEFER TO T0-2 4** — **34 finite items**.
+Ledger totals: **REMOVE 3; LOW-RISK PRESENTATION 4; SUMMARY/COLLAPSE 7; PROCESS
+SIMPLIFICATION 5; HIGH-RISK CONTRACT MIGRATION 6; PERFORMANCE 6; RELEASE PRESENTATION 4;
+DEFER TO T0-2 5** — **40 finite items**.
 
 ## Recommended T0-1 checkpoint sequence
 
 1. **CP1 — Inventory (complete):** this document; no behavior change.
-2. **CP2 — Remove obsolete surfaces (complete):** deleted `main.yml` and `release.yml`, explicitly
-   deferred AAB/store distribution, and updated ownership/tests/docs atomically. Hosted sidebar
-   observation remains post-merge evidence.
+2. **CP2 — Remove obsolete surfaces (complete / hosted validated):** deleted `main.yml` and
+   `release.yml`, explicitly deferred AAB/store distribution, updated ownership/tests/docs
+   atomically, and confirmed the resulting five-workflow Actions sidebar and non-APK main path.
 3. **CP3 — Low-risk names and summaries:** remove redundant prefixes, translate primary decisions,
    add early summary lines, collapse detail. Do not touch `CI / Full validation`.
 4. **CP4 — Process simplification:** eliminate redundant validation paths, simplify Signing
@@ -500,7 +552,6 @@ Stable Promotion and Hold Release retain their exact responsibilities. Appstore/
 distribution is explicitly deferred. The ownership policy and regression fixtures make both
 deletions intentional downstream state.
 
-CP3 may begin on a separate branch after CP2 is merged. Hosted confirmation of the five-workflow
-sidebar is useful natural acceptance evidence but does not block the next bounded checkpoint. CP3
-must still avoid the coordinated `CI / Full validation` machine-contract migration reserved for a
-later checkpoint.
+Hosted acceptance confirmed the five-workflow sidebar, exact-tree reuse, and a tooling-only main
+path with no APK Build/Sign/Publish. CP3 may begin on a separate branch and must still avoid the
+coordinated `CI / Full validation` machine-contract migration reserved for a later checkpoint.

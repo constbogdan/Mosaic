@@ -8,7 +8,7 @@
 
 `Baseline T0 — IN PROGRESS`
 
-`T0-1 CP2 — COMPLETE / OBSOLETE SURFACES REMOVED`
+`T0-1 CP2 — COMPLETE / HOSTED VALIDATED`
 
 `Next: T0-1 CP3 — Low-risk names and summaries`
 
@@ -26,7 +26,7 @@ afterward; future infrastructure work becomes demand-driven.
 The authoritative [T0-1 inventory and implementation ledger](T0_1_OPERATOR_UX_INVENTORY.md)
 audited seven workflows, 145 YAML/generated presentation labels or families, 52 grouped
 presentation surfaces, 20 multiline outputs, timing/conditional explanations, PR/Release/artifact
-presentation, validation duplication, signing diagnostics, and performance evidence. It defines 34
+presentation, validation duplication, signing diagnostics, and performance evidence. It defines 40
 finite implementation items across CP2–CP8.
 
 ### T0-1 CP2 obsolete-surface removal
@@ -47,10 +47,48 @@ Both deleted workflow paths remain in `scripts/upstream_ownership_policy.json` a
 `DOWNSTREAM-OWNED`. This represents approved absence: I06 observes and records upstream changes to
 those paths but does not restore either publisher. Focused tests prove upstream additions remain
 excluded/absent and that unknown automation still defaults to REVIEW. All 54 hosted-sync fixtures
-and all 10 delivery/presentation tests pass. No shared helper was removed;
-the workflows were self-contained. Hosted confirmation that GitHub's Actions sidebar now contains
-only the five supported workflows remains post-merge evidence. Older Item 6 audit passages about
-retaining guarded copies are historical and superseded by this decision.
+and all 10 delivery/presentation tests pass. No shared helper was removed; the workflows were
+self-contained. Older Item 6 audit passages about retaining guarded copies are historical and
+superseded by this decision.
+
+Hosted acceptance confirmed the final sidebar: `CI`, `Hold Release`, `Mosaic — Signing
+Diagnostic`, `Mosaic — Stable Promotion`, and `Upstream — Synchronization`. The protected-main run
+completed in 1m53s by reusing exact-tree PR Full evidence: Full validation 1m35s, Build Development
+Release 11s, Sign 0s/skipped, Publish 0s/skipped. The range was `tooling-only / high` with
+`releaseRequired=false`; no APK was built, signed, or published. This closes CP2 as
+**COMPLETE / HOSTED VALIDATED**. CP3 low-risk names/summaries is next; it must not migrate the live
+`CI / Full validation` contract.
+
+### CP2 hosted lessons retained for later checkpoints
+
+- The initial PR attempt failed before compilation resolving two existing Android debug variants;
+  local Full had passed and an unchanged hosted rerun passed. CP2 changed no dependency, Gradle, or
+  repository configuration. Treat this as a transient clean-host dependency/cache/repository
+  incident unless recurrence provides stronger evidence; do not speculate with dependency changes.
+- A separate main attempt waited about 20 minutes for a runner before work began. Queue time is not
+  execution time. Future measurements must separate queue, setup, validation/build, Environment
+  waits, and signing/publication.
+- One hosted run executed 232 offline tooling tests in about 18.6s but restored about 801 MB of
+  Gradle cache and 133 MB of wrapper data; JDK setup took about 15–20s and Android setup about 20s,
+  installed replacement tooling, and emitted noisy legacy/preview license output. Preserve this as
+  CP7 evidence; do not optimize it during CP3.
+- A separate pre-CP2 Upstream candidate observed successfully but failed publication at `git push`.
+  It contained `.github/workflows/release.yml`, while the least-privilege App token had
+  `contents: write` and `pull-requests: write`, not Workflows write. Do not broaden privilege or retry
+  the obsolete candidate: a fresh observation must treat that removed path as a downstream-owned
+  exclusion. The retained outcome had only the generic publication error; no candidate branch or PR
+  was created. For future genuine workflow-file candidates, prefer human/manual publication unless
+  a concrete need justifies isolated repo-scoped Workflows write.
+- Current `git push --porcelain` handling captures but suppresses both streams, so the exact hosted
+  rejection was lost and only a generic outcome remained. A later bounded diagnostic improvement
+  should examine sanitized stdout and stderr, identify operation/remote/refspec/exit/category, and
+  never reveal credentials.
+- Before Baseline T0 is declared, audit real hosted logs for every surviving workflow and important
+  alternate path: PR/main validation, evidence reuse/fallback, Development Build/Sign/Publish,
+  Stable, Hold, Signing Diagnostic, Upstream Sync, reruns, queues, transient dependency failure,
+  refusal, and skip. Feed presentation findings to CP3/CP6, timing to CP7, reproducibility/security
+  to T0-2, and durable operator explanations to T0-3. Do not manufacture hosted mutations merely
+  to populate this corpus.
 
 ## Item 6 I06: ownership-aware hosted Upstream Sync
 

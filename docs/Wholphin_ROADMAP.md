@@ -10,7 +10,7 @@ authoritative; the obsolete Issue/journal/finalizer lifecycle is removed.
 **I07 — COMPLETE / LIVE VALIDATED.** Development uses forward-fix recovery. Stable supports the
 minimal emergency Hold Release followed by forward-fix and zero-input Stable Promotion.
 
-**Baseline T0 — IN PROGRESS. T0-1 CP2 obsolete-surface removal is complete; next is CP3
+**Baseline T0 — IN PROGRESS. T0-1 CP2 obsolete-surface removal is complete and hosted validated; next is CP3
 low-risk names and summaries.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
@@ -28,7 +28,7 @@ backlog, operating principles, audit scope, and acceptance criteria follow below
 
 The authoritative [T0-1 inventory and implementation ledger](T0_1_OPERATOR_UX_INVENTORY.md)
 maps all current workflows, presentation/output/timing/conditional surfaces, machine-contract
-risks, 34 implementation items, and the bounded CP2–CP8 sequence.
+risks, 40 implementation items, and the bounded CP2–CP8 sequence.
 
 ### T0-1 scope and operator presentation principles
 
@@ -60,6 +60,15 @@ inherited Development Build and Create release surfaces; Baseline T0 deliberatel
 Appstore or Fire TV AAB distribution. Later, audit compatibility for human Development versions such as
 `v1.0.34-1-g<sha>` while retaining `downstream-build-N` machine identity, and add Compare Changes
 links.
+
+Hosted CP2 evidence also establishes bounded later work: CP7 must separate runner queue, setup,
+cache/tool installation, test/build execution, Environment wait, and publication timing, and must
+review real hosted logs across every surviving workflow before optimizing. T0-2 owns recurrence-based
+clean-host dependency reproducibility and the authority decision for genuine upstream workflow-file
+candidates. The preferred default is manual handling rather than broader App permission unless a
+concrete automation requirement is demonstrated. CP3/CP6 own sanitized actionable push diagnostics;
+the current generic publication error is insufficient because `git push --porcelain` rejection detail
+may arrive on stdout as well as stderr.
 
 ### T0-2 audit contract
 
@@ -844,7 +853,7 @@ publishing as measured options, not completed optimizations.
 Audit all Actions workflows together: dead/redundant workflow code, obsolete compatibility
 branches, unused scripts/helpers, duplicate GitHub API/provenance requests, unnecessary
 checkouts/transfers, slow Python helpers, caching and unnecessary Gradle tasks. Determine
-CP2 proved and removed the skipped inherited Development build and tag-release workflows. Both
+CP2 proved, removed, and hosted-validated the skipped inherited Development build and tag-release workflows. Both
 paths are intentional downstream-owned absences; store/AAB distribution remains unsupported until
 a deliberately owned pipeline is designed. Next standardize surviving workflow/job/step/artifact
 names, summaries, outputs, scripts and tests.

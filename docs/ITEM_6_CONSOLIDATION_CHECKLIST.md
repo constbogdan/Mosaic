@@ -188,9 +188,10 @@ I06 and I07 are **COMPLETE / LIVE VALIDATED**. The next top-level program is
 [Baseline T0](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 Cleanup & Operator Experience, T0-2 Full Engineering / Process
 Audit, then T0-3 Documentation, Wiki & Roadmap. Baseline T0 is not an application release and must
 not be declared until its audit has no unresolved/unaccepted blocker and the current architecture is
-navigable from `docs/README.md`. T0-1 CP1 is complete: the authoritative
+navigable from `docs/README.md`. T0-1 CP1 and CP2 are complete: the authoritative
 [operator UX inventory and implementation ledger](T0_1_OPERATOR_UX_INVENTORY.md) defines the
-finite CP2–CP8 work. Next is CP2 Remove obsolete surfaces.
+finite CP3–CP8 work. CP2 is hosted validated with exactly five supported Actions surfaces and no APK
+build/sign/publish for its tooling-only main range. Next is CP3 Low-risk names and summaries.
 
 - [ ] **D02 — DOCUMENT — Consolidate operational documentation after each checkpoint** (Items 45–47, 51, 62, 70–72, 75, 119, 123–125)
   - Status: **ONGOING.**
