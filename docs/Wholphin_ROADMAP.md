@@ -13,13 +13,14 @@ minimal emergency Hold Release followed by forward-fix and zero-input Stable Pro
 **Baseline T0 — IN PROGRESS. T0-1 CP4B.1 exact-tree reuse contract repair is COMPLETE / HOSTED
 VALIDATED. CP4B.2 — Authoritative PR Validation Model — is COMPLETE / HOSTED VALIDATED for both
 `ANDROID_FULL` and `NON_ANDROID`. CP4B.3 — Local / prepare-pr simplification — is COMPLETE / HOSTED
-VALIDATED. P04 — prepare-pr native auto-merge — is COMPLETE / HOSTED VALIDATED.** Baseline T0 is an
+VALIDATED. P04 — prepare-pr native auto-merge — is COMPLETE / HOSTED VALIDATED. Validation-plan
+visibility is COMPLETE / HOSTED VALIDATED.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 Checkpoint sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE /
-HOSTED VALIDATED.**
+HOSTED VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED.**
 
 CP4B.2 evidence classes: **`ANDROID_FULL` — HOSTED VALIDATED; `NON_ANDROID` — HOSTED VALIDATED.**
 
@@ -158,13 +159,20 @@ evidence and reused Full in approximately 11 seconds. Merge-commit/two-parent in
 intact, and prepare-pr used no administrative/direct bypass, force push, readiness change, or settings
 mutation.
 
-The next bounded sequence is existing T0-1 work, not a new architecture: first correct the
-`scripts/tooling_test_support.py` classification gap that conservatively caused `ANDROID_FULL` and
-Development v1.0.46; then improve when the already-computed PR Validation plan becomes visible; then
-continue the existing upstream presentation backlog (direct candidate link, less Observe/Publish
-duplication, REVIEW-first presentation, and truthful navigation for excluded/preserved paths).
-Unknown paths must retain conservative Full/release behavior while the narrow classifier correction
-is assessed.
+The tooling-support classification gap was corrected in PR #67 without weakening conservative
+unknown-path behavior. PR #68 then made the already-computed PR Validation plan visible near the
+start of authoritative CI and is **COMPLETE / HOSTED VALIDATED**. Its workflow-sensitive scope
+truthfully selected conservative `ANDROID_FULL`; the signal appeared early, required CI passed,
+native auto-merge waited for protection, protected main reused exact-tree evidence, and Development
+eligibility independently determined release relevance. Existing job, step, evidence, reuse,
+permission, and Release Build/Sign/Publish contracts did not change.
+
+The next bounded T0-1 item is **prepare-pr terminal UX cleanup**: concise stage progress; one useful
+scope/classification line; short clickable stage-log and PR links; explicit required-CI and expected
+hosted-path state; automatic concise failure diagnostics; retained forensic logs; and graceful
+fallback without terminal hyperlink support. The complete illustrative output contract is recorded
+in the [T0-1 execution ledger](T0_1_OPERATOR_UX_INVENTORY.md#t0-1-validation-plan-visibility).
+Upstream presentation remains the following bounded backlog, not part of this checkpoint.
 
 Hosted CP2 evidence also establishes bounded later work: CP7 must separate runner queue, setup,
 cache/tool installation, test/build execution, Environment wait, and publication timing, and must

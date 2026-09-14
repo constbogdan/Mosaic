@@ -14,12 +14,14 @@
 
 `P04 — COMPLETE / HOSTED VALIDATED`
 
-`Next: correct the tooling-test-support classification gap without weakening unknown-path fallback`
+`Validation-plan visibility — COMPLETE / HOSTED VALIDATED (PR #68)`
+
+`Next: prepare-pr terminal UX cleanup`
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
 `CP4B.2 COMPLETE / HOSTED VALIDATED`; `CP4B.3 COMPLETE / HOSTED VALIDATED`; `P04 COMPLETE / HOSTED
-VALIDATED`.
+VALIDATED`; `Validation-plan visibility COMPLETE / HOSTED VALIDATED`.
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -271,20 +273,27 @@ branch protection. Prepare-pr used no `--admin`, force push, direct bypass, read
 repository-setting mutation. Upstream REVIEW/conflict Drafts remain excluded and human-controlled.
 P04 is **COMPLETE / HOSTED VALIDATED**.
 
-Immediate follow-up, not a P04 defect: the new `scripts/tooling_test_support.py` path was
-conservatively unknown. That correctly selected `ANDROID_FULL` and then caused Development release
-eligibility, Release APK build/sign/publish, and Development v1.0.46. Determine whether the
-legitimate tooling path warrants a narrow tooling-only mapping and regression coverage; retain
-unknown-path conservative Full/release behavior.
+PR #67 closed the tooling-support classification gap with a narrow known-tooling rule while retaining
+conservative behavior for genuinely unknown paths. PR #68 then closed the Validation-plan visibility
+item. Authoritative CI now renders `Validation path · Non-Android`, `Validation path · Android Full`,
+or `Validation path · Conservative Android Full` from the existing policy outputs and writes a
+concise explanation to the live log immediately after classification. The detailed job summary
+remains. No second classifier or lifecycle state was added.
 
-After that classification correction, improve the already-computed PR Validation plan's early
-visibility using the smallest native GitHub presentation change. Then continue the existing upstream
-presentation backlog recorded from manual Upstream check #39: current Scheduled/Manual run names are
-adequate; preserve existing-candidate reuse/no-duplicate behavior; add a prominent final candidate
-PR/Draft link; reduce duplicate Observe/Publish outcome text; put REVIEW attention before bulk
-incoming history; and provide truthful current-upstream comparison/navigation when preserved REVIEW
-paths are absent from Files changed. Keep `resolve-upstream.ps1` as the semantic entry point and its
-automatic Codex handoff.
+PR #68 naturally selected conservative `ANDROID_FULL`; the early signal was visible, required CI
+passed, P04 auto-merge waited for protection, and protected main authenticated and reused the exact
+PR evidence. Development eligibility continued to decide release relevance independently. `CI /
+Full validation`, `full-validation`, `Choose PR validation path`, `Check changed files`, `Run offline
+tooling checks`, `Run Full validation`, step IDs, evidence classes/artifacts, reuse selectors,
+permissions, and release/sign/publish authority are unchanged. Eligible ordinary PR wording now
+reflects native auto-merge, while Draft/upstream-review PRs remain human-controlled.
+
+The next bounded item is **prepare-pr terminal UX cleanup**. Preserve the six-stage concise-success
+target in the [authoritative ledger](T0_1_OPERATOR_UX_INVENTORY.md#t0-1-validation-plan-visibility):
+short clickable `[log]` and `[open]` links, explicit required-CI and expected hosted-path state, one
+useful scope/classification line, automatic concise failure diagnostics, complete existing forensic
+logs, and graceful fallback where terminal hyperlinks are unsupported. Do not fold the later
+upstream presentation backlog into that change.
 
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-
