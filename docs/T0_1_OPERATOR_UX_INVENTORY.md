@@ -839,6 +839,16 @@ only uncommitted-content stages, never creates or amends a commit, and retains a
 divergence, no-force, PR reuse, and native-upstream safeguards. Disposable coverage is complete;
 hosted use of this new path remains pending rather than being folded into PR #63's earlier evidence.
 
+PR #64 then exercised the committed-only fixtures in hosted authoritative CI. The positive clean
+publication, complete multi-commit scope, and existing-PR reuse cases passed. Three negative cases
+also refused correctlyâ€”clean `HEAD == origin/main`, divergent remote publication, and an upstream
+branch without preserved native-merge identityâ€”but their assertions encountered the already-known
+PowerShell rendering behavior: hosted error-column formatting inserted standalone `|` markers at
+wrapped word boundaries. The fixture now has one central test-side presentation contract that
+removes ANSI CSI sequences, whitespace-delimited PowerShell column markers, line wrapping, and
+resulting repeated whitespace before semantic assertions. Production prepare-pr behavior remains
+unchanged; the centralized normalization correction still requires hosted confirmation.
+
 
 ---
 

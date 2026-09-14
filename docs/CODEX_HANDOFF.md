@@ -199,6 +199,17 @@ unless the preserved-merge identity contract is supplied, and they retain focuse
 parent/tree/Draft authentication. Twelve disposable prepare-pr fixtures pass; hosted acceptance of
 this committed-only path is still pending. P04 remains separate and unstarted.
 
+PR #64 provided partial hosted acceptance for that follow-up. Clean committed-only publication
+without a new/amended commit, complete scope across multiple existing commits, and existing-PR reuse
+passed on the hosted runner. The three failing fixtures were presentation-only: production correctly
+refused clean/equal scope, remote divergence requiring force push, and an upstream branch missing
+preserved native-merge identity, but PowerShell inserted standalone `|` error-column markers between
+wrapped words. `test_prepare_pr.py` now centralizes the observed presentation boundaryâ€”ANSI CSI,
+line wrapping, whitespace-delimited column pipes, and repeated whitespace normalize to semantic
+diagnostic text before assertions. All failure-message assertions use that shared helper where
+presentation can vary. No production prepare-pr, validation/provenance, workflow, or release
+behavior changed; hosted confirmation of the normalization correction remains pending.
+
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-
 and commit-tree verification, unexpected-mutation refusal, remote divergence/no-force protection,

@@ -18,25 +18,42 @@ ANSI_CONTROL = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 
 def normalized_native_output(result):
-    """Remove terminal presentation and fold wrapped diagnostics for assertions."""
-    return " ".join(ANSI_CONTROL.sub("", result.stdout + result.stderr).split())
+    """Remove observed PowerShell presentation and retain semantic diagnostics."""
+    presentation = ANSI_CONTROL.sub("", (result.stdout or "") + (result.stderr or ""))
+    presentation = re.sub(r"(?<!\S)\|(?=\s|$)", " ", presentation)
+    return " ".join(presentation.split())
 
 
 class PreparePrFixtureTest(unittest.TestCase):
     def test_native_diagnostic_normalization_handles_ansi_wrapping_and_columns(self):
-        result = subprocess.CompletedProcess(
-            args=[],
-            returncode=1,
-            stdout="\x1b[31;1mThe produced commit tree does |\x1b[0m\n",
-            stderr=(
+        cases = {
+            (
+                "\x1b[31;1mThe produced commit tree does |\x1b[0m\n",
                 "\x1b[31;1mnot match the reviewed staged tree |\x1b[0m\n"
-                "\x1b[31;1mpublication is refused.\x1b[0m\n"
+                "\x1b[31;1mpublication is refused.\x1b[0m\n",
+            ): (
+                "The produced commit tree does not match the reviewed staged tree "
+                "publication is refused."
             ),
-        )
-        diagnostic = normalized_native_output(result)
-        self.assertIn("produced commit tree", diagnostic)
-        self.assertIn("reviewed staged tree", diagnostic)
-        self.assertIn("publication is refused", diagnostic)
+            ("publication would require a force | push\n", ""): (
+                "publication would require a force push"
+            ),
+            ("branch-only committed paths |\n", "were found\n"): (
+                "branch-only committed paths were found"
+            ),
+            ("existing preserved | native-merge identity arguments\n", ""): (
+                "existing preserved native-merge identity arguments"
+            ),
+        }
+        for (stdout, stderr), expected in cases.items():
+            with self.subTest(expected=expected):
+                result = subprocess.CompletedProcess(
+                    args=[],
+                    returncode=1,
+                    stdout=stdout,
+                    stderr=stderr,
+                )
+                self.assertEqual(expected, normalized_native_output(result))
 
     def setUp(self):
         if not POWERSHELL:
@@ -345,7 +362,7 @@ raise SystemExit(2)
             check=False,
         )
         self.assertNotEqual(0, result.returncode)
-        self.assertIn("Nothing was staged", result.stdout + result.stderr)
+        self.assertIn("Nothing was staged", normalized_native_output(result))
         self.assertEqual(0, self.git("diff", "--cached", "--quiet", check=False).returncode)
         self.assertEqual("ScopeConfirmed", self.state()["completedPhase"])
 
