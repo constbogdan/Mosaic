@@ -1,11 +1,11 @@
 # Baseline T0-1 operator UX, workflow, and presentation inventory
 
-Status: **CP4B.3 IMPLEMENTED / FOCUSED VALIDATED; HOSTED ACCEPTANCE IN PROGRESS**
-Next: **Revalidate PR #63 after its hosted-only output portability correction, then complete CP4B.3 hosted acceptance**
+Status: **CP4B.3 COMPLETE / HOSTED VALIDATED**
+Next: **P04 — prepare-pr native auto-merge, after its repository-setting and safety prerequisites are explicitly approved**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
-CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 IMPLEMENTED / FOCUSED VALIDATED / HOSTED ACCEPTANCE IN PROGRESS.**
+CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED.**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
 baseline; historical names in acceptance records are evidence, not active UX. CP2 removed only
@@ -14,8 +14,8 @@ operator presentation without changing machine contracts. CP4A records the measu
 from local edits through hosted validation and Development publication. CP4B.1 repaired and
 live-proved the exact-tree reuse selector contract exposed by that audit. CP4B.2 implements the
 complete two-class PR policy contract. Natural hosted runs validated both `ANDROID_FULL` and
-`NON_ANDROID`; CP4B.3 now removes duplicate routine local authority while leaving that hosted
-contract unchanged.
+`NON_ANDROID`; PR #63 live-validated the CP4B.3 removal of duplicate routine local authority while
+leaving that hosted contract unchanged.
 
 ## T0-1 CP4B.1 exact-tree reuse contract repair
 
@@ -184,9 +184,9 @@ The controlled migration order is:
 4. Teach protected main to reuse complete PR policy evidence — **IMPLEMENTED**.
 5. Live-prove the Android path — **COMPLETE (`ANDROID_FULL`, PR #61)**.
 6. Live-prove the non-Android path — **COMPLETE (`NON_ANDROID`, PR #62)**.
-7. Simplify local and prepare-pr validation — **IMPLEMENTED / FOCUSED VALIDATED (CP4B.3)**.
-8. Remove superseded state, catalog, tests, and documentation.
-9. Simplify Signing Diagnostic separately.
+7. Simplify local and prepare-pr validation — **COMPLETE / HOSTED VALIDATED (CP4B.3, PR #63)**.
+8. Arm native auto-merge from prepare-pr only after P04 safety and repository-setting prerequisites.
+9. Simplify Signing Diagnostic separately under P05.
 
 No safety mechanism is removed before its replacement is implemented and hosted-proven. Performance
 work remains CP7/T0-2: retain the observed 6+ minute local versus tens-of-seconds hosted offline gap,
@@ -197,7 +197,7 @@ diagnostics as evidence rather than folding them into CP4B.2.
 
 ## T0-1 CP4B.3 local / prepare-pr simplification
 
-Status: **IMPLEMENTED / FOCUSED VALIDATED; HOSTED ACCEPTANCE PENDING**
+Status: **COMPLETE / HOSTED VALIDATED**
 
 The normal publication path is now:
 
@@ -237,10 +237,12 @@ validation results, unexpected local-check mutation refusing before staging, exa
 tree equality, and commit-hook mutation refusing publication state. Existing focused contracts
 continue to cover remote divergence/no-force refusal, existing-PR reuse/no duplication, and native
 upstream Draft/merge identity. PowerShell parsing and focused validation-policy/resolver suites are
-part of this checkpoint's local acceptance. The final focused run passed 4 disposable prepare-pr
-tests, 21 validation-policy/integration tests, and 34 resolver tests. A real current-branch Fast run
-classified `tooling-only / high`, selected `non-android`, deliberately deferred the complete offline
-suite to PR CI, passed changed-scope pre-commit and whitespace checking, and completed in 2.7 seconds.
+part of this checkpoint's local acceptance. The final focused coverage passed 5 disposable
+prepare-pr tests after the hosted portability corrections, 21 validation-policy/integration tests,
+and 34 resolver tests. The acceptance Fast run reported `tooling-only / high`, selected
+`non-android`, deliberately deferred the complete offline suite to authoritative PR CI, passed
+changed-scope pre-commit in about 1.8 seconds and whitespace checking in about 0.1 seconds, and
+completed in about 4.0 seconds.
 
 PR #63 supplied two hosted CP4B.3 portability findings. Authoritative PR CI correctly exercised the
 new disposable prepare-pr fixtures and first caught ANSI formatting plus host line wrapping that
@@ -250,14 +252,38 @@ correctly in both runs—the commit hook changed `HEAD^{tree}`, COMMIT failed, s
 `Staged`, and publication was refused. Coverage removes ANSI control sequences, folds presentation
 whitespace, and asserts the stable semantic components independently of visual error-column
 formatting; it separately asserts COMMIT failure, the mismatched tree, and unchanged state. No
-prepare-pr safety or publication behavior changed. A successful PR #63 rerun remains required
-before CP4B.3 hosted acceptance is complete.
+prepare-pr safety or publication behavior changed.
 
-The first normal PR after merge must capture prepare-pr duration against the historical roughly
-5–6 minute validation-heavy path, pass authoritative PR policy, and show protected-main exact-tree
-reuse. No synthetic application or release change is required; this tooling/process branch is a
-natural `NON_ANDROID` candidate. Any evidence uncertainty must still exercise the complete
-protected-main fallback.
+Normal prepare-pr reviewed the complete intended scope, retained exact snapshot/staging/tree
+guarantees, committed the reviewed tree, pushed without force, and created or reused PR #63 before
+handing authority to GitHub. It did not run routine broad local Full. The observed publication
+stage took about 8 seconds, versus the historical roughly 5–6 minute validation-heavy prepare-pr
+path; the 8 seconds is the publication-stage measurement, not a claim about complete prepare-pr
+duration.
+
+The final PR #63 run completed successfully in about 1m08s. Changed-range pre-commit and the
+complete offline tooling suite passed, Android application validation was correctly not required,
+and CI emitted exact-tree `NON_ANDROID` policy evidence. This is the intended separation: local
+checks provide fast feedback, while hosted PR CI provides authoritative integration validation.
+
+After merge, protected-main CI completed in about 26 seconds and reported:
+
+```text
+PR validation reused — this exact tree passed NON_ANDROID on PR #63.
+```
+
+Evidence authentication took about 14 seconds; Development eligibility took about 7 seconds and
+reported `No build required`; Sign and Publish were skipped. Protected main therefore authenticated
+the exact PR policy evidence instead of repeating pre-commit, offline tooling, Android setup, or
+Gradle work already proven for that tree.
+
+The before/after evidence is intentionally approximate. Before CP4B.3, routine local Full had been
+observed around 9–12 minutes (most recently about 12), prepare-pr broad validation around 5–6
+minutes, then authoritative PR validation and protected-main duplicate validation followed. After
+CP4B.3, Fast feedback took about 4 seconds, PR #63's publication stage about 8 seconds, authoritative
+PR CI about 1m08s, and the complete protected-main reuse run about 26 seconds. Authoritative tests
+were not removed: the complete offline suite still runs on every PR, and `ANDROID_FULL` still runs
+expensive Full Debug validation when required. Full/Gradle performance remains CP7/T0-2 work.
 
 ## T0-1 CP4A behavioral execution audit
 
@@ -799,9 +825,10 @@ of the graph. Debug execution cannot substitute for Release assembly.
 
 The narrow exact-tree reuse contract repair is complete and hosted validated. CP4B.2 defines
 complete policy evidence for both non-Android and Full committed PR paths; PR #61 live-proved
-`ANDROID_FULL` and PR #62 live-proved `NON_ANDROID`. CP4B.3 has now removed routine broad local
-duplication while preserving every scope, tree, publication, and hosted fallback guarantee above;
-its first normal hosted lifecycle remains the acceptance gate.
+`ANDROID_FULL` and PR #62 live-proved `NON_ANDROID`. CP4B.3 removed routine broad local duplication
+while preserving every scope, tree, publication, and hosted fallback guarantee above; PR #63 then
+live-validated the simplified local/prepare-pr-to-authoritative-PR lifecycle and protected-main
+exact-tree reuse.
 
 
 ---
@@ -1277,9 +1304,9 @@ external action, and owner checkpoint.
 
 | ID | Source / current problem | Target and dependency/risk | Validation / external action | CP |
 |---|---|---|---|---|
-| P01 — CP4B.3 IMPLEMENTED / HOSTED PENDING | Operator Full could precede prepare-pr Full | Normal publication no longer requires operator or prepare-pr Full; explicit Full remains diagnostic/on-demand | Disposable drift/snapshot/tree fixtures; normal hosted PR timing | CP4 |
-| P02 — CP4B.3 IMPLEMENTED / HOSTED PENDING | prepare-pr + PR Full duplicated local/hosted assurance | Fast local feedback plus exact publication integrity, then authoritative PR policy; retain fail-closed main fallback | Classifier/prepare-pr fixtures and live PR/main reuse | CP4 |
-| P03 — CP4B.3 IMPLEMENTED / HOSTED PENDING | Upstream candidates required local Standard then Full plus PR Full | One meaningful focused local pass; preserve native merge identity and forced hosted Full | Native merge/filter fixtures; next natural resolved candidate | CP4 |
+| P01 — CP4B.3 COMPLETE / HOSTED VALIDATED | Operator Full could precede prepare-pr Full | Normal publication no longer requires operator or prepare-pr Full; explicit Full remains diagnostic/on-demand | Disposable drift/snapshot/tree fixtures plus PR #63 timing | CP4 |
+| P02 — CP4B.3 COMPLETE / HOSTED VALIDATED | prepare-pr + PR Full duplicated local/hosted assurance | Fast local feedback plus exact publication integrity, then authoritative PR policy; retain fail-closed main fallback | Classifier/prepare-pr fixtures and PR #63 PR/main reuse | CP4 |
+| P03 — CP4B.3 COMPLETE / HOSTED VALIDATED | Upstream candidates required local Standard then Full plus PR Full | One meaningful focused local pass; preserve native merge identity and forced hosted Full | Native merge/filter fixtures; forced hosted authority remains intact | CP4 |
 | P04 — CP4A AUDITED / CP4B PENDING | prepare-pr stops after PR creation and manual auto-merge click | Authenticate same non-Draft head and arm native auto-merge; never arm upstream Draft | Mocked `gh`, branch/rules tests; enable GitHub auto-merge manually; hosted acceptance | CP4 |
 | P05 — CP4A AUDITED / CP4B PENDING | Signing Diagnostic requires repeated SHA | Zero-input authenticated protected-main source; keep Environment approval and no publication | Signing auth/refusal tests + manual hosted diagnostic | CP4 |
 
