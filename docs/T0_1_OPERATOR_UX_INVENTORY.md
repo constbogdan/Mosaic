@@ -1,13 +1,14 @@
 # Baseline T0-1 operator UX, workflow, and presentation inventory
 
-Status: **CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED VALIDATED**
+Status: **CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED VALIDATED;
+Validation-plan visibility COMPLETE / HOSTED VALIDATED**
 Committed-only publication follow-up: **HOSTED VALIDATED (PR #64)**
-Next: **correct the `scripts/tooling_test_support.py` classification gap without weakening unknown-path fallback**
+Next: **prepare-pr terminal UX cleanup**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED
-VALIDATED.**
+VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED.**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
 baseline; historical names in acceptance records are evidence, not active UX. CP2 removed only
@@ -18,6 +19,74 @@ live-proved the exact-tree reuse selector contract exposed by that audit. CP4B.2
 complete two-class PR policy contract. Natural hosted runs validated both `ANDROID_FULL` and
 `NON_ANDROID`; PR #63 live-validated the CP4B.3 removal of duplicate routine local authority while
 leaving that hosted contract unchanged.
+
+## T0-1 validation-plan visibility
+
+Status: **COMPLETE / HOSTED VALIDATED (PR #68)**
+
+The authoritative PR workflow now exposes its already-selected policy near the start of the job.
+It uses the existing policy outputs rather than a second classifier or new lifecycle state. The
+visible step is one of `Validation path · Non-Android`, `Validation path · Android Full`, or
+`Validation path · Conservative Android Full`, and its live log immediately explains the checks
+that will run. The detailed `GITHUB_STEP_SUMMARY` remains available after that concise early signal.
+
+PR #68 naturally selected conservative `ANDROID_FULL` because it changed the workflow contract.
+The new path signal was visible during execution, required CI passed, and native auto-merge merged
+only after protection succeeded. Protected main authenticated and reused the exact PR evidence.
+Development eligibility remained an independent release-relevance decision rather than being
+inferred from the PR validation class.
+
+The presentation change did not rename or alter the machine contracts `CI / Full validation`,
+`full-validation`, `Choose PR validation path`, `Check changed files`, `Run offline tooling checks`,
+or `Run Full validation`. Step IDs, evidence classes, evidence artifacts, reuse selectors,
+permissions, and Release Build/Sign/Publish authority are unchanged. Summary wording now reflects
+that eligible ordinary PRs use P04 native auto-merge after required CI succeeds; Draft and upstream
+review PRs remain human-controlled.
+
+The next bounded item is **prepare-pr terminal UX cleanup**. The accepted target experience is
+illustrative in timings and counts but normative in structure:
+
+```text
+[1/6] PREFLIGHT [RUN]
+[1/6] PREFLIGHT [PASS] 3.5s  [log]
+
+[2/6] AUDIT CHANGES [RUN]
+Scope: 2 paths · tooling-only · high risk
+[2/6] AUDIT CHANGES [PASS] 1.1s  [log]
+
+[3/6] LOCAL CHECKS [RUN]
+Validation: Fast · non-android
+  [1/3] Changed-scope pre-commit [PASS] 2.3s  [log]
+  [2/3] Offline tooling tests [PASS] 3.5s  [log]
+  [3/3] Git whitespace check [PASS] 0.1s  [log]
+[3/6] LOCAL CHECKS [PASS] 7.8s  [log]
+
+[4/6] STAGE CONFIRMED SCOPE [RUN]
+2 files changed, 101 insertions(+), 9 deletions(-)
+[4/6] STAGE CONFIRMED SCOPE [PASS] 1.5s  [log]
+
+[5/6] COMMIT [RUN]
+chore: t0 1 validation plan visibility
+2 files changed, 101 insertions(+), 9 deletions(-)
+[5/6] COMMIT [PASS] 3.5s  [log]
+
+[6/6] PUBLISH [RUN]
+PR #68 created  [open]
+Auto-merge: ENABLED
+Required CI / Full validation: PENDING
+Expected path: Android Full authoritative validation
+[6/6] PUBLISH [PASS] 14.4s  [log]
+
+SUCCESS: prepare-pr completed in 31.8s
+PR: #68  [open]
+Logs: .logs\prepare-pr\<run>
+```
+
+Implementation must keep normal success concise; provide short clickable `[log]` links for every
+stage and a short clickable `[open]` PR link; state required CI and the expected hosted validation
+path explicitly; summarize scope/classification once; surface useful diagnostics automatically on
+failure; retain complete forensic detail in the existing logs; and degrade cleanly when terminal
+hyperlinks are unsupported. This checkpoint records that target only and does not implement it.
 
 ## T0-1 CP4B.1 exact-tree reuse contract repair
 
@@ -1159,19 +1228,12 @@ This proves native auto-merge remains subordinate to required branch protection 
 current authenticated PR head rather than bypassing failed validation. P04 is **COMPLETE / HOSTED
 VALIDATED**.
 
-Three bounded follow-ups remain; none is a P04 defect:
-
-1. `scripts/tooling_test_support.py` was conservatively unclassified. PR #65 therefore ran
-   `ANDROID_FULL`, and protected-main Development eligibility conservatively caused the Release
-   APK build, signing, publication, and Development v1.0.46. Diagnose the legitimate new tooling
-   path, add the narrow mapping and coverage if justified, and retain unknown-path conservative
-   Full/release behavior. This is the immediate next item because the gap caused unnecessary
-   expensive validation and publication.
-2. The PR `Validation plan` is computed before expensive execution but is most visible in the final
-   job summary after that work. Seek the smallest native GitHub presentation improvement; do not add
-   lifecycle machinery merely to expose it earlier.
-3. Preserve manual Upstream check #39 evidence in the existing presentation backlog: `Upstream check
-   · Scheduled` / `Upstream check · Manual` plus GitHub's run number are adequate; candidate reuse
+Two bounded follow-ups are now closed: PR #67 added the narrow tooling-support classification while
+retaining unknown-path fail-closed behavior, and PR #68 made the existing PR Validation plan visible
+early without changing its authority contract. The next item is the prepare-pr terminal UX cleanup
+specified above. After that, preserve manual Upstream check #39 evidence in the existing
+presentation backlog: `Upstream check · Scheduled` / `Upstream check · Manual` plus GitHub's run
+number are adequate; candidate reuse
    creates no duplicate; the final summary should prominently link the candidate PR/Draft, reduce
    duplicated Observe/Publish outcome text, and put REVIEW attention before bulk incoming history.
    REVIEW paths deliberately preserved/excluded downstream may be absent from Files changed, so
@@ -1368,11 +1430,11 @@ external action, and owner checkpoint.
 
 | ID | Source / current problem | Target and dependency/risk | Validation / external action | CP |
 |---|---|---|---|---|
-| S01 — CP3 COMPLETE / HOSTED VALIDATED | `ci.yml` PR policy summary is late and classifier-centric | Early plain-language plan + final result; raw policy in details | Static/output tests pass; hosted PR rendering observed | CP3 |
+| S01 — COMPLETE / HOSTED VALIDATED (PR #68) | `ci.yml` PR policy summary was late and classifier-centric | Early live path signal from existing policy outputs plus detailed final summary | Conservative `ANDROID_FULL` signal appeared early; required CI, auto-merge, and exact-tree main reuse succeeded | CP3/CP4 |
 | S02 — CP3 COMPLETE / HOSTED VALIDATED | PR APK/main reuse summaries expose all identities equally | Main result/link visible; SHA/tree/run/artifact in `<details>` | Exact evidence assertions pass; hosted exact-tree reuse observed, with fallback retained by fixtures | CP3 |
 | S03 — CP3 COMPLETE / HOSTED VALIDATED | `mosaic_development_release.record_eligibility` emits full paths/default | One build/no-build sentence; paths and policy evidence collapsed | Release classifier/output tests pass; hosted non-APK presentation observed and APK paths remain live-proven elsewhere | CP3 |
 | S04 — CP3 COMPLETE / HOSTED VALIDATED | `hosted_upstream.upstream_summary` exposes policy tables and full JSON | Counts/attention/action first; lists/navigation/details collapsed; artifact remains complete | Hostile-input/quiet-surface fixtures and natural hosted Upstream runs observed | CP3 |
-| S05 | prepare-pr console and PR body repeat raw scope | `PR scope: N files`; paths/stats in logs and collapsed PR details | Disposable prepare-pr tests; no snapshot weakening | CP6 |
+| S05 — NEXT | prepare-pr terminal success output remains noisier than its operator decision path | Six concise stages, scope/classification once, clickable log/PR links, CI/path state, detailed failure diagnostics and forensic logs | Disposable prepare-pr/output fixtures; terminal-link fallback; no snapshot weakening | CP6 |
 | S06 — CP3 PRESENTATION IMPLEMENTED / CP8 SWEEP REMAINS | failure summaries name `$GITHUB_JOB` but not always action/remedy | Plain refusal/failure, mutation status, retry/forward-fix action visible | Current Stable/Hold/Signing/CI failures now state action; final cross-surface sweep remains CP8 | CP3/CP8 |
 | S07 — RECLASSIFIED AS OPERATIONAL | Upstream publication hides the actionable `git push --porcelain` rejection because stdout/stderr are captured but discarded | Bounded sanitized failure detail: operation, remote/refspec, exit, destination existence, rejection category/excerpt from both streams; never credentials | Requires subprocess/error-contract tests, not cosmetic summary editing | CP6 or T0-2 security |
 
