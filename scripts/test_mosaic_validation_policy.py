@@ -5,12 +5,41 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 
 import mosaic_validation_policy as policy
 
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def run_embedded_validation_plan(mode, relevance, release_required):
+    """Execute the actual early-plan Python embedded in ci.yml."""
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    step = workflow.split("      - name: Validation path ·", 1)[1]
+    source = step.split("          python - <<'PY'\n", 1)[1].split("\n          PY", 1)[0]
+    source = textwrap.dedent(source)
+    with tempfile.TemporaryDirectory() as directory:
+        summary = Path(directory) / "summary.md"
+        env = {
+            **os.environ,
+            "RELEASE_RELEVANCE": relevance,
+            "RELEASE_REQUIRED": release_required,
+            "VALIDATION_RISK": "high" if relevance == "unknown" else "normal",
+            "VALIDATION_MODE": mode,
+            "CHANGED_PATH_COUNT": "3",
+            "REASON": "fixture policy reason",
+            "GITHUB_STEP_SUMMARY": str(summary),
+        }
+        result = subprocess.run(
+            [sys.executable, "-B", "-c", source],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout, summary.read_text()
 
 
 class ValidationPolicyTest(unittest.TestCase):
@@ -176,6 +205,62 @@ class ValidationPolicyTest(unittest.TestCase):
 
 
 class ValidationIntegrationContractTest(unittest.TestCase):
+    def test_ci_exposes_each_validation_path_before_expensive_execution(self):
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        dynamic_name = (
+            "Validation path · ${{ steps.pr-validation.outputs.release_relevance == 'unknown' "
+            "&& 'Conservative Android Full' || steps.pr-validation.outputs.validation_mode == "
+            "'non-android' && 'Non-Android' || 'Android Full' }}"
+        )
+        self.assertIn(dynamic_name, workflow)
+
+        cases = (
+            (
+                "non-android",
+                "tooling-only",
+                "false",
+                "Application validation not required.",
+                "Next: check changed files and run all offline tooling tests.",
+            ),
+            (
+                "full",
+                "apk-relevant",
+                "true",
+                "Android Full required.",
+                "Next: check changed files, run all offline tooling tests, then run Full validation.",
+            ),
+            (
+                "full",
+                "unknown",
+                "true",
+                "Conservative Android Full required because classification is uncertain.",
+                "Running changed-range pre-commit, all offline tooling tests, then Full defaultDebug validation.",
+            ),
+        )
+        for mode, relevance, required, headline, next_step in cases:
+            with self.subTest(mode=mode, relevance=relevance):
+                output, summary = run_embedded_validation_plan(mode, relevance, required)
+                self.assertIn(headline, output)
+                self.assertIn(next_step, output)
+                self.assertIn(headline, summary)
+                self.assertIn(next_step, summary)
+
+    def test_ci_retains_machine_contracts_and_current_merge_guidance(self):
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        for contract in (
+            "  full-validation:",
+            "    name: Full validation",
+            "id: pr-validation",
+            "- name: Run Full validation",
+            "id: full-validation",
+            "Record reusable PR validation evidence",
+            "Upload PR validation evidence",
+        ):
+            self.assertIn(contract, workflow)
+        self.assertNotIn("Confirm this required job is green", workflow)
+        self.assertIn("Eligible ordinary PRs merge through native auto-merge", workflow)
+        self.assertIn("Draft and upstream-review PRs remain human-controlled", workflow)
+
     def test_fast_standard_full_and_prepare_pr_contracts(self):
         validator = (ROOT / "scripts/validate-local.ps1").read_text()
         core = validator
@@ -248,13 +333,13 @@ class ValidationIntegrationContractTest(unittest.TestCase):
         self.assertIn("!.vscode/tasks.json", ignore)
 
     def test_ci_has_authoritative_pr_policy_and_keeps_main_i02_boundary(self):
-        workflow = (ROOT / ".github/workflows/ci.yml").read_text()
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
         self.assertIn("Choose PR validation path", workflow)
-        self.assertIn("Explain PR validation plan", workflow)
-        self.assertIn("Android Full validation required", workflow)
+        self.assertIn("Validation path ·", workflow)
+        self.assertIn("Android Full required", workflow)
         self.assertIn("No Development release is expected from this PR alone.", workflow)
         self.assertIn("Selected PR checks passed", workflow)
-        self.assertIn("Confirm this required job is green", workflow)
+        self.assertIn("Required CI is green", workflow)
         self.assertIn("<summary>Technical details</summary>", workflow)
         self.assertIn('git show "$BASE_SHA:scripts/mosaic_validation_policy.py"', workflow)
         self.assertIn("First rollout cannot trust a policy absent from base; require Full.", workflow)
