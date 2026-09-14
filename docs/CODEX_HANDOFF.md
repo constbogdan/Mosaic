@@ -8,13 +8,13 @@
 
 `Baseline T0 — IN PROGRESS`
 
-`T0-1 CP4B.3 — IMPLEMENTED / FOCUSED VALIDATED`
+`T0-1 CP4B.3 — IMPLEMENTED / FOCUSED VALIDATED; HOSTED ACCEPTANCE IN PROGRESS`
 
-`Next: CP4B.3 hosted acceptance, then the next bounded CP4 item`
+`Next: revalidate PR #63 after its hosted-only output portability correction, then complete CP4B.3 hosted acceptance`
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
-`CP4B.2 COMPLETE / HOSTED VALIDATED`; `CP4B.3 IMPLEMENTED / FOCUSED VALIDATED`.
+`CP4B.2 COMPLETE / HOSTED VALIDATED`; `CP4B.3 IMPLEMENTED / FOCUSED VALIDATED / HOSTED ACCEPTANCE IN PROGRESS`.
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -152,6 +152,17 @@ tests, and 34/34 resolver tests. PowerShell parsing passed. The final current-br
 2.7 seconds, classified `tooling-only / high`, selected `non-android`, deferred the multi-suite
 `test_*.py` expansion to authoritative PR CI, and passed changed-scope pre-commit plus
 `git diff --check`.
+
+PR #63 produced a useful hosted-only CP4B.3 finding before acceptance could complete. The
+authoritative complete offline suite ran the new disposable prepare-pr coverage on Linux and found
+that PowerShell ANSI formatting and line wrapping made the expected tree-mismatch phrase
+non-contiguous in captured stdout/stderr. The safety behavior itself was correct: the hook-mutated
+commit tree differed from the reviewed staged tree, COMMIT failed, resumable state remained
+`Staged`, and publication was refused. The fixture now normalizes ANSI/control presentation and
+whitespace solely for its diagnostic assertion and separately verifies the actual tree mismatch and
+refused state. Production prepare-pr, validation authority, provenance, and release behavior are
+unchanged. CP4B.3 remains hosted-acceptance-in-progress until PR #63 passes and its normal hosted
+policy/main-reuse evidence is recorded.
 
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-

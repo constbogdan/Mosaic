@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import stat
 import subprocess
@@ -12,9 +13,27 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 POWERSHELL = shutil.which("pwsh") or shutil.which("powershell")
+ANSI_CONTROL = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+
+
+def normalized_native_output(result):
+    """Remove terminal presentation and fold wrapped diagnostics for assertions."""
+    return " ".join(ANSI_CONTROL.sub("", result.stdout + result.stderr).split())
 
 
 class PreparePrFixtureTest(unittest.TestCase):
+    def test_native_diagnostic_normalization_handles_ansi_and_wrapping(self):
+        result = subprocess.CompletedProcess(
+            args=[],
+            returncode=1,
+            stdout="\x1b[31;1mThe produced commit tree does\x1b[0m\n",
+            stderr="\x1b[31;1mnot match the reviewed staged tree; publication is refused.\x1b[0m\n",
+        )
+        self.assertIn(
+            "does not match the reviewed staged tree",
+            normalized_native_output(result),
+        )
+
     def setUp(self):
         if not POWERSHELL:
             self.skipTest("PowerShell is unavailable")
@@ -145,6 +164,7 @@ $global:LASTEXITCODE = 0
         self.prepare("Audit")
         self.prepare("Validate")
         self.prepare("Stage")
+        reviewed_tree = self.state()["stagedTree"]
         hooks = self.root / ".git/hooks"
         hooks.mkdir(parents=True, exist_ok=True)
         hook = hooks / "pre-commit"
@@ -160,7 +180,10 @@ $global:LASTEXITCODE = 0
             check=False,
         )
         self.assertNotEqual(0, result.returncode)
-        self.assertIn("does not match the reviewed staged tree", result.stdout + result.stderr)
+        diagnostic = normalized_native_output(result)
+        self.assertIn("does not match the reviewed staged tree", diagnostic)
+        self.assertIn("publication is refused", diagnostic)
+        self.assertNotEqual(reviewed_tree, self.git("rev-parse", "HEAD^{tree}").stdout.strip())
         self.assertEqual("Staged", self.state()["completedPhase"])
 
 

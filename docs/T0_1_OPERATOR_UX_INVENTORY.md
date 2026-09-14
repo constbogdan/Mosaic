@@ -1,11 +1,11 @@
 # Baseline T0-1 operator UX, workflow, and presentation inventory
 
-Status: **CP4B.3 IMPLEMENTED / FOCUSED VALIDATED**
-Next: **CP4B.3 hosted acceptance, then the next bounded CP4 item**
+Status: **CP4B.3 IMPLEMENTED / FOCUSED VALIDATED; HOSTED ACCEPTANCE IN PROGRESS**
+Next: **Revalidate PR #63 after its hosted-only output portability correction, then complete CP4B.3 hosted acceptance**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
-CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 IMPLEMENTED / FOCUSED VALIDATED.**
+CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 IMPLEMENTED / FOCUSED VALIDATED / HOSTED ACCEPTANCE IN PROGRESS.**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
 baseline; historical names in acceptance records are evidence, not active UX. CP2 removed only
@@ -241,6 +241,16 @@ part of this checkpoint's local acceptance. The final focused run passed 4 dispo
 tests, 21 validation-policy/integration tests, and 34 resolver tests. A real current-branch Fast run
 classified `tooling-only / high`, selected `non-android`, deliberately deferred the complete offline
 suite to PR CI, passed changed-scope pre-commit and whitespace checking, and completed in 2.7 seconds.
+
+PR #63 supplied the first hosted CP4B.3 finding. Authoritative PR CI correctly exercised the new
+disposable prepare-pr fixtures and caught a Linux/PowerShell presentation portability defect that
+local focused validation had not exposed: ANSI formatting plus host line wrapping split the stable
+tree-mismatch phrase across physical output lines. The production guard behaved correctly—the
+commit hook changed `HEAD^{tree}`, COMMIT failed, state remained `Staged`, and publication was
+refused. Coverage now removes ANSI control sequences and folds presentation whitespace before
+asserting the diagnostic, while independently asserting the mismatched tree and unchanged state.
+No prepare-pr safety or publication behavior changed. A successful PR #63 rerun remains required
+before CP4B.3 hosted acceptance is complete.
 
 The first normal PR after merge must capture prepare-pr duration against the historical roughly
 5–6 minute validation-heavy path, pass authoritative PR policy, and show protected-main exact-tree
