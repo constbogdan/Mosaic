@@ -39,6 +39,16 @@ def _path(value):
     return result
 
 
+def is_offline_tooling_test_support_path(value):
+    """Return whether a path uses the supported flat tooling-test-support convention."""
+    path = _path(value)
+    return (
+        path.startswith("scripts/")
+        and path.count("/") == 1
+        and path.endswith("_test_support.py")
+    )
+
+
 def classify_path(value):
     """Classify one Git path; unmatched paths fail into the conservative bucket."""
     path = _path(value)
@@ -62,6 +72,8 @@ def classify_path(value):
             return PathClassification(path, TOOLING_ONLY, HIGH, "repository automation")
         if name.startswith("test_") and name.endswith(".py"):
             return PathClassification(path, TOOLING_ONLY, NORMAL, "offline tooling test")
+        if is_offline_tooling_test_support_path(path):
+            return PathClassification(path, TOOLING_ONLY, NORMAL, "offline tooling test support")
         if _matches(name, (
             "mosaic_*.py", "verify_mosaic_apk.py", "hosted_upstream.py",
             "*.ps1", "prepare-pr*.psd1", "mosaic-signing.json",

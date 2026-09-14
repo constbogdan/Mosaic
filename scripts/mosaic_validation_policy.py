@@ -108,6 +108,8 @@ def offline_test_pattern(paths):
             tests.add("test_mosaic_validation_policy.py")
         elif path.startswith("scripts/test_") and path.endswith(".py"):
             tests.add(Path(path).name)
+        elif classification.is_offline_tooling_test_support_path(path):
+            tests.add("test_*.py")
         elif path in OFFLINE_TEST_MAP:
             tests.add(OFFLINE_TEST_MAP[path])
     if not tests:
