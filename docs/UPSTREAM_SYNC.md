@@ -174,6 +174,17 @@ reason, automatic FOLLOW integration, preserved downstream state, next action, t
 technical provenance/history. The next action continues to be `resolve-upstream.ps1`; its generated
 authenticated Codex handoff is not duplicated into the PR.
 
+Natural hosted acceptance used a manual check against existing review candidate PR #58. Observe
+displayed only `Upstream observation recorded` and explained the exact handoff to Publish. Publish
+owned the single `29 upstream changes · review candidate already open` result, put REVIEW and the
+exact PR #58 link first, reused the candidate without creating another PR, and showed the one
+attention path `.github/workflows/pr.yml` before bulk history. Because that path is absent in current
+Mosaic, the summary truthfully said `current Mosaic absent` and supplied the exact incoming upstream
+blob link rather than inventing a candidate diff. It separately identified the Git textual conflict
+and the trusted-policy semantic REVIEW, directed the operator through `resolve-upstream.ps1`, and
+kept 1 attention / 26 FOLLOW / 2 preserved as secondary context. This closes the presentation batch
+without changing I06 behavior or evidence.
+
 An unresolved candidate is identified by trusted policy version plus the paths requiring
 attention, their ownership/status and downstream blob identities, and their textual-conflict
 signature. It excludes the whole downstream HEAD, so unrelated downstream movement can reuse the

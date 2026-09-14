@@ -18,15 +18,15 @@
 
 `prepare-pr terminal UX — COMPLETE / HOSTED VALIDATED (PR #70)`
 
-`Operator UX batch — IMPLEMENTED / HOSTED ACCEPTANCE PENDING`
+`Operator UX batch — COMPLETE / HOSTED VALIDATED (ordinary PR #72; upstream PR #58)`
 
-`Next: natural hosted Operator UX acceptance`
+`Next: Release / Diagnostic UX batch`
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
 `CP4B.2 COMPLETE / HOSTED VALIDATED`; `CP4B.3 COMPLETE / HOSTED VALIDATED`; `P04 COMPLETE / HOSTED
 VALIDATED`; `Validation-plan visibility COMPLETE / HOSTED VALIDATED`; `prepare-pr terminal UX
-COMPLETE / HOSTED VALIDATED`; `Operator UX batch IMPLEMENTED / HOSTED ACCEPTANCE PENDING`.
+COMPLETE / HOSTED VALIDATED`; `Operator UX batch COMPLETE / HOSTED VALIDATED`.
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -304,20 +304,29 @@ changing preparation or publication semantics. Its initial older-base branch cor
 `Current branch does not descend from validated origin/main.`; rebasing onto current `origin/main`
 resolved the condition without weakening the ancestry guard.
 
-The **Operator UX batch is implemented with hosted acceptance pending**. For candidate-producing
-upstream runs, Observe now records the authenticated handoff while Publish owns the single final
-operator outcome. Publish leads with REVIEW attention or readiness and the exact downstream PR;
-semantic REVIEW and Git textual conflicts are distinct, and exact authenticated current-Mosaic and
-incoming-upstream blob links support paths absent from Files changed. Candidate bodies follow the
-same decision-first order and keep the resolver/Codex handoff authoritative. Ordinary prepare-pr
-bodies now lead with compact scope/relevance/risk, retain high-risk paths prominently, collapse the
-complete path inventory, and preserve validation/release implications.
+The **Operator UX batch is complete and hosted validated**. Ordinary PR #72 rendered the compact
+`What changed` body with `Scope: 9 files · tooling-only · high risk`, immediate application/UI,
+review, validation and release implications, and collapsed exhaustive paths. CI selected
+`NON_ANDROID`, ran changed-range pre-commit and the complete offline tooling suite, omitted Android
+validation, and merged only after required CI through native auto-merge. Protected main
+authenticated exact PR #72 evidence, reused it in about 10 seconds, independently reported
+`No build required`, and skipped Development Build/Sign/Publish.
 
-Natural hosted acceptance must verify the final GitHub rendering, direct PR link, single outcome
-ownership and exact REVIEW navigation before this batch is marked complete. No upstream lifecycle,
-ownership, quiet-surface, ancestry, evidence, permission, required-CI, P04 auto-merge, or release
-authority contract changed. Remaining T0-1 work is the optional CP5 machine-contract migration,
-broader PR/Release presentation, measured performance work, and CP8 consistency sweep.
+A natural manual Upstream check against existing review PR #58 proved Observe now owns only
+`Upstream observation recorded` and the authenticated handoff, while Publish owns the single final
+`29 upstream changes · review candidate already open` result. Publish led with REVIEW and the exact
+PR #58 link, reused it without duplication, placed `.github/workflows/pr.yml` first, reported
+current Mosaic absent, linked the exact incoming blob, distinguished Git textual conflict from
+trusted-policy semantic REVIEW, and directed the operator to `resolve-upstream.ps1` and its
+generated authenticated handoff. Counts of 1 attention, 26 FOLLOW and 2 preserved remained
+secondary. Run names remain unchanged and final.
+
+No upstream lifecycle, ownership, quiet-surface, ancestry, evidence, permission, required-CI, P04
+auto-merge, or Development/Stable authority contract changed. The next grouped work is **Release /
+Diagnostic UX**: reassess Signing Diagnostic's manual SHA and improve channel, Compare Changes,
+archive emphasis, release wording and redundant human-facing provenance without changing machine
+identity. CP5 machine-contract renames remain a separate explicit value decision; CP7 and CP8
+follow.
 
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-
