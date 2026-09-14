@@ -1,14 +1,16 @@
 # Baseline T0-1 operator UX, workflow, and presentation inventory
 
 Status: **CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED VALIDATED;
-Validation-plan visibility COMPLETE / HOSTED VALIDATED**
+Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX COMPLETE / HOSTED
+VALIDATED**
 Committed-only publication follow-up: **HOSTED VALIDATED (PR #64)**
-Next: **prepare-pr terminal UX cleanup**
+Next: **Operator UX batch**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED
-VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED.**
+VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX COMPLETE /
+HOSTED VALIDATED.**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
 baseline; historical names in acceptance records are evidence, not active UX. CP2 removed only
@@ -43,50 +45,76 @@ permissions, and Release Build/Sign/Publish authority are unchanged. Summary wor
 that eligible ordinary PRs use P04 native auto-merge after required CI succeeds; Draft and upstream
 review PRs remain human-controlled.
 
-The next bounded item is **prepare-pr terminal UX cleanup**. The accepted target experience is
-illustrative in timings and counts but normative in structure:
+## T0-1 prepare-pr terminal UX
+
+Status: **COMPLETE / HOSTED VALIDATED (PR #70)**
+
+Normal Guided execution now uses concise six-stage terminal output. Each top-level and nested
+validation stage exposes its short clickable `[log]` link on the `[RUN]` line only; PASS/FAIL does
+not duplicate it. Supporting terminals use OSC 8 hyperlinks, while unsupported or redirected
+terminals receive readable fallback link/path presentation. The final run-log location is always
+printed, and forensic logs remain escape-sequence-free.
+
+Successful console output keeps scope, classification, concise diff statistics, commit title, PR
+identity, native auto-merge state, required-CI state, and expected hosted validation path visible.
+Low-value remote/ref/SHA, snapshot/tree, and detailed path-inventory evidence remains in the
+per-stage forensic logs. Failures and safety refusals still surface their actionable semantic
+reason. The accepted hosted presentation was:
 
 ```text
-[1/6] PREFLIGHT [RUN]
-[1/6] PREFLIGHT [PASS] 3.5s  [log]
+[1/6] PREFLIGHT [RUN]  [log]
+[1/6] PREFLIGHT [PASS] 2.6s
 
-[2/6] AUDIT CHANGES [RUN]
-Scope: 2 paths · tooling-only · high risk
-[2/6] AUDIT CHANGES [PASS] 1.1s  [log]
+[2/6] AUDIT CHANGES [RUN]  [log]
+Scope: 7 paths · tooling-only · high risk
+[2/6] AUDIT CHANGES [PASS] 2.5s
 
-[3/6] LOCAL CHECKS [RUN]
-Validation: Fast · non-android
-  [1/3] Changed-scope pre-commit [PASS] 2.3s  [log]
-  [2/3] Offline tooling tests [PASS] 3.5s  [log]
-  [3/3] Git whitespace check [PASS] 0.1s  [log]
-[3/6] LOCAL CHECKS [PASS] 7.8s  [log]
+[3/6] LOCAL CHECKS [RUN]  [log]
+  Validation: Fast · non-android
+  [1/2] Changed-scope pre-commit [RUN]  [log]
+  [1/2] Changed-scope pre-commit [PASS] 1.8s
+  [2/2] Git whitespace check [RUN]  [log]
+  [2/2] Git whitespace check [PASS] 0.1s
+[3/6] LOCAL CHECKS [PASS] 6.3s
 
-[4/6] STAGE CONFIRMED SCOPE [RUN]
-2 files changed, 101 insertions(+), 9 deletions(-)
-[4/6] STAGE CONFIRMED SCOPE [PASS] 1.5s  [log]
+[4/6] STAGE CONFIRMED SCOPE [RUN]  [log]
+7 files changed, 431 insertions(+), 80 deletions(-)
+[4/6] STAGE CONFIRMED SCOPE [PASS] 3.8s
 
-[5/6] COMMIT [RUN]
-chore: t0 1 validation plan visibility
-2 files changed, 101 insertions(+), 9 deletions(-)
-[5/6] COMMIT [PASS] 3.5s  [log]
+[5/6] COMMIT [RUN]  [log]
+chore: t0 1 prepare pr terminal ux
+[5/6] COMMIT [PASS] 4.2s
 
-[6/6] PUBLISH [RUN]
-PR #68 created  [open]
+[6/6] PUBLISH [RUN]  [log]
+PR #70 created  [open]
 Auto-merge: ENABLED
 Required CI / Full validation: PENDING
-Expected path: Android Full authoritative validation
-[6/6] PUBLISH [PASS] 14.4s  [log]
+Expected path: Non-Android authoritative validation
+[6/6] PUBLISH [PASS] 14.0s
 
-SUCCESS: prepare-pr completed in 31.8s
-PR: #68  [open]
+SUCCESS: prepare-pr completed in 33.5s
+PR: #70  [open]
 Logs: .logs\prepare-pr\<run>
 ```
 
-Implementation must keep normal success concise; provide short clickable `[log]` links for every
-stage and a short clickable `[open]` PR link; state required CI and the expected hosted validation
-path explicitly; summarize scope/classification once; surface useful diagnostics automatically on
-failure; retain complete forensic detail in the existing logs; and degrade cleanly when terminal
-hyperlinks are unsupported. This checkpoint records that target only and does not implement it.
+PR #70 exercised the concise presentation, live stage-log links, short PR link, enabled auto-merge
+state, and expected `NON_ANDROID` authoritative path. Required hosted validation passed, GitHub
+merged through native auto-merge, and protected main retained exact-tree evidence reuse. No
+prepare-pr safety, validation, staging, commit, publication, or auto-merge semantic changed.
+
+Acceptance also encountered `Current branch does not descend from validated origin/main.` This was
+a legitimate ancestry refusal because the branch was based on an older `main`. Rebasing onto the
+current `origin/main` resolved the stale base; ancestry protection was not weakened.
+
+The next bounded work is an **Operator UX batch**. It may combine presentation-only improvements to
+ordinary prepare-pr PR bodies and upstream synchronization: prominently link the candidate/Draft PR
+in Actions summaries; reduce duplicate Observe/Publish outcome text; make REVIEW attention primary;
+provide truthful current-downstream/incoming-upstream navigation for preserved REVIEW paths that may
+not appear in GitHub Files changed; retain `resolve-upstream.ps1` and its generated Codex handoff;
+improve noisy/raw ordinary PR scope presentation; and, if naturally bounded without lifecycle or
+security changes, improve upstream publication-failure wording/navigation. The existing
+`Upstream check · Scheduled` and `Upstream check · Manual` names are already satisfactory because
+GitHub supplies run number and date; no further upstream run-title work is required.
 
 ## T0-1 CP4B.1 exact-tree reuse contract repair
 
@@ -1228,12 +1256,12 @@ This proves native auto-merge remains subordinate to required branch protection 
 current authenticated PR head rather than bypassing failed validation. P04 is **COMPLETE / HOSTED
 VALIDATED**.
 
-Two bounded follow-ups are now closed: PR #67 added the narrow tooling-support classification while
-retaining unknown-path fail-closed behavior, and PR #68 made the existing PR Validation plan visible
-early without changing its authority contract. The next item is the prepare-pr terminal UX cleanup
-specified above. After that, preserve manual Upstream check #39 evidence in the existing
-presentation backlog: `Upstream check · Scheduled` / `Upstream check · Manual` plus GitHub's run
-number are adequate; candidate reuse
+Three bounded follow-ups are now closed: PR #67 added the narrow tooling-support classification
+while retaining unknown-path fail-closed behavior; PR #68 made the existing PR Validation plan
+visible early without changing its authority contract; and PR #70 live-validated the concise
+prepare-pr terminal UX specified above. The next Operator UX batch retains manual Upstream check #39
+evidence in the presentation backlog: `Upstream check · Scheduled` / `Upstream check · Manual` plus
+GitHub's run number are adequate; candidate reuse
    creates no duplicate; the final summary should prominently link the candidate PR/Draft, reduce
    duplicated Observe/Publish outcome text, and put REVIEW attention before bulk incoming history.
    REVIEW paths deliberately preserved/excluded downstream may be absent from Files changed, so
@@ -1434,7 +1462,7 @@ external action, and owner checkpoint.
 | S02 — CP3 COMPLETE / HOSTED VALIDATED | PR APK/main reuse summaries expose all identities equally | Main result/link visible; SHA/tree/run/artifact in `<details>` | Exact evidence assertions pass; hosted exact-tree reuse observed, with fallback retained by fixtures | CP3 |
 | S03 — CP3 COMPLETE / HOSTED VALIDATED | `mosaic_development_release.record_eligibility` emits full paths/default | One build/no-build sentence; paths and policy evidence collapsed | Release classifier/output tests pass; hosted non-APK presentation observed and APK paths remain live-proven elsewhere | CP3 |
 | S04 — CP3 COMPLETE / HOSTED VALIDATED | `hosted_upstream.upstream_summary` exposes policy tables and full JSON | Counts/attention/action first; lists/navigation/details collapsed; artifact remains complete | Hostile-input/quiet-surface fixtures and natural hosted Upstream runs observed | CP3 |
-| S05 — NEXT | prepare-pr terminal success output remains noisier than its operator decision path | Six concise stages, scope/classification once, clickable log/PR links, CI/path state, detailed failure diagnostics and forensic logs | Disposable prepare-pr/output fixtures; terminal-link fallback; no snapshot weakening | CP6 |
+| S05 — COMPLETE / HOSTED VALIDATED (PR #70) | prepare-pr terminal success output was noisier than its operator decision path | Six concise stages, scope/classification once, RUN-only clickable log links, PR link, CI/path state, detailed failure diagnostics and forensic logs | PR #70 exercised the accepted presentation; disposable prepare-pr/output fixtures retain terminal-link fallback and snapshot safety | CP6 |
 | S06 — CP3 PRESENTATION IMPLEMENTED / CP8 SWEEP REMAINS | failure summaries name `$GITHUB_JOB` but not always action/remedy | Plain refusal/failure, mutation status, retry/forward-fix action visible | Current Stable/Hold/Signing/CI failures now state action; final cross-surface sweep remains CP8 | CP3/CP8 |
 | S07 — RECLASSIFIED AS OPERATIONAL | Upstream publication hides the actionable `git push --porcelain` rejection because stdout/stderr are captured but discarded | Bounded sanitized failure detail: operation, remote/refspec, exit, destination existence, rejection category/excerpt from both streams; never credentials | Requires subprocess/error-contract tests, not cosmetic summary editing | CP6 or T0-2 security |
 

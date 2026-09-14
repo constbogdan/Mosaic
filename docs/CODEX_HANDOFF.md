@@ -16,12 +16,15 @@
 
 `Validation-plan visibility — COMPLETE / HOSTED VALIDATED (PR #68)`
 
-`Next: prepare-pr terminal UX cleanup`
+`prepare-pr terminal UX — COMPLETE / HOSTED VALIDATED (PR #70)`
+
+`Next: Operator UX batch`
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
 `CP4B.2 COMPLETE / HOSTED VALIDATED`; `CP4B.3 COMPLETE / HOSTED VALIDATED`; `P04 COMPLETE / HOSTED
-VALIDATED`; `Validation-plan visibility COMPLETE / HOSTED VALIDATED`.
+VALIDATED`; `Validation-plan visibility COMPLETE / HOSTED VALIDATED`; `prepare-pr terminal UX
+COMPLETE / HOSTED VALIDATED`.
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -288,12 +291,24 @@ tooling checks`, `Run Full validation`, step IDs, evidence classes/artifacts, re
 permissions, and release/sign/publish authority are unchanged. Eligible ordinary PR wording now
 reflects native auto-merge, while Draft/upstream-review PRs remain human-controlled.
 
-The next bounded item is **prepare-pr terminal UX cleanup**. Preserve the six-stage concise-success
-target in the [authoritative ledger](T0_1_OPERATOR_UX_INVENTORY.md#t0-1-validation-plan-visibility):
-short clickable `[log]` and `[open]` links, explicit required-CI and expected hosted-path state, one
-useful scope/classification line, automatic concise failure diagnostics, complete existing forensic
-logs, and graceful fallback where terminal hyperlinks are unsupported. Do not fold the later
-upstream presentation backlog into that change.
+PR #70 completed and hosted-validated the prepare-pr terminal UX cleanup. Guided execution now uses
+six concise stages with one clickable/fallback `[log]` link on each RUN line only; nested validation
+uses the same rule, PASS/FAIL does not duplicate links, and the final log location is always visible.
+Scope/classification, concise diffstat, commit title, PR identity/link, auto-merge, required CI,
+expected hosted path, and actionable refusal reasons remain on the console; detailed identities and
+inventories remain in escape-sequence-free forensic logs. PR #70 reported `NON_ANDROID`, passed
+required CI, merged through native auto-merge, and retained protected-main exact-tree reuse without
+changing preparation or publication semantics. Its initial older-base branch correctly refused with
+`Current branch does not descend from validated origin/main.`; rebasing onto current `origin/main`
+resolved the condition without weakening the ancestry guard.
+
+The next bounded work is an **Operator UX batch**. It may combine presentation-only ordinary
+prepare-pr PR-body/scope cleanup with prominent upstream candidate/Draft links, REVIEW-first
+attention, reduced Observe/Publish duplication, and truthful downstream/upstream comparison
+navigation. Preserve `resolve-upstream.ps1` and its Codex handoff. `Upstream check · Scheduled` and
+`Upstream check · Manual` are already satisfactory; GitHub supplies run number/date. Any bounded
+publication-failure wording improvement must leave lifecycle, permission, validation, and
+publication semantics unchanged.
 
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-

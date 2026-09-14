@@ -14,13 +14,14 @@ minimal emergency Hold Release followed by forward-fix and zero-input Stable Pro
 VALIDATED. CP4B.2 — Authoritative PR Validation Model — is COMPLETE / HOSTED VALIDATED for both
 `ANDROID_FULL` and `NON_ANDROID`. CP4B.3 — Local / prepare-pr simplification — is COMPLETE / HOSTED
 VALIDATED. P04 — prepare-pr native auto-merge — is COMPLETE / HOSTED VALIDATED. Validation-plan
-visibility is COMPLETE / HOSTED VALIDATED.** Baseline T0 is an
+visibility and prepare-pr terminal UX are COMPLETE / HOSTED VALIDATED.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 Checkpoint sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE /
-HOSTED VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED.**
+HOSTED VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX
+COMPLETE / HOSTED VALIDATED.**
 
 CP4B.2 evidence classes: **`ANDROID_FULL` — HOSTED VALIDATED; `NON_ANDROID` — HOSTED VALIDATED.**
 
@@ -167,12 +168,23 @@ native auto-merge waited for protection, protected main reused exact-tree eviden
 eligibility independently determined release relevance. Existing job, step, evidence, reuse,
 permission, and Release Build/Sign/Publish contracts did not change.
 
-The next bounded T0-1 item is **prepare-pr terminal UX cleanup**: concise stage progress; one useful
-scope/classification line; short clickable stage-log and PR links; explicit required-CI and expected
-hosted-path state; automatic concise failure diagnostics; retained forensic logs; and graceful
-fallback without terminal hyperlink support. The complete illustrative output contract is recorded
-in the [T0-1 execution ledger](T0_1_OPERATOR_UX_INVENTORY.md#t0-1-validation-plan-visibility).
-Upstream presentation remains the following bounded backlog, not part of this checkpoint.
+PR #70 completed and hosted-validated the prepare-pr terminal UX cleanup. Guided output now presents
+six concise stages, places one clickable/fallback stage-log link on each RUN line, avoids duplicate
+PASS/FAIL links, and applies the same rule to nested validation. Scope/classification, concise
+diffstat, commit title, PR identity/link, auto-merge, required CI, expected hosted path, actionable
+refusals, and the final run-log location remain visible; detailed identities and inventories stay in
+escape-sequence-free forensic logs. During acceptance, an older-base branch correctly refused with
+`Current branch does not descend from validated origin/main.` Rebasing onto current `origin/main`
+resolved it without weakening ancestry protection. Required CI passed, native auto-merge merged PR
+#70, and protected main preserved exact-tree evidence reuse.
+
+The next bounded T0-1 work is an **Operator UX batch** combining presentation-only ordinary
+prepare-pr PR-body/scope improvements with upstream candidate/Draft links, REVIEW-first attention,
+less duplicate Observe/Publish outcome text, and useful downstream/upstream comparison navigation.
+It retains `resolve-upstream.ps1` as the semantic-resolution entry point and may improve bounded
+publication-failure wording only without lifecycle, permission, validation, or publication changes.
+`Upstream check · Scheduled` and `Upstream check · Manual` already provide adequate run intent;
+GitHub supplies the run number/date, so no run-title work remains.
 
 Hosted CP2 evidence also establishes bounded later work: CP7 must separate runner queue, setup,
 cache/tool installation, test/build execution, Environment wait, and publication timing, and must
