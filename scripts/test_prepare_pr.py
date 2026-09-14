@@ -37,6 +37,10 @@ class PreparePrFixtureTest(unittest.TestCase):
             ("existing preserved | native-merge identity arguments\n", ""): (
                 "existing preserved native-merge identity arguments"
             ),
+            (
+                "\x1b]8;;file:///tmp/stage.log\x1b\\[log]\x1b]8;;\x1b\\\n",
+                "\x1b]8;;https://example.invalid/pr/63\x1b\\[open]\x1b]8;;\x1b\\\n",
+            ): "[log] [open]",
         }
         for (stdout, stderr), expected in cases.items():
             with self.subTest(expected=expected):
@@ -60,6 +64,12 @@ class PreparePrFixtureTest(unittest.TestCase):
             ROOT / "scripts/prepare-pr.config.psd1",
             self.root / "scripts/prepare-pr.config.psd1",
         )
+        for name in (
+            "mosaic_output.ps1",
+            "mosaic_validation_policy.py",
+            "mosaic_change_classification.py",
+        ):
+            shutil.copy2(ROOT / "scripts" / name, self.root / "scripts" / name)
         (self.root / ".github/pull_request_template.md").write_text("fixture\n", encoding="utf-8")
         (self.root / ".gitignore").write_text(".logs/\n*.log\n", encoding="utf-8")
         (self.root / "file.txt").write_text("base\n", encoding="utf-8")
@@ -158,6 +168,7 @@ $global:LASTEXITCODE = 0
         git_proxy.write_text(
             """import json
 import os
+from pathlib import Path
 import subprocess
 import sys
 
@@ -173,6 +184,11 @@ if logical and logical[0] == \"ls-remote\":
 if logical and logical[0] == \"fetch\" and \"origin\" in logical:
     raise SystemExit(0)
 if logical and logical[0] == \"push\":
+    head = subprocess.check_output(
+        [os.environ[\"REAL_GIT\"], \"rev-parse\", \"HEAD\"],
+        text=True,
+    ).strip()
+    (Path(os.environ[\"FAKE_GH_STATE\"]) / \"published-head\").write_text(head)
     print(\"simulated push\")
     raise SystemExit(0)
 delegated = [
@@ -210,7 +226,8 @@ def bump(path):
 
 def summary(number=63):
     list_count = bump(list_count_path)
-    head = os.environ[\"FAKE_HEAD\"]
+    published_head = state_dir / \"published-head\"
+    head = published_head.read_text() if published_head.exists() else os.environ[\"FAKE_HEAD\"]
     before = os.environ.get(\"FAKE_LIST_HEAD_BEFORE\", \"\")
     if before and list_count == 1:
         head = before
@@ -224,7 +241,8 @@ def summary(number=63):
 
 def view():
     view_count = bump(view_count_path)
-    head = os.environ[\"FAKE_HEAD\"]
+    published_head = state_dir / \"published-head\"
+    head = published_head.read_text() if published_head.exists() else os.environ[\"FAKE_HEAD\"]
     if mode == \"wrong_head_sha\":
         head = \"f\" * 40
     if mode == \"head_drift\" and view_count > 1:
@@ -362,6 +380,125 @@ raise SystemExit(2)
         self.git("branch", "-m", "chore/sync-upstream-fixture")
         return first, upstream, merge, resolved_tree
 
+    def test_guided_success_is_concise_with_readable_link_fallbacks(self):
+        env = {
+            **self.fake_publish_env(),
+            "MOSAIC_TERMINAL_HYPERLINKS": "never",
+        }
+        result = self.prepare("Guided", env=env, check=False)
+        diagnostic = normalized_native_output(result)
+        self.assertEqual(0, result.returncode, diagnostic)
+        for number, name in (
+            (1, "PREFLIGHT"),
+            (2, "AUDIT CHANGES"),
+            (3, "LOCAL CHECKS"),
+            (4, "STAGE CONFIRMED SCOPE"),
+            (5, "COMMIT"),
+            (6, "PUBLISH"),
+        ):
+            run_line = next(
+                line for line in result.stdout.splitlines()
+                if f"[{number}/6] {name} [RUN]" in line
+            )
+            pass_line = next(
+                line for line in result.stdout.splitlines()
+                if f"[{number}/6] {name} [PASS]" in line
+            )
+            self.assertIn("[log:", run_line)
+            self.assertNotIn("[log", pass_line)
+        self.assertIn("[log: 01-preflight.log]", result.stdout)
+        self.assertIn("[log: 06-publish.log]", result.stdout)
+        self.assertIn("Scope: 1 path · unknown · high risk", result.stdout)
+        self.assertIn(
+            "PR #63 created  [open: https://example.invalid/pr/63]",
+            result.stdout,
+        )
+        self.assertIn("Auto-merge: ENABLED", result.stdout)
+        self.assertIn("Required CI / Full validation: PENDING", result.stdout)
+        self.assertIn(
+            "Expected path: Conservative Android Full authoritative validation",
+            result.stdout,
+        )
+        self.assertIn("SUCCESS: prepare-pr completed in", result.stdout)
+        self.assertIn("Logs: .logs\\prepare-pr\\", result.stdout)
+        for noise in (
+            "origin ->",
+            "HEAD:",
+            "Base:",
+            "Tracking:",
+            "Known remote branch:",
+            "Intended snapshot:",
+            "Staged tree:",
+        ):
+            self.assertNotIn(noise, result.stdout)
+        run_dirs = list((self.root / ".logs/prepare-pr").iterdir())
+        latest = max(run_dirs, key=lambda path: path.stat().st_mtime_ns)
+        self.assertEqual(6, len(list(latest.glob("[0-9][0-9]-*.log"))))
+        forensic = (latest / "prepare-pr.log").read_text(encoding="utf-8")
+        self.assertIn("Preflight passed. Branch=", forensic)
+        self.assertIn("Confirmed publication path: file.txt", forensic)
+        self.assertIn("Publication completed.", forensic)
+
+    def test_guided_hyperlinks_use_osc8_and_normalize_to_semantic_labels(self):
+        env = {
+            **self.fake_publish_env(),
+            "MOSAIC_TERMINAL_HYPERLINKS": "always",
+        }
+        result = self.prepare("Guided", env=env, check=False)
+        self.assertEqual(0, result.returncode, normalized_native_output(result))
+        self.assertIn("\x1b]8;;file:", result.stdout)
+        self.assertIn("\x1b]8;;https://example.invalid/pr/63", result.stdout)
+        normalized = normalized_native_output(result)
+        self.assertIn("[log]", normalized)
+        self.assertIn("PR #63 created [open]", normalized)
+        self.assertNotIn("\x1b]8;;", normalized)
+        stage_lines = [
+            line for line in result.stdout.splitlines()
+            if "[1/6] PREFLIGHT" in line
+        ]
+        self.assertIn("[RUN]", stage_lines[0])
+        self.assertIn("[log]", stage_lines[0])
+        self.assertNotIn("[log]", stage_lines[1])
+
+    def test_expected_hosted_path_uses_existing_policy_for_non_android(self):
+        self.git("restore", "--", "file.txt")
+        path = self.root / "scripts/test_terminal_fixture.py"
+        path.write_text("# tooling fixture\n", encoding="utf-8")
+        result = self.prepare(
+            "Guided",
+            env={
+                **self.fake_publish_env(scenario="non-android"),
+                "MOSAIC_TERMINAL_HYPERLINKS": "never",
+            },
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, normalized_native_output(result))
+        self.assertIn("Scope: 1 path · tooling-only · normal risk", result.stdout)
+        self.assertIn(
+            "Expected path: Non-Android authoritative validation",
+            result.stdout,
+        )
+
+    def test_expected_hosted_path_uses_existing_policy_for_android(self):
+        self.git("restore", "--", "file.txt")
+        path = self.root / "app/src/main/java/example/Feature.kt"
+        path.parent.mkdir(parents=True)
+        path.write_text("class Feature\n", encoding="utf-8")
+        result = self.prepare(
+            "Guided",
+            env={
+                **self.fake_publish_env(scenario="android"),
+                "MOSAIC_TERMINAL_HYPERLINKS": "never",
+            },
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, normalized_native_output(result))
+        self.assertIn("Scope: 1 path · apk-relevant · normal risk", result.stdout)
+        self.assertIn(
+            "Expected path: Android Full authoritative validation",
+            result.stdout,
+        )
+
     def test_default_local_checks_are_fast_and_preserve_explicit_filter(self):
         self.prepare("Audit")
         self.prepare("Validate", "-TestFilter", "*FocusedFixtureTest")
@@ -392,7 +529,7 @@ raise SystemExit(2)
             self.assertEqual(reviewed_head, self.git("rev-parse", "HEAD").stdout.strip())
         result = self.prepare("Publish", env=self.fake_publish_env(), check=False)
         self.assertEqual(0, result.returncode, normalized_native_output(result))
-        self.assertIn("PR created", result.stdout)
+        self.assertIn("PR #63 created", result.stdout)
         self.assertIn("Auto-merge: ENABLED", result.stdout)
         self.assertEqual(reviewed_head, self.git("rev-parse", "HEAD").stdout.strip())
         pushes = [args for args in self.fake_trace("git") if args and args[0] == "push"]
@@ -464,7 +601,9 @@ raise SystemExit(2)
             check=False,
         )
         self.assertNotEqual(0, result.returncode)
-        self.assertIn("publication would require a force push", normalized_native_output(result))
+        diagnostic = normalized_native_output(result)
+        self.assertIn("publication would require a force push", diagnostic)
+        self.assertIn("[log: 02-publish.log]", diagnostic)
         self.assertFalse(any(args and args[0] == "push" for args in self.fake_trace("git")))
 
     def test_committed_only_existing_pr_is_reused_without_duplicate(self):
@@ -476,7 +615,7 @@ raise SystemExit(2)
             check=False,
         )
         self.assertEqual(0, result.returncode, normalized_native_output(result))
-        self.assertIn("PR: #63 https://example.invalid/pr/63", result.stdout)
+        self.assertIn("PR #63 reused  [open: https://example.invalid/pr/63]", result.stdout)
         self.assertIn("Auto-merge: ENABLED", result.stdout)
         gh_commands = self.fake_trace("gh")
         self.assertTrue(any(args[:2] == ["pr", "list"] for args in gh_commands))

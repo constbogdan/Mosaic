@@ -23,9 +23,11 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $configPath = Join-Path $PSScriptRoot 'prepare-pr.config.psd1'
 $config = Import-PowerShellDataFile -LiteralPath $configPath
+. (Join-Path $PSScriptRoot 'mosaic_output.ps1')
 $startingLocation = Get-Location
 $runId = '{0}-{1}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $PID
-$runDirectory = [IO.Path]::GetFullPath((Join-Path $repoRoot ".logs\prepare-pr\$runId"))
+$runRelativeDirectory = ".logs\prepare-pr\$runId"
+$runDirectory = [IO.Path]::GetFullPath((Join-Path $repoRoot $runRelativeDirectory))
 New-Item -ItemType Directory -Path $runDirectory -Force | Out-Null
 $logPath = Join-Path $runDirectory 'prepare-pr.log'
 $summaryPath = Join-Path $runDirectory 'summary.txt'
@@ -47,6 +49,9 @@ $script:stageNumber = 0
 $script:stageLogPath = $null
 $script:stageTimer = $null
 $script:prepareFailed = $false
+$script:runTimer = [Diagnostics.Stopwatch]::StartNew()
+$script:validationPlan = $null
+$script:publishedPullRequest = $null
 $script:totalStages = switch ($Phase) {
     'Guided' { 6 }
     'Audit' { 2 }
@@ -61,7 +66,8 @@ function Complete-PrepareStage([string]$Status = 'PASS') {
         '{0}m{1:00}s' -f [int]$script:stageTimer.Elapsed.TotalMinutes, $script:stageTimer.Elapsed.Seconds
     } else { '{0:0.0}s' -f $script:stageTimer.Elapsed.TotalSeconds }
     Write-PrepareLog "Phase $Status`: $($script:stageName); Duration=$elapsed; Log=$($script:stageLogPath)"
-    Write-Host ('[{0}/{1}] {2} [{3}] {4} -> {5}' -f $script:stageNumber, $script:totalStages, $script:stageName, $Status, $elapsed, $script:stageLogPath)
+    Write-Host ('[{0}/{1}] {2} [{3}] {4}' -f $script:stageNumber, $script:totalStages, $script:stageName, $Status, $elapsed)
+    if ($script:conciseMode) { Write-Host '' }
     $script:stageLogPath = $null
 }
 
@@ -73,7 +79,8 @@ function Write-Section([string]$Name) {
     $script:stageLogPath = [IO.Path]::GetFullPath((Join-Path $runDirectory ("{0:00}-{1}.log" -f $script:stageNumber, $safeName)))
     $script:stageTimer = [Diagnostics.Stopwatch]::StartNew()
     Set-Content -LiteralPath $script:stageLogPath -Value "Stage: $Name`nStarted: $(Get-Date -Format o)" -Encoding UTF8
-    Write-Host ('[{0}/{1}] {2} [RUN]' -f $script:stageNumber, $script:totalStages, $Name)
+    $logLink = Format-MosaicTerminalLink '[log]' $script:stageLogPath ([IO.Path]::GetFileName($script:stageLogPath))
+    Write-Host ('[{0}/{1}] {2} [RUN]  {3}' -f $script:stageNumber, $script:totalStages, $Name, $logLink)
     Write-PrepareLog "Phase started: $Name"
 }
 
@@ -83,6 +90,48 @@ function Write-AuditDetail([string]$Name) {
         Write-Host "--- $Name ---" -ForegroundColor Cyan
     }
     Write-PrepareLog "Audit detail: $Name"
+}
+
+function Get-PrepareValidationPlan([string[]]$Paths) {
+    $fallback = [pscustomobject]@{
+        releaseRelevance = 'unknown'
+        validationRisk = 'high'
+        validationMode = 'full'
+    }
+    $python = Get-Command python -ErrorAction SilentlyContinue
+    $policyScript = Join-Path $PSScriptRoot 'mosaic_validation_policy.py'
+    if (-not $python -or -not (Test-Path -LiteralPath $policyScript -PathType Leaf)) {
+        Write-PrepareLog 'Validation-path presentation fell back conservatively because Python or the existing policy script was unavailable.'
+        return $fallback
+    }
+    $arguments = @('-B', $policyScript)
+    foreach ($path in @($Paths)) { $arguments += @('--path', $path) }
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = @(& $python.Source @arguments 2>&1 | ForEach-Object { [string]$_ })
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorAction
+    }
+    if ($exitCode -ne 0) {
+        Write-PrepareLog "Validation-path presentation fell back conservatively because the existing policy exited $exitCode."
+        return $fallback
+    }
+    try {
+        $plan = ($output -join "`n") | ConvertFrom-Json
+        Write-PrepareLog "Presentation policy: ReleaseRelevance=$($plan.releaseRelevance) ValidationRisk=$($plan.validationRisk) ValidationMode=$($plan.validationMode)"
+        return $plan
+    } catch {
+        Write-PrepareLog 'Validation-path presentation fell back conservatively because the existing policy returned invalid JSON.'
+        return $fallback
+    }
+}
+
+function Get-ExpectedHostedPath([object]$Plan) {
+    if ($Plan.releaseRelevance -eq 'unknown') { return 'Conservative Android Full authoritative validation' }
+    if ($Plan.validationMode -eq 'non-android') { return 'Non-Android authoritative validation' }
+    return 'Android Full authoritative validation'
 }
 
 function Invoke-Git {
@@ -280,7 +329,7 @@ function Enable-NativeAutoMerge(
         if ($pullRequest.autoMergeRequest.mergeMethod -cne $expectedMethod) {
             throw "PR auto-merge is already configured with unexpected method '$($pullRequest.autoMergeRequest.mergeMethod)'."
         }
-        Write-Host 'Auto-merge: already enabled for the exact reviewed head.'
+        if (-not $script:conciseMode) { Write-Host 'Auto-merge: already enabled for the exact reviewed head.' }
         Write-PrepareLog "Native auto-merge already enabled. PR=$($pullRequest.number) Head=$ExpectedHead Method=$expectedMethod"
         return 'already enabled'
     }
@@ -302,7 +351,7 @@ function Enable-NativeAutoMerge(
         if ($pullRequest.autoMergeRequest.mergeMethod -cne $expectedMethod) {
             throw "PR auto-merge is already configured with unexpected method '$($pullRequest.autoMergeRequest.mergeMethod)'."
         }
-        Write-Host 'Auto-merge: already enabled for the exact reviewed head.'
+        if (-not $script:conciseMode) { Write-Host 'Auto-merge: already enabled for the exact reviewed head.' }
         Write-PrepareLog "Native auto-merge became enabled before mutation. PR=$($pullRequest.number) Head=$ExpectedHead Method=$expectedMethod"
         return 'already enabled'
     }
@@ -316,7 +365,7 @@ function Enable-NativeAutoMerge(
         $details = ($merge.Output -join [Environment]::NewLine).Trim()
         throw "GitHub could not enable native auto-merge for the exact reviewed head. The PR remains open; no direct merge or bypass was attempted.`n$details"
     }
-    Write-Host 'Auto-merge: ENABLED'
+    if (-not $script:conciseMode) { Write-Host 'Auto-merge: ENABLED' }
     Write-PrepareLog "Native auto-merge enabled. PR=$($pullRequest.number) Head=$ExpectedHead Method=$expectedMethod"
     return 'enabled'
 }
@@ -351,7 +400,7 @@ function Assert-Preflight([switch]$RefreshBase) {
         $slug = Get-RepositorySlug ($remote.Output -join '')
         $expected = if ($remoteName -eq $config.OriginRemote) { $config.ExpectedOriginRepositories } else { $config.ExpectedUpstreamRepositories }
         if ($slug -notin $expected) { throw "Remote '$remoteName' points to unexpected repository '$slug'. Expected: $($expected -join ', ')." }
-        Write-Host "$remoteName -> $slug"
+        if (-not $script:conciseMode) { Write-Host "$remoteName -> $slug" }
     }
     foreach ($requiredPath in @($config.ValidationScript, $config.PullRequestTemplate)) {
         if (-not (Test-Path -LiteralPath (Join-Path $repoRoot $requiredPath) -PathType Leaf)) {
@@ -360,7 +409,7 @@ function Assert-Preflight([switch]$RefreshBase) {
     }
 
     if ($RefreshBase -and -not $NoFetch) {
-        Write-Host "Refreshing $($config.OriginRemote)/$($config.BaseBranch)..."
+        if (-not $script:conciseMode) { Write-Host "Refreshing $($config.OriginRemote)/$($config.BaseBranch)..." }
         Invoke-Git -Arguments @('fetch', '--no-tags', $config.OriginRemote, $config.BaseBranch) | Out-Null
     }
     $baseRef = "$($config.OriginRemote)/$($config.BaseBranch)"
@@ -378,16 +427,20 @@ function Assert-Preflight([switch]$RefreshBase) {
             Sort-Object -Unique
     )
     $relationship = (Get-GitText @('rev-list', '--left-right', '--count', "$baseRef...HEAD")) -split '\s+'
-    Write-Host "Branch: $branch"
-    Write-Host "HEAD: $head"
-    Write-Host "Base: $baseRef ($baseCommit)"
-    Write-Host "Tracking: $tracking"
+    if (-not $script:conciseMode) {
+        Write-Host "Branch: $branch"
+        Write-Host "HEAD: $head"
+        Write-Host "Base: $baseRef ($baseCommit)"
+        Write-Host "Tracking: $tracking"
+    }
     $remoteBranchRef = "refs/remotes/$($config.OriginRemote)/$branch"
     $remoteBranchKnown = (Invoke-Git -Arguments @('show-ref', '--verify', '--quiet', $remoteBranchRef) -AllowFailure).ExitCode -eq 0
-    Write-Host "Known remote branch: $(if ($remoteBranchKnown) { $remoteBranchRef } else { '(none in local refs)' })"
-    Write-Host "Relationship to ${baseRef}: ahead $($relationship[1]), behind $($relationship[0])"
-    Write-Host "Branch-only commits: $($commits.Count)"
-    Write-Host "Already committed PR paths: $($committedPaths.Count)"
+    if (-not $script:conciseMode) {
+        Write-Host "Known remote branch: $(if ($remoteBranchKnown) { $remoteBranchRef } else { '(none in local refs)' })"
+        Write-Host "Relationship to ${baseRef}: ahead $($relationship[1]), behind $($relationship[0])"
+        Write-Host "Branch-only commits: $($commits.Count)"
+        Write-Host "Already committed PR paths: $($committedPaths.Count)"
+    }
     if (-not $script:conciseMode) {
         $commits | ForEach-Object { Write-Host "  $_" }
         $committedPaths | ForEach-Object { Write-Host "  $_" }
@@ -435,7 +488,7 @@ function Resolve-Scope([object[]]$Entries) {
             throw "Refusing likely local, generated, or sensitive artifact '$path'."
         }
     }
-    Write-Host "Working-tree scope: $($scope.Count) path(s)"
+    if (-not $script:conciseMode) { Write-Host "Working-tree scope: $($scope.Count) path(s)" }
     if (-not $script:conciseMode) { $scope | ForEach-Object { Write-Host "  $_" } }
     return $scope
 }
@@ -540,15 +593,15 @@ function Load-State([object]$Preflight) {
 
 function Show-Audit([string[]]$Scope, [object[]]$Entries, [object]$Preflight) {
     Write-AuditDetail 'COMPLETE EVENTUAL PR SCOPE'
-    Write-Host "Already committed branch content: $(@($Preflight.CommittedPaths).Count) path(s) in $(@($Preflight.BranchCommits).Count) commit(s)"
+    if (-not $script:conciseMode) { Write-Host "Already committed branch content: $(@($Preflight.CommittedPaths).Count) path(s) in $(@($Preflight.BranchCommits).Count) commit(s)" }
     if (-not $script:conciseMode) {
         @($Preflight.BranchCommits) | ForEach-Object { Write-Host "  commit: $_" }
         @($Preflight.CommittedPaths) | ForEach-Object { Write-Host "  committed: $_" }
     }
-    Write-Host "Current working-tree candidates: $($Scope.Count) path(s)"
+    if (-not $script:conciseMode) { Write-Host "Current working-tree candidates: $($Scope.Count) path(s)" }
     if (-not $script:conciseMode) { $Scope | ForEach-Object { Write-Host "  candidate: $_" } }
     $publicationPaths = @(@($Preflight.CommittedPaths) + $Scope | Sort-Object -Unique)
-    Write-Host "TOTAL COMPLETE PR SCOPE: $($publicationPaths.Count) UNIQUE PATH(S)" -ForegroundColor Green
+    if (-not $script:conciseMode) { Write-Host "TOTAL COMPLETE PR SCOPE: $($publicationPaths.Count) UNIQUE PATH(S)" -ForegroundColor Green }
     if (-not $script:conciseMode) { $publicationPaths | ForEach-Object { Write-Host "  PR: $_" } }
 
     Write-AuditDetail 'INTENDED SNAPSHOT'
@@ -557,13 +610,15 @@ function Show-Audit([string[]]$Scope, [object[]]$Entries, [object]$Preflight) {
     $deleted = @($scopedEntries | Where-Object { $_.Code -match 'D' })
     $renamed = @($scopedEntries | Where-Object { $_.Code -match 'R' })
     $modified = @($scopedEntries | Where-Object { -not $_.Untracked -and $_.Code -match 'M' })
-    Write-Host "Tracked modified candidates: $($modified.Count)"
-    Write-Host "Added/new candidates (including untracked): $($added.Count)"
-    Write-Host "Deleted: $($deleted.Count)"
-    Write-Host "Rename path entries: $($renamed.Count)"
-    Write-Host "Staged: $(@($scopedEntries | Where-Object Staged).Count)"
-    Write-Host "Unstaged: $(@($scopedEntries | Where-Object Unstaged).Count)"
-    Write-Host "Untracked/new files outside tracked diff statistics: $(@($scopedEntries | Where-Object Untracked).Count)"
+    if (-not $script:conciseMode) {
+        Write-Host "Tracked modified candidates: $($modified.Count)"
+        Write-Host "Added/new candidates (including untracked): $($added.Count)"
+        Write-Host "Deleted: $($deleted.Count)"
+        Write-Host "Rename path entries: $($renamed.Count)"
+        Write-Host "Staged: $(@($scopedEntries | Where-Object Staged).Count)"
+        Write-Host "Unstaged: $(@($scopedEntries | Where-Object Unstaged).Count)"
+        Write-Host "Untracked/new files outside tracked diff statistics: $(@($scopedEntries | Where-Object Untracked).Count)"
+    }
     if (-not $script:conciseMode) {
         Write-Host 'Tracked working-tree diff statistics (untracked/new files are listed separately below):'
         Invoke-Git -Arguments (@('diff', '--stat', 'HEAD', '--') + $Scope) | Select-Object -ExpandProperty Output | ForEach-Object { Write-Host $_ }
@@ -571,13 +626,13 @@ function Show-Audit([string[]]$Scope, [object[]]$Entries, [object]$Preflight) {
         Invoke-Git -Arguments @('diff', '--stat', "$($Preflight.BaseRef)...HEAD") | Select-Object -ExpandProperty Output | ForEach-Object { Write-Host $_ }
     }
     $untracked = @($scopedEntries | Where-Object Untracked)
-    if ($untracked.Count) { Write-Host 'Untracked/new files included in eventual PR scope:' }
+    if ($untracked.Count -and -not $script:conciseMode) { Write-Host 'Untracked/new files included in eventual PR scope:' }
     if (-not $script:conciseMode) { $untracked | ForEach-Object { Write-Host "  untracked/new: $($_.Path)" } }
     Write-PrepareLog "Audit scope: committedPaths=$(@($Preflight.CommittedPaths).Count) candidatePaths=$($Scope.Count) totalUniquePaths=$($publicationPaths.Count)"
     $publicationPaths | ForEach-Object { Write-PrepareLog "Audited publication path: $_" }
 
     $risks = @($publicationPaths | Where-Object { Test-Pattern $_ $config.HighRiskPatterns })
-    if ($risks.Count) {
+    if ($risks.Count -and -not $script:conciseMode) {
         Write-Host 'High-risk/review-sensitive paths:' -ForegroundColor Yellow
         $risks | ForEach-Object { Write-Host "  $_" }
     }
@@ -586,7 +641,7 @@ function Show-Audit([string[]]$Scope, [object[]]$Entries, [object]$Preflight) {
     if ($diffCheck.ExitCode -ne 0) { throw "git diff --check failed:`n$($diffCheck.Output -join [Environment]::NewLine)" }
     $committedDiffCheck = Invoke-Git -Arguments @('diff', '--check', "$($Preflight.BaseRef)...HEAD") -AllowFailure
     if ($committedDiffCheck.ExitCode -ne 0) { throw "Committed PR diff check failed:`n$($committedDiffCheck.Output -join [Environment]::NewLine)" }
-    Write-Host 'git diff --check: PASS'
+    if (-not $script:conciseMode) { Write-Host 'git diff --check: PASS' }
 
     $markers = @()
     foreach ($path in $publicationPaths) {
@@ -598,7 +653,7 @@ function Show-Audit([string[]]$Scope, [object[]]$Entries, [object]$Preflight) {
         } catch { }
     }
     if ($markers.Count) { throw "Canonical conflict markers require review:`n$($markers -join [Environment]::NewLine)" }
-    Write-Host 'Conflict-marker check: PASS'
+    if (-not $script:conciseMode) { Write-Host 'Conflict-marker check: PASS' }
     return $risks
 }
 
@@ -616,14 +671,21 @@ function Resolve-AndSaveScope([object]$Preflight) {
             throw 'A committed-only upstream-sync branch requires the existing preserved native-merge identity arguments.'
         }
         Write-Section 'AUDIT CHANGES'
-        Write-Host 'Working tree and index are clean; reviewing committed branch content only.'
+        if (-not $script:conciseMode) { Write-Host 'Working tree and index are clean; reviewing committed branch content only.' }
         $scope = @()
     } else {
         $scope = @(Resolve-Scope $entries)
     }
     Assert-NoOutOfScope $scope $entries
     $risks = @(Show-Audit $scope $entries $Preflight)
-    return Save-ConfirmedScope $Preflight $scope $risks -CommittedOnly:$committedOnly
+    $state = Save-ConfirmedScope $Preflight $scope $risks -CommittedOnly:$committedOnly
+    $script:validationPlan = Get-PrepareValidationPlan @($state.publicationPaths)
+    if ($script:conciseMode) {
+        $pathLabel = if (@($state.publicationPaths).Count -eq 1) { 'path' } else { 'paths' }
+        $separator = [char]0xB7
+        Write-Host "Scope: $(@($state.publicationPaths).Count) $pathLabel $separator $($script:validationPlan.releaseRelevance) $separator $($script:validationPlan.validationRisk) risk"
+    }
+    return $state
 }
 
 function Save-ConfirmedScope([object]$Preflight, [string[]]$Scope, [string[]]$Risks, [switch]$CommittedOnly) {
@@ -660,10 +722,10 @@ function Save-ConfirmedScope([object]$Preflight, [string[]]$Scope, [string[]]$Ri
     }
     Save-State $state
     if ($CommittedOnly) {
-        Write-Host "Committed-only scope confirmed. HEAD: $($Preflight.Head); tree: $(Get-GitText @('rev-parse', 'HEAD^{tree}'))"
+        if (-not $script:conciseMode) { Write-Host "Committed-only scope confirmed. HEAD: $($Preflight.Head); tree: $(Get-GitText @('rev-parse', 'HEAD^{tree}'))" }
         Write-PrepareLog "Committed-only scope confirmed. Commit=$($Preflight.Head) Tree=$(Get-GitText @('rev-parse', 'HEAD^{tree}'))"
     } else {
-        Write-Host "Scope confirmed. Intended snapshot: $snapshotHash"
+        if (-not $script:conciseMode) { Write-Host "Scope confirmed. Intended snapshot: $snapshotHash" }
         Write-PrepareLog "Scope confirmed. IntendedSnapshot=$snapshotHash"
     }
     @($state.publicationPaths) | ForEach-Object { Write-PrepareLog "Confirmed publication path: $_" }
@@ -711,9 +773,20 @@ function Invoke-LocalChecks([object]$Preflight, [object]$State, [string]$Request
     $arguments = @('-Level', $RequestedLevel)
     foreach ($filter in $filters) { $arguments += @('-TestFilter', $filter) }
     foreach ($path in @($State.publicationPaths)) { $arguments += @('-ChangedPath', $path) }
-    Write-Host ".\$($config.ValidationScript) $($arguments -join ' ')"
-    & (Join-Path $repoRoot $config.ValidationScript) -Level $RequestedLevel -TestFilter $filters -ChangedPath @($State.publicationPaths)
-    $validationExitCode = $LASTEXITCODE
+    if (-not $script:conciseMode) { Write-Host ".\$($config.ValidationScript) $($arguments -join ' ')" }
+    $previousCompact = $env:MOSAIC_OUTPUT_COMPACT
+    $previousPrefix = $env:MOSAIC_OUTPUT_PREFIX
+    if ($script:conciseMode) {
+        $env:MOSAIC_OUTPUT_COMPACT = '1'
+        $env:MOSAIC_OUTPUT_PREFIX = '  '
+    }
+    try {
+        & (Join-Path $repoRoot $config.ValidationScript) -Level $RequestedLevel -TestFilter $filters -ChangedPath @($State.publicationPaths)
+        $validationExitCode = $LASTEXITCODE
+    } finally {
+        if ($null -eq $previousCompact) { Remove-Item Env:MOSAIC_OUTPUT_COMPACT -ErrorAction SilentlyContinue } else { $env:MOSAIC_OUTPUT_COMPACT = $previousCompact }
+        if ($null -eq $previousPrefix) { Remove-Item Env:MOSAIC_OUTPUT_PREFIX -ErrorAction SilentlyContinue } else { $env:MOSAIC_OUTPUT_PREFIX = $previousPrefix }
+    }
     $validationLog = Join-Path $repoRoot 'validation.log'
     if (Test-Path -LiteralPath $validationLog) {
         Add-Content -LiteralPath $script:stageLogPath -Value "`n--- $RequestedLevel local-check output ---" -Encoding UTF8
@@ -750,7 +823,7 @@ function Invoke-LocalChecks([object]$Preflight, [object]$State, [string]$Request
     $updated.localCheckLevel = $RequestedLevel
     $updated.completedPhase = 'Checked'
     Save-State $updated
-    Write-Host "Local checks passed for unchanged snapshot $afterSnapshot."
+    if (-not $script:conciseMode) { Write-Host "Local checks passed for unchanged snapshot $afterSnapshot." }
     Write-PrepareLog "Local checks completed for unchanged snapshot $afterSnapshot."
     return [pscustomobject]$updated
 }
@@ -779,9 +852,14 @@ function Invoke-Stage([object]$Preflight, [object]$State) {
     $stagedSnapshotHash = Get-StagedSnapshotHash $scope
     $stagedTree = Get-GitText @('write-tree')
     if ($stagedSnapshotHash -ne $State.intendedSnapshotHash) { throw 'The staged snapshot does not match the reviewed intended snapshot.' }
-    Invoke-Git -Arguments @('status', '--short', '--untracked-files=all') | Select-Object -ExpandProperty Output | ForEach-Object { Write-Host $_ }
-    Invoke-Git -Arguments @('diff', '--cached', '--stat') | Select-Object -ExpandProperty Output | ForEach-Object { Write-Host $_ }
-    Write-Host "Staged tree: $stagedTree"
+    if ($script:conciseMode) {
+        $shortStat = Get-GitText @('diff', '--cached', '--shortstat')
+        if ($shortStat) { Write-Host $shortStat.Trim() }
+    } else {
+        Invoke-Git -Arguments @('status', '--short', '--untracked-files=all') | Select-Object -ExpandProperty Output | ForEach-Object { Write-Host $_ }
+        Invoke-Git -Arguments @('diff', '--cached', '--stat') | Select-Object -ExpandProperty Output | ForEach-Object { Write-Host $_ }
+        Write-Host "Staged tree: $stagedTree"
+    }
     $updated = @{}
     $State.psobject.Properties | ForEach-Object { $updated[$_.Name] = $_.Value }
     $updated.stagedTree = $stagedTree
@@ -829,8 +907,14 @@ function Invoke-Commit([object]$Preflight, [object]$State) {
     $commitTitle = New-CommitTitle $Preflight $State
     if (-not $commitTitle) { throw 'No honest conventional commit title could be generated from the task branch. Supply -Title.' }
     if ($commitTitle -notmatch '^(feat|fix|chore|ci|docs|test|refactor)(\([^)]+\))?: .+') { throw 'Commit title must use a supported Conventional Commit prefix.' }
-    Write-Host "Title: $commitTitle"
-    Invoke-Git -Arguments @('diff', '--cached', '--stat') | Select-Object -ExpandProperty Output | ForEach-Object { Write-Host $_ }
+    if ($script:conciseMode) {
+        Write-Host $commitTitle
+        $shortStat = Get-GitText @('diff', '--cached', '--shortstat')
+        if ($shortStat) { Write-Host $shortStat.Trim() }
+    } else {
+        Write-Host "Title: $commitTitle"
+        Invoke-Git -Arguments @('diff', '--cached', '--stat') | Select-Object -ExpandProperty Output | ForEach-Object { Write-Host $_ }
+    }
     if ($PreserveMergeCommit) {
         if ($Preflight.Branch -notlike $config.UpstreamSyncBranchPattern) { throw '-PreserveMergeCommit is restricted to an upstream-sync branch.' }
         foreach ($identity in @($ExpectedMergeFirstParent, $ExpectedMergeSecondParent, $ExpectedMergeTree)) {
@@ -850,9 +934,10 @@ function Invoke-Commit([object]$Preflight, [object]$State) {
         $remoteHead = (($remote.Output | Select-Object -First 1) -split '\s+')[0]
         if ($remoteHead -ne $ExpectedMergeFirstParent) { throw 'Existing Draft branch moved; preserved merge publication is refused.' }
         $commitTitle = Get-GitText @('show', '-s', '--format=%s', 'HEAD')
-        Write-Host "Preserving existing merge commit: $commit"
+        if ($script:conciseMode) { Write-Host 'Preserving reviewed native merge commit.' } else { Write-Host "Preserving existing merge commit: $commit" }
     } else {
-        Invoke-Git -Arguments @('commit', '-m', $commitTitle) | Select-Object -ExpandProperty Output | ForEach-Object { Write-Host $_ }
+        $commitResult = Invoke-Git -Arguments @('commit', '-m', $commitTitle)
+        if (-not $script:conciseMode) { $commitResult.Output | ForEach-Object { Write-Host $_ } }
         $commit = Get-GitText @('rev-parse', 'HEAD')
     }
     $committedTree = Get-GitText @('rev-parse', 'HEAD^{tree}')
@@ -961,9 +1046,11 @@ function Invoke-Publish([object]$Preflight, [object]$State) {
         Invoke-Git -Arguments @('fetch', '--no-tags', $config.OriginRemote, $remoteRef) | Out-Null
         $fastForward = Invoke-Git -Arguments @('merge-base', '--is-ancestor', $remoteCommit, 'HEAD') -AllowFailure
         if ($fastForward.ExitCode -ne 0) { throw 'Remote branch is divergent or ahead; publication would require a force push. Refusing.' }
-        Invoke-Git -Arguments @('push', $config.OriginRemote, $branch) | Select-Object -ExpandProperty Output | ForEach-Object { Write-Host $_ }
+        $pushResult = Invoke-Git -Arguments @('push', $config.OriginRemote, $branch)
+        if (-not $script:conciseMode) { $pushResult.Output | ForEach-Object { Write-Host $_ } }
     } else {
-        Invoke-Git -Arguments @('push', '-u', $config.OriginRemote, $branch) | Select-Object -ExpandProperty Output | ForEach-Object { Write-Host $_ }
+        $pushResult = Invoke-Git -Arguments @('push', '-u', $config.OriginRemote, $branch)
+        if (-not $script:conciseMode) { $pushResult.Output | ForEach-Object { Write-Host $_ } }
     }
 
     $prResult = $null
@@ -979,8 +1066,8 @@ function Invoke-Publish([object]$Preflight, [object]$State) {
         if ($existingPullRequests[0].headRefOid -ne $State.commit) { throw 'Existing Draft PR head does not match the reviewed upstream merge commit.' }
     }
     if ($existing.Count) {
-        Write-Host "PR: $($existing -join ', ')"
         $prResult = 'existing PR reported'
+        $prDisposition = 'reused'
         Write-PrepareLog "Existing PR: $($existing -join ', ')"
     } else {
         $bodyFile = Join-Path ([IO.Path]::GetTempPath()) ("wholphin-pr-{0}.md" -f [guid]::NewGuid())
@@ -988,8 +1075,8 @@ function Invoke-Publish([object]$Preflight, [object]$State) {
             $pullRequestBody | Set-Content -LiteralPath $bodyFile -Encoding UTF8
             $createResult = Invoke-Gh -CommandPath $gh.Source -Arguments @('pr', 'create', '--repo', $slug, '--base', $config.BaseBranch, '--head', $branch, '--title', $State.approvedTitle, '--body-file', $bodyFile) -AllowFailure
             if ($createResult.ExitCode -ne 0) { throw "GitHub CLI could not create the PR:`n$($createResult.Output -join [Environment]::NewLine)" }
-            Write-Host "PR created: $($createResult.Output -join '')"
             $prResult = 'PR created'
+            $prDisposition = 'created'
             Write-PrepareLog "PR created: $($createResult.Output -join '')"
         } finally { Remove-Item -LiteralPath $bodyFile -Force -ErrorAction SilentlyContinue }
         $createdListResult = Invoke-Gh -CommandPath $gh.Source -Arguments @('pr', 'list', '--repo', $slug, '--base', $config.BaseBranch, '--head', $branch, '--state', 'open', '--json', 'number,url,isDraft,headRefOid') -AllowFailure
@@ -998,17 +1085,31 @@ function Invoke-Publish([object]$Preflight, [object]$State) {
         $existingPullRequests = if ($createdListJson) { @($createdListJson | ConvertFrom-Json) } else { @() }
         if ($existingPullRequests.Count -ne 1) { throw 'Expected exactly one open PR after creation; refusing ambiguous PR identity.' }
     }
-    Write-Host 'Required CI / Full validation pending.'
+    $pullRequest = $existingPullRequests[0]
+    $openLink = Format-MosaicTerminalLink '[open]' ([string]$pullRequest.url) ([string]$pullRequest.url)
+    Write-Host "PR #$($pullRequest.number) $prDisposition  $openLink"
     if ($PreserveMergeCommit) {
         Write-Host 'Auto-merge: EXCLUDED (upstream Draft requires human review).'
         Write-Host 'Review and resolve Draft readiness in GitHub.'
         $autoMergeResult = 'excluded upstream Draft'
     } else {
-        $autoMergeResult = Enable-NativeAutoMerge $gh.Source $slug $existingPullRequests[0] $branch $State.commit
-        Write-Host 'GitHub will merge only after required protection succeeds.'
+        $autoMergeResult = Enable-NativeAutoMerge $gh.Source $slug $pullRequest $branch $State.commit
+        if ($script:conciseMode) { Write-Host 'Auto-merge: ENABLED' }
+        if (-not $script:conciseMode) { Write-Host 'GitHub will merge only after required protection succeeds.' }
     }
-    Write-Host 'Done - authoritative validation is running on GitHub.'
-    Write-PrepareLog "Publication completed. Branch=$branch Result=$prResult AutoMerge=$autoMergeResult"
+    Write-Host 'Required CI / Full validation: PENDING'
+    if (-not $script:validationPlan) { $script:validationPlan = Get-PrepareValidationPlan @($State.publicationPaths) }
+    $expectedHostedPath = Get-ExpectedHostedPath $script:validationPlan
+    Write-Host "Expected path: $expectedHostedPath"
+    if (-not $script:conciseMode) { Write-Host 'Done - authoritative validation is running on GitHub.' }
+    $script:publishedPullRequest = [pscustomobject]@{
+        number = $pullRequest.number
+        url = $pullRequest.url
+        disposition = $prDisposition
+        autoMerge = $autoMergeResult
+        expectedPath = $expectedHostedPath
+    }
+    Write-PrepareLog "Publication completed. Branch=$branch Result=$prResult AutoMerge=$autoMergeResult ExpectedPath=$expectedHostedPath"
 }
 
 try {
@@ -1051,5 +1152,14 @@ try {
     $logWriter.Dispose()
     $logStream.Dispose()
     Set-Location -LiteralPath $startingLocation
-    Write-Host "Prepare-pr logs: $runDirectory"
+    $script:runTimer.Stop()
+    if ($Phase -eq 'Guided' -and -not $script:prepareFailed -and $script:publishedPullRequest) {
+        $duration = Format-MosaicDuration $script:runTimer.Elapsed
+        $openLink = Format-MosaicTerminalLink '[open]' ([string]$script:publishedPullRequest.url) ([string]$script:publishedPullRequest.url)
+        Write-Host "SUCCESS: prepare-pr completed in $duration"
+        Write-Host "PR: #$($script:publishedPullRequest.number)  $openLink"
+        Write-Host "Logs: $runRelativeDirectory"
+    } else {
+        Write-Host "Prepare-pr logs: $runDirectory"
+    }
 }

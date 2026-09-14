@@ -5,6 +5,45 @@ function Format-MosaicDuration {
     return ('{0:0.0}s' -f $Elapsed.TotalSeconds)
 }
 
+function Test-MosaicTerminalHyperlinks {
+    $override = [string]$env:MOSAIC_TERMINAL_HYPERLINKS
+    if ($override -in @('always', '1', 'true')) { return $true }
+    if ($override -in @('never', '0', 'false')) { return $false }
+    if ([Console]::IsOutputRedirected) { return $false }
+    return [bool](
+        $env:WT_SESSION -or
+        $env:TERM_PROGRAM -in @('vscode', 'Windows_Terminal', 'WezTerm.app', 'iTerm.app') -or
+        ($env:TERM -and $env:TERM -ne 'dumb')
+    )
+}
+
+function Format-MosaicTerminalLink {
+    param(
+        [Parameter(Mandatory)][string]$Label,
+        [Parameter(Mandatory)][string]$Target,
+        [string]$Fallback
+    )
+    if (Test-MosaicTerminalHyperlinks) {
+        $escape = [char]27
+        $terminator = "$escape\"
+        $uri = if ($Target -match '^https?://') {
+            $Target
+        } else {
+            [Uri]::new([IO.Path]::GetFullPath($Target)).AbsoluteUri
+        }
+        return "$escape]8;;$uri$terminator$Label$escape]8;;$terminator"
+    }
+    if ($Fallback) {
+        $fallbackLabel = $Label.TrimEnd(']')
+        return "${fallbackLabel}: $Fallback]"
+    }
+    return "$Label ($Target)"
+}
+
+function Get-MosaicConsolePrefix {
+    return [string]$env:MOSAIC_OUTPUT_PREFIX
+}
+
 function New-MosaicRunOutput {
     param(
         [Parameter(Mandatory)][string]$RepositoryRoot,
@@ -108,7 +147,12 @@ function Start-MosaicStage {
     $Context.CurrentStageWriter.AutoFlush = $true
     Write-MosaicStageLog $Context "Stage: $Name"
     Write-MosaicStageLog $Context "Started: $(Get-Date -Format o)"
-    Write-Host ('[{0}/{1}] {2} [RUN]' -f $Number, $Total, $Name)
+    if ($env:MOSAIC_OUTPUT_COMPACT -eq '1') {
+        $link = Format-MosaicTerminalLink '[log]' $Context.CurrentStageLog ([IO.Path]::GetFileName($Context.CurrentStageLog))
+        Write-Host ((Get-MosaicConsolePrefix) + ('[{0}/{1}] {2} [RUN]  {3}' -f $Number, $Total, $Name, $link))
+    } else {
+        Write-Host ((Get-MosaicConsolePrefix) + ('[{0}/{1}] {2} [RUN]' -f $Number, $Total, $Name))
+    }
     Write-MosaicRunLog $Context "Stage started: $Name; Log=$($Context.CurrentStageLog)"
 }
 
@@ -118,7 +162,11 @@ function Complete-MosaicStage {
     $duration = Format-MosaicDuration $Context.StageTimer.Elapsed
     Write-MosaicRunLog $Context "Stage passed: $($Context.CurrentStageName); Duration=$duration"
     Close-MosaicStageWriter $Context
-    Write-Host ('[{0}/{1}] {2} [PASS] {3} -> {4}' -f $Context.CurrentStageNumber, $Context.TotalStages, $Context.CurrentStageName, $duration, $Context.CurrentStageLog)
+    if ($env:MOSAIC_OUTPUT_COMPACT -eq '1') {
+        Write-Host ((Get-MosaicConsolePrefix) + ('[{0}/{1}] {2} [PASS] {3}' -f $Context.CurrentStageNumber, $Context.TotalStages, $Context.CurrentStageName, $duration))
+    } else {
+        Write-Host ('[{0}/{1}] {2} [PASS] {3} -> {4}' -f $Context.CurrentStageNumber, $Context.TotalStages, $Context.CurrentStageName, $duration, $Context.CurrentStageLog)
+    }
     $Context.CurrentStageLog = $null
     $Context.CurrentStageName = $null
 }
@@ -142,7 +190,8 @@ function Fail-MosaicStage {
     $logPath = $Context.CurrentStageLog
     Write-MosaicRunLog $Context "Stage failed: $($Context.CurrentStageName); Duration=$duration; Reason=$Reason"
     Close-MosaicStageWriter $Context
-    Write-Host ('[{0}/{1}] {2} [FAIL] {3}' -f $Context.CurrentStageNumber, $Context.TotalStages, $Context.CurrentStageName, $duration) -ForegroundColor Red
+    $prefix = Get-MosaicConsolePrefix
+    Write-Host ($prefix + ('[{0}/{1}] {2} [FAIL] {3}' -f $Context.CurrentStageNumber, $Context.TotalStages, $Context.CurrentStageName, $duration)) -ForegroundColor Red
     Write-Host ''
     Write-Host "FAILED: $($Context.CurrentStageName)" -ForegroundColor Red
     Write-Host $Reason
@@ -160,10 +209,12 @@ function Complete-MosaicRun {
     $Context.Timer.Stop()
     $duration = Format-MosaicDuration $Context.Timer.Elapsed
     Write-MosaicRunLog $Context "$Message; Total=$duration"
-    Write-Host ''
-    Write-Host $Message
-    Write-Host "Total: $duration"
-    Write-Host "Logs: $($Context.RunDirectory)"
+    if ($env:MOSAIC_OUTPUT_COMPACT -ne '1') {
+        Write-Host ''
+        Write-Host $Message
+        Write-Host "Total: $duration"
+        Write-Host "Logs: $($Context.RunDirectory)"
+    }
 }
 
 function Invoke-MosaicLoggedCommand {

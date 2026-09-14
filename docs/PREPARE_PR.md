@@ -55,7 +55,21 @@ In a dedicated task worktree, one coherent non-ignored dirty set is selected aut
 
 Human-readable state is stored at the Git path `.git/wholphin-prepare-pr-state.json` (or the worktree-specific equivalent). It records only data needed to preserve the otherwise unreconstructable reviewed scope/tree boundary across diagnostic phases: branch/base/HEAD, already committed PR paths and commits, confirmed candidate paths, their publication union, intended snapshot hash, local-check level, staged snapshot/tree hashes, approved title, and completed phase. It is not validation authority. A changed branch, base, HEAD, working snapshot, or index invalidates the relevant phase.
 
-Each invocation creates one ignored run directory under `.logs/prepare-pr/<run>/`, including `prepare-pr.log`, a summary, and per-stage logs. The obsolete repository-root compatibility log is no longer written because it had no runtime consumer. The console prints concise truthful stage start/pass/fail summaries and the run-log location; complete Git diagnostics and deterministic evidence remain in the logs. Logs are diagnostic and non-authoritative, and never contain credentials, tokens, environment dumps, or PR-body contents.
+Each invocation creates one ignored run directory under `.logs/prepare-pr/<run>/`, including
+`prepare-pr.log`, a summary, and per-stage logs. The obsolete repository-root compatibility log is
+no longer written because it had no runtime consumer. Guided success output shows the six phase
+start/result lines, duration, one scope/classification line, concise diff statistics, commit title,
+PR create/reuse result, native auto-merge state, pending required CI, expected hosted validation
+path, and the final run-log location. Complete Git identities, remote/ref diagnostics, hashes, path
+inventories, and command output remain in the logs.
+
+Supporting terminals receive OSC 8 `[log]` links on stage-start lines to exact stage logs and
+`[open]` links to the PR. PASS/FAIL lines do not repeat the stage link.
+Redirected or unsupported terminals instead show the stage-log filename and full PR URL; the final
+`.logs/prepare-pr/<run>` location is always printed. Failure output keeps the semantic refusal reason
+and relevant stage-log location visible. ANSI/OSC presentation is never written into the forensic
+logs. Logs are diagnostic and non-authoritative, and never contain credentials, tokens, environment
+dumps, or PR-body contents.
 
 Advanced diagnostic commands remain available after an intentional stop:
 
