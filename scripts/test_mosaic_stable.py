@@ -195,6 +195,28 @@ class StableTests(unittest.TestCase):
         stable.promote(self.api, self.m, self.apk)
         self.assertTrue(all(method == 'GET' for method, _, _ in self.api.calls[count:]))
 
+    def test_new_stable_links_previous_immutable_stable_without_changing_identity(self):
+        previous = dict(self.m, versionCode=4, versionName='1.0.4', immutableIdentity='downstream-build-4',
+                        sourceSha='4' * 40)
+        self.assertIsNone(stable.promote(self.api, previous, self.apk))
+        self.assertEqual('mosaic-v1.0.4', stable.promote(self.api, self.m, self.apk))
+        latest = self.api.call('GET', 'releases/latest')
+        self.assertEqual('v1.0.5', latest['name'])
+        self.assertIn('/compare/mosaic-v1.0.4...mosaic-v1.0.5', latest['body'])
+        count = len(self.api.calls)
+        self.assertEqual('mosaic-v1.0.4', stable.promote(self.api, self.m, self.apk))
+        self.assertTrue(all(method == 'GET' for method, _, _ in self.api.calls[count:]))
+
+    def test_untrusted_previous_stable_identity_is_not_used_for_navigation(self):
+        previous = dict(self.m, versionCode=4, versionName='1.0.4', immutableIdentity='downstream-build-4',
+                        sourceSha='4' * 40)
+        stable.promote(self.api, previous, self.apk)
+        previous_ref = self.api.refs['mosaic-v1.0.4']['object']['sha']
+        self.api.tags[previous_ref]['message'] = '{}'
+        self.assertIsNone(stable.promote(self.api, self.m, self.apk))
+        latest = self.api.call('GET', 'releases/latest')
+        self.assertNotIn('Compare changes', latest['body'])
+
     def test_conflicting_stable_never_overwritten(self):
         stable.promote(self.api, self.m, self.apk)
         count = len(self.api.calls)
@@ -318,8 +340,9 @@ class StableTests(unittest.TestCase):
         self.assertNotIn('MOSAIC_BUILD', workflow)
         self.assertNotIn('MOSAIC_SOURCE_SHA', workflow)
         self.assertNotIn('MOSAIC_APK_SHA256', workflow)
-        self.assertIn('## Ready to release: [%s](%s)', verify)
-        self.assertIn('Waiting for approval — authorization is required before Stable publication.', verify)
+        self.assertIn('## Stable %s ready for approval', verify)
+        self.assertIn('Explicitly promote the authenticated Development build', verify)
+        self.assertIn('Waiting for <code>release-promote</code> approval.', verify)
         self.assertIn('<summary>Technical details</summary>', verify)
         self.assertIn('environment: release-promote', publisher)
         self.assertIn('Reauthenticate Development', publisher)

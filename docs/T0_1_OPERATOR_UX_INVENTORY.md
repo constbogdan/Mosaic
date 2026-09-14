@@ -4,13 +4,15 @@ Status: **CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED VALIDATED;
 Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX COMPLETE / HOSTED
 VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED**
 Committed-only publication follow-up: **HOSTED VALIDATED (PR #64)**
-Next: **Release / Diagnostic UX batch**
+Release / Diagnostic UX batch: **IMPLEMENTED / OFFLINE VALIDATED; HOSTED ACCEPTANCE PENDING**
+Next after acceptance: **CP5 value decision**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED
 VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX COMPLETE /
-HOSTED VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED.**
+HOSTED VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED; Release / Diagnostic UX batch
+IMPLEMENTED / OFFLINE VALIDATED.**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
 baseline; historical names in acceptance records are evidence, not active UX. CP2 removed only
@@ -159,6 +161,43 @@ manual SHA, improve Development/Stable and Compare Changes navigation, demote im
 updater/tag/asset identity, and remove redundant human-facing provenance only where durable machine
 evidence already provides it. CP5 machine-contract renames are not implicit in that batch; their
 value must be decided explicitly afterward. CP7 performance and CP8 consistency remain subsequent.
+
+## T0-1 Release / Diagnostic UX batch
+
+Status: **IMPLEMENTED / OFFLINE VALIDATED; HOSTED ACCEPTANCE PENDING**
+
+Signing Diagnostic remains a distinct no-publication check of the real build, `release-sign`
+Environment, credentials, certificate, package and payload boundary. Its required `expected_sha`
+form field was removed: a dispatch on protected `main` already binds `github.sha`, and the existing
+source/tree/run/attempt and numeric artifact-ID/digest checks authenticate the exact bytes. The
+workflow now derives `MOSAIC_EXERCISE_SHA` from `github.sha`; Build still has no secrets or write
+authority, Sign still has no Gradle or Release authority, and nothing is published.
+
+New Development bodies lead with **Latest automatically published validated build**. New Stable
+bodies lead with **Explicitly promoted trusted build for normal consumption**. Release API names,
+tags, asset names, manifests and updater endpoints are unchanged. The rolling Development body and
+summary derive the newest authenticated current Stable tag from the publication inventory and link
+that immutable Stable-to-Development source range. Stable publication derives the highest prior valid Stable tag
+from the release set it already validates and links that immutable tag range. Invalid, mutable,
+identical or externally shaped comparison text is omitted rather than interpolated.
+
+New `downstream-build-N` bodies identify themselves as permanent build/provenance records, state
+that they are not another update channel, and direct normal preview use to rolling Development.
+Development/Stable result summaries put channel meaning and primary navigation first; source,
+digest, immutable record and producer run/attempt remain in collapsed technical details. Existing
+published bodies are deliberately not backfilled during idempotent retries.
+
+Stable Prepare now says which authenticated candidate is ready and that `release-promote` approval
+will explicitly promote it. Hold Prepare says that `/releases/latest` advertising will stop while
+the tag, APK, manifest and provenance remain preserved. Hold success states whether an older Stable
+became current or none remains and directs a forward fix when necessary. Hold authentication,
+recheck, mutation, idempotency and Environment authority are unchanged.
+
+This closes P05 (Signing Diagnostic repeated SHA), V02 (reliable Compare Changes), V03 (immutable
+archive emphasis), and V04 (channel/result prominence) at implementation level. V01's proposed
+human Development version format remains unimplemented because the current numeric Release `name`
+is updater-consumed; any further title/identity change belongs to the later explicit CP5 value
+decision. CP5 names, CP7 performance and CP8 consistency were not started.
 
 ## T0-1 CP4B.1 exact-tree reuse contract repair
 
@@ -1518,7 +1557,7 @@ external action, and owner checkpoint.
 | P02 — CP4B.3 COMPLETE / HOSTED VALIDATED | prepare-pr + PR Full duplicated local/hosted assurance | Fast local feedback plus exact publication integrity, then authoritative PR policy; retain fail-closed main fallback | Classifier/prepare-pr fixtures and PR #63 PR/main reuse | CP4 |
 | P03 — CP4B.3 COMPLETE / HOSTED VALIDATED | Upstream candidates required local Standard then Full plus PR Full | One meaningful focused local pass; preserve native merge identity and forced hosted Full | Native merge/filter fixtures; forced hosted authority remains intact | CP4 |
 | P04 — COMPLETE / HOSTED VALIDATED | prepare-pr stopped after PR creation and manual auto-merge click | Authenticate the exact open same-repository/base/head non-Draft PR; use native `--auto --merge --match-head-commit`; never arm upstream Draft | PR #65 proved failed CI blocks head A, corrected head B reuses the PR and auto-merges only after required CI, and main reuses exact evidence | CP4 |
-| P05 — CP4A AUDITED / CP4B PENDING | Signing Diagnostic requires repeated SHA | Zero-input authenticated protected-main source; keep Environment approval and no publication | Signing auth/refusal tests + manual hosted diagnostic | CP4 |
+| P05 — IMPLEMENTED / OFFLINE VALIDATED; HOSTED PENDING | Signing Diagnostic requires repeated SHA | Zero-input authenticated protected-main source; keep Environment approval and no publication | Signing auth/refusal tests pass; zero-input hosted diagnostic pending | Release / Diagnostic UX |
 
 ### HIGH-RISK CONTRACT MIGRATION (6)
 
@@ -1547,9 +1586,9 @@ external action, and owner checkpoint.
 | ID | Source / current problem | Target and dependency/risk | Validation / external action | CP |
 |---|---|---|---|---|
 | V01 | Development primary title lacks distance from Stable | After compatibility audit, `vStable-distance-gSHA — Development`; machine `downstream-build-N` unchanged | VersionCode/updater/provenance tests + device acceptance | CP6 |
-| V02 | Stable/Development bodies lack prominent comparison | Compare Stable→Development and prior Stable→new Stable | Source-baseline/ref authentication tests + live releases | CP6 |
-| V03 | Immutable archive looks like another human release | Mark archive/provenance role; rolling channel is primary | Release body/updater tests | CP6 |
-| V04 | Artifact identities dominate summaries | Human version/channel first; exact artifact in details | Artifact authentication unchanged; summary tests | CP6 |
+| V02 — IMPLEMENTED / OFFLINE VALIDATED; HOSTED PENDING | Stable/Development bodies lack prominent comparison | Immutable authenticated source range for Development and prior-Stable tag range for Stable | Source/ref validation and presentation tests pass; natural publication pending | Release / Diagnostic UX |
+| V03 — IMPLEMENTED / OFFLINE VALIDATED; HOSTED PENDING | Immutable archive looks like another human release | Body identifies permanent provenance record and points to rolling Development | Release body/updater contract tests pass; natural publication pending | Release / Diagnostic UX |
+| V04 — IMPLEMENTED / OFFLINE VALIDATED; HOSTED PENDING | Artifact identities dominate summaries | Human version/channel first; exact artifact in technical details | Artifact authentication unchanged; summary tests pass; natural publication pending | Release / Diagnostic UX |
 
 ### DEFER TO T0-2 (5)
 

@@ -57,7 +57,7 @@ jobs:
           BUILD: ${{ steps.prepare.outputs.build }}
           APK_URL: ${{ steps.prepare.outputs.apk_url }}
         run: |
-          printf '## Ready to release: [%s](%s)\n\nWaiting for approval — authorization is required before Stable publication.\n\nNothing has been published by this run.\n\n<details>\n<summary>Technical details</summary>\n\nAuthenticated Development build: <code>%s</code>\n\n</details>\n' "$VERSION" "$APK_URL" "$BUILD" >> "$GITHUB_STEP_SUMMARY"
+          printf '## Stable %s ready for approval\n\nExplicitly promote the authenticated Development build for normal consumption.\n\n[Download the exact candidate APK](%s)\n\nWaiting for <code>release-promote</code> approval. Nothing has been published by this run.\n\n<details>\n<summary>Technical details</summary>\n\nAuthenticated immutable build: <code>%s</code>\n\n</details>\n' "$VERSION" "$APK_URL" "$BUILD" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         id: verified
         with:

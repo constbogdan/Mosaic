@@ -173,24 +173,20 @@ records **who** authorized the action. Approval never substitutes for source, tr
 artifact, signer, freshness, or conflict checks. No active workflow or script references the
 retired `mosaic-release-signing` Environment; it can be deleted manually after operator review.
 
-## Deferred post-I06 CI/CD UX work
+## Post-I06 CI/CD UX follow-up status
 
-The following are deliberately outside I07 and are not operational yet:
+Completed after I07: zero-input Signing Diagnostic; prepare-pr native auto-merge; authoritative PR
+validation with exact-tree main reuse; simplified local preparation; early validation-plan output;
+collapsed PR scope; and immutable release Compare Changes links.
+
+The following remain deliberately outside I07 and are not operational yet:
 
 - coordinate the `Full validation` → `Prepare` machine-contract migration and required-check
   update;
 - rename `Build Development Release`, `Sign Development`, and `Publish Development` to
   `Build`, `Sign`, and `Publish`;
-- remove the Signing Diagnostic manual SHA input;
-- let `prepare-pr` arm native auto-merge;
-- eliminate duplicate local, prepare-pr, and PR Full validation where equivalent evidence can
-  be authenticated;
-- evaluate making PR Full authoritative for every `releaseRequired=true` APK change;
-- add a human-readable pre-execution CI plan, collapsible PR Confirmed paths, and a PR to
-  post-merge CI lifecycle link;
 - complete workflow/action naming cleanup;
 - evaluate Development versions such as `v1.0.34-1-g<sha>` and `v1.0.34-2-g<sha>`;
-- add release **Compare changes** links.
 
 ## Rejected machinery
 

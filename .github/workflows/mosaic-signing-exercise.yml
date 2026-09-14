@@ -3,11 +3,6 @@ run-name: Signing Diagnostic
 
 on:
   workflow_dispatch:
-    inputs:
-      expected_sha:
-        description: 'Explicitly authorized full protected-main SHA to build and sign'
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -21,12 +16,12 @@ defaults:
     shell: bash
 
 env:
-  MOSAIC_EXERCISE_SHA: ${{ inputs.expected_sha }}
+  MOSAIC_EXERCISE_SHA: ${{ github.sha }}
 
 jobs:
   build:
     name: Validate and build diagnostic input
-    if: github.repository == 'constbogdan/Wholphin' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.ref_protected && inputs.expected_sha == github.sha
+    if: github.repository == 'constbogdan/Wholphin' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.ref_protected
     runs-on: ubuntu-latest
     timeout-minutes: 60
     outputs:
@@ -35,7 +30,7 @@ jobs:
     steps:
       - name: Explain diagnostic purpose
         run: |
-          printf '## Signing Diagnostic\n\nValidates the signing configuration for the selected protected-main source.\n\n**Nothing will be published.**\n\nFull validation and an unsigned Release build run first. Signing then waits for <code>release-sign</code> authorization.\n\n<details>\n<summary>Technical details</summary>\n\nSource: <code>%s</code>\n\n</details>\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          printf '## Signing Diagnostic\n\nTests the real signing boundary against the current protected-main source.\n\n**Nothing will be published.**\n\nFull validation and an unsigned Release build run first. Signing then waits for <code>release-sign</code> authorization.\n\n<details>\n<summary>Technical details</summary>\n\nSource: <code>%s</code>\n\nRun: <code>%s</code> / attempt <code>%s</code>\n\n</details>\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.sha }}
@@ -74,7 +69,7 @@ jobs:
     needs: build
     permissions:
       contents: read
-    if: github.repository == 'constbogdan/Wholphin' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.ref_protected && inputs.expected_sha == github.sha
+    if: github.repository == 'constbogdan/Wholphin' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.ref_protected
     outputs:
       artifact_id: ${{ steps.signed.outputs.artifact-id }}
     environment: release-sign

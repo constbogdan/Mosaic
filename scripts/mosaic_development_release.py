@@ -257,9 +257,9 @@ def verified_manifest(record, apk, identity, run, attempt, policy, build_workflo
                 assetName=APK_NAME, source=source)
 
 
-def release_fields(m, draft, *, archive=False):
+def release_fields(m, draft, *, archive=False, compare_from=None):
     return dict(name='v' + m['versionName'], draft=draft, prerelease=True, make_latest='false',
-                body=release_body(m, 'Development', archive=archive))
+                body=release_body(m, 'Development', archive=archive, compare_from=compare_from))
 
 
 def check_asset(asset, name, data):
@@ -437,12 +437,42 @@ def assets(api, release, expected, allow_upload):
         check_asset(asset, name, data)
 
 
-def publish(api, m, apk):
+def stable_compare_tag(api, releases):
+    """Find the newest Stable tag whose immutable Git identity authenticates."""
+    candidates = []
+    for release in releases:
+        if release.get('draft') or release.get('prerelease'):
+            continue
+        version = re.fullmatch(r'mosaic-v1\.0\.([1-9][0-9]*)', str(release.get('tag_name', '')))
+        if version and release.get('name') == f'v1.0.{version[1]}':
+            candidates.append((int(version[1]), release['tag_name']))
+    for _, tag in sorted(candidates, reverse=True):
+        try:
+            ref = api.call('GET', f'git/ref/tags/{tag}', missing=True)
+            if not ref or ref.get('object', {}).get('type') != 'tag':
+                continue
+            annotation = api.call('GET', 'git/tags/' + ref['object']['sha'])
+            manifest = json.loads(annotation.get('message', ''))
+            version = int(tag.rsplit('.', 1)[1])
+            if (annotation.get('tag') != tag or annotation.get('object', {}).get('type') != 'commit'
+                    or annotation.get('object', {}).get('sha') != manifest.get('sourceSha')
+                    or annotation.get('message', '').rstrip('\n') != canonical(manifest).decode().rstrip('\n')
+                    or manifest.get('versionCode') != version
+                    or manifest.get('versionName') != f'1.0.{version}'):
+                continue
+            return tag
+        except (AttributeError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            continue
+    return None
+
+
+def publish(api, m, apk, compare_from=None):
     """Never replace immutable records/assets; hide rolling metadata during replacement."""
     tag = m['immutableIdentity']
     record_bytes = canonical(m)
     expected = {APK_NAME: apk, MANIFEST_NAME: record_bytes}
     releases = api.pages('releases')
+    compare_from = stable_compare_tag(api, releases) if compare_from is None else compare_from
     rolling = find_release(api, 'develop', releases)
     if rolling:
         if rolling.get('immutable') or not rolling.get('prerelease'):
@@ -467,18 +497,18 @@ def publish(api, m, apk):
         api.call('POST', 'git/refs', dict(ref='refs/tags/' + tag, sha=annotation['sha']))
     archive = find_release(api, tag, releases)
     if archive is None:
-        archive = api.call('POST', 'releases', dict(tag_name=tag, target_commitish=m['sourceSha'], **release_fields(m, True, archive=True)))
+        archive = api.call('POST', 'releases', dict(tag_name=tag, target_commitish=m['sourceSha'], **release_fields(m, True, archive=True, compare_from=compare_from)))
     if not archive.get('prerelease') or archive.get('name') != 'v' + m['versionName']:
         raise ValueError('Immutable archive release metadata mismatch')
     assets(api, archive, expected, allow_upload=archive['draft'])
     if archive['draft']:
-        api.call('PATCH', f"releases/{archive['id']}", release_fields(m, False, archive=True))
+        api.call('PATCH', f"releases/{archive['id']}", release_fields(m, False, archive=True, compare_from=compare_from))
     develop_ref = api.call('GET', 'git/ref/tags/develop', missing=True)
     if rolling and rolling['name'] == 'v' + m['versionName'] and not rolling['draft']:
         if not develop_ref or develop_ref['object']['type'] != 'commit' or develop_ref['object']['sha'] != m['sourceSha']:
             raise ValueError('Existing rolling tag/source mismatch')
         assets(api, rolling, expected, allow_upload=False)
-        return
+        return compare_from
     if rolling:
         api.call('PATCH', f"releases/{rolling['id']}", dict(draft=True, prerelease=True, make_latest='false'))
     elif develop_ref:
@@ -489,15 +519,16 @@ def publish(api, m, apk):
     else:
         api.call('POST', 'git/refs', dict(ref='refs/tags/develop', sha=m['sourceSha']))
     if rolling is None:
-        rolling = api.call('POST', 'releases', dict(tag_name='develop', target_commitish=m['sourceSha'], **release_fields(m, True)))
+        rolling = api.call('POST', 'releases', dict(tag_name='develop', target_commitish=m['sourceSha'], **release_fields(m, True, compare_from=compare_from)))
     for asset in api.pages(f"releases/{rolling['id']}/assets"):
         if asset['name'] not in expected:
             raise ValueError('Unexpected rolling asset; explicit recovery review required')
         api.call('DELETE', f"releases/assets/{asset['id']}")
     assets(api, rolling, expected, allow_upload=True)
-    result = api.call('PATCH', f"releases/{rolling['id']}", release_fields(m, False))
+    result = api.call('PATCH', f"releases/{rolling['id']}", release_fields(m, False, compare_from=compare_from))
     if result.get('draft') or result.get('prerelease') is not True or result.get('tag_name') != 'develop':
         raise ValueError('Rolling release final verification failed')
+    return compare_from
 
 
 def main():
@@ -535,8 +566,8 @@ def main():
             require_current_protected_main(api, sha)
             if path.read_bytes() != canonical(m):
                 raise ValueError('Prepared publication manifest changed')
-            publish(api, m, apk)
-            append_summary(publication_summary(m, 'publish', env, ci), env)
+            compare_from = publish(api, m, apk)
+            append_summary(publication_summary(m, 'publish', env, ci, compare_from=compare_from), env)
             return
     except (ValueError, OSError, KeyError) as error:
         parser.exit(1, str(error) + '\n')

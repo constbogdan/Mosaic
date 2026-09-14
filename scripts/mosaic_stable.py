@@ -205,8 +205,8 @@ def publish_prepared(api, root, env, directory):
         raise ValueError('Current Development candidate changed after authentication')
     if current_manifest != manifest:
         raise ValueError('Current Development provenance changed after authentication')
-    promote(api, manifest, apk)
-    append_summary(publication_summary(manifest, 'promote', env), env)
+    compare_from = promote(api, manifest, apk)
+    append_summary(publication_summary(manifest, 'promote', env, compare_from=compare_from), env)
 
 
 def authenticated_stable_release(api, release):
@@ -251,22 +251,43 @@ def verify_manifest(m, apk, acceptance, identity, policy):
         raise ValueError('Stable input differs from verified development manifest')
 
 
-def fields(m, draft):
+def fields(m, draft, compare_from=None):
     return dict(name='v' + m['versionName'], draft=draft, prerelease=False,
                 make_latest='false' if draft else 'true',
-                body=release_body(m, 'Stable'))
+                body=release_body(m, 'Stable', compare_from=compare_from))
+
+
+def previous_stable_compare(api, candidates):
+    """Return the newest prior tag only when its immutable Git identity authenticates."""
+    for _, release in sorted(candidates, key=lambda item: item[0], reverse=True):
+        tag = release['tag_name']
+        try:
+            recorded = annotation(api, tag)
+            manifest = json.loads(recorded.get('message', ''))
+            check_annotation(recorded, tag, manifest)
+            version = int(tag.rsplit('.', 1)[1])
+            if manifest.get('versionCode') != version or manifest.get('versionName') != f'1.0.{version}':
+                continue
+            return tag
+        except (AttributeError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            continue
+    return None
 
 
 def promote(api, m, apk, releases=None):
     tag = 'mosaic-v' + m['versionName']
     # Refuse numeric rollback and unknown stable ownership, even if GitHub ordering differs.
     releases = api.pages('releases') if releases is None else releases
+    previous = []
     for existing in releases:
         if existing.get('draft') or existing.get('prerelease'):
             continue
         version = re.fullmatch(r'mosaic-v1\.0\.([1-9][0-9]*)', existing.get('tag_name', ''))
         if not version or int(version[1]) > m['versionCode']:
             raise ValueError('Unknown or newer stable release; refusing latest rollback')
+        if int(version[1]) < m['versionCode']:
+            previous.append((int(version[1]), existing))
+    compare_from = previous_stable_compare(api, previous)
     a = annotation(api, tag)
     stable = find_release(api, tag, releases)
     if a:
@@ -277,16 +298,17 @@ def promote(api, m, apk, releases=None):
         obj = api.call('POST', 'git/tags', dict(tag=tag, message=canonical(m).decode(), object=m['sourceSha'], type='commit'))
         api.call('POST', 'git/refs', dict(ref='refs/tags/' + tag, sha=obj['sha']))
     if stable is None:
-        stable = api.call('POST', 'releases', dict(tag_name=tag, target_commitish=m['sourceSha'], **fields(m, True)))
+        stable = api.call('POST', 'releases', dict(tag_name=tag, target_commitish=m['sourceSha'], **fields(m, True, compare_from)))
     if stable.get('prerelease') is not False or stable.get('name') != 'v' + m['versionName']:
         raise ValueError('Stable release metadata conflict')
     assets(api, stable, {APK_NAME: apk, MANIFEST_NAME: canonical(m)}, allow_upload=stable['draft'])
     if stable['draft']:
-        api.call('PATCH', f"releases/{stable['id']}", fields(m, False))
+        api.call('PATCH', f"releases/{stable['id']}", fields(m, False, compare_from))
     # An already published stable is never edited or re-uploaded on retry.
     latest = api.call('GET', 'releases/latest')
     if latest.get('id') != stable['id'] or latest.get('draft') or latest.get('prerelease') or latest.get('tag_name') != tag:
         raise ValueError('Stable latest postcondition failed; existing bytes were not replaced')
+    return compare_from
 
 
 def main():

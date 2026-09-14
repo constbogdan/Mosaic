@@ -11,8 +11,8 @@ Current operation supersedes the historical form procedure below. Stable Promoti
 zero-input manual **Prepare -> Release** workflow. Prepare resolves the current rolling
 `develop` publication and derives/authenticates protected-main tooling, its immutable
 `downstream-build-N`, source SHA/tree, signed APK hash, version, producer run/attempt,
-tag/release/assets, signer, package and payload. Its compact summary is `Ready to release:
-[v1.0.N](exact authenticated APK URL) · ✓ Authenticated`. Release alone uses
+tag/release/assets, signer, package and payload. Its compact summary is `Stable v1.0.N ready for
+approval`, links the exact authenticated candidate APK, and explains the `release-promote` action. Release alone uses
 `release-promote`; after approval it reauthenticates protected main and proves rolling
 `develop` still identifies the exact prepared candidate before invoking the unchanged
 exact-byte publisher. Movement or ambiguity refuses instead of selecting another build.
@@ -23,11 +23,17 @@ I07 forward-recovery acceptance promoted `downstream-build-34` unchanged in run
 Development. The held v1.0.5 release remains preserved as a prerelease.
 
 The workflow displays **Stable Promotion** and uses the same fixed run identity.
-Prepare leads with `Ready to release: v1.0.N`, the exact authenticated APK link, and the pending
-approval action; successful publication leads with `Released: v1.0.N`. Exact provenance stays in
+Prepare leads with `Stable v1.0.N ready for approval`, the exact authenticated APK link, and the pending
+approval action; successful publication leads with `Stable v1.0.N released`. Exact provenance stays in
 collapsed technical details. API title `v1.0.N`, workflow path, verification/publisher separation, manual
 authorization and assets remain unchanged. New bodies use a branded Stable heading;
 historical bodies are not changed. See the [I05 ledger](ITEM_6_I05_PRESENTATION.md).
+
+New Stable bodies describe an explicitly promoted trusted build for normal consumption. When an
+older valid Stable exists, the publisher derives its immutable `mosaic-v1.0.N` tag from the same
+release inventory used for rollback/ownership refusal and adds a GitHub Compare Changes link to the
+new immutable Stable tag. The Release API `name`, stable/development tags, APK/manifest assets and
+updater endpoints remain unchanged. Invalid or mutable comparison identities are never rendered.
 
 User confirms downstream-build-5 / v1.0.5 was promoted unchanged to tag `mosaic-v1.0.5`;
 the reported release label is **Mosaic stable 1.0.5**. `/releases/latest` resolves to it.

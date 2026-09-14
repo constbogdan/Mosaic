@@ -11,6 +11,15 @@ For routine Sign or pre-mutation Publish failures, use GitHub **Re-run failed jo
 
 Historical sections below retain migration evidence only; commands and workflows described there are not current operator capabilities.
 
+New rolling Development bodies describe the channel as the latest automatically published validated
+build. Publication resolves the newest current Stable release whose annotated Git tag and canonical
+manifest authenticate, then uses that immutable tag only for a Stable-to-Development Compare Changes
+link. Source, digest, immutable `downstream-build-N` record and producer run/attempt remain available
+under technical provenance. New immutable release bodies identify themselves as permanent build and
+provenance records, not another update channel, and direct normal preview updates to `develop`.
+Release API names, tags, asset names, manifests and updater discovery remain unchanged. Idempotent
+publication never rewrites historical bodies.
+
 ## Change-aware Development eligibility
 
 **IMPLEMENTED / OFFLINE VALIDATED; post-merge live acceptance pending.** After trusted
