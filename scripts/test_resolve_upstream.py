@@ -9,6 +9,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from tooling_test_support import normalized_native_output
+
 
 MODULE_PATH = Path(__file__).with_name("resolve_upstream.py")
 sys.path.insert(0, str(MODULE_PATH.parent))
@@ -311,7 +313,7 @@ class ResolveUpstreamTests(unittest.TestCase):
     def test_invalid_explicit_pr_fails_clearly(self):
         completed, captured = self.run_wrapper(["-Pr", "0"])
         self.assertNotEqual(0, completed.returncode)
-        self.assertIn("-Pr must be a positive integer", completed.stderr)
+        self.assertIn("-Pr must be a positive integer", normalized_native_output(completed))
         self.assertEqual("", captured)
 
     def test_wrong_repository_refuses_before_checkout(self):
@@ -596,20 +598,6 @@ class ResolveUpstreamTests(unittest.TestCase):
         candidate.state = "Waiting on PR #33"
         with self.assertRaisesRegex(resolve.Refusal, "Resolve its predecessor"):
             resolve.select_candidate([candidate], 37)
-
-    def test_prepare_pr_contract_reuses_same_head_without_ready_or_force(self):
-        source = (MODULE_PATH.parent / "prepare-pr.ps1").read_text(encoding="utf-8")
-        self.assertIn("pr list --repo $slug --base $config.BaseBranch --head $branch --state open", source)
-        self.assertIn("Remote branch is divergent or ahead; publication would require a force push", source)
-        self.assertIn("[switch]$PreserveMergeCommit", source)
-        self.assertIn("Expected exactly one existing Draft PR for the preserved upstream merge", source)
-        self.assertIn("Expected exactly one existing Draft PR before preserved merge publication", source)
-        self.assertIn("Existing Draft PR moved before publication; no push occurred", source)
-        self.assertIn("HEAD is not the exact reviewed native upstream-resolution merge commit", source)
-        self.assertIn("Existing Draft PR head does not match the reviewed upstream merge commit", source)
-        self.assertNotIn("pr ready", source)
-        self.assertNotIn("--force", source)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -3,7 +3,6 @@
 import json
 import os
 from pathlib import Path
-import re
 import shutil
 import stat
 import subprocess
@@ -11,17 +10,11 @@ import sys
 import tempfile
 import unittest
 
+from tooling_test_support import normalized_native_output
+
 
 ROOT = Path(__file__).resolve().parents[1]
 POWERSHELL = shutil.which("pwsh") or shutil.which("powershell")
-ANSI_CONTROL = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
-
-
-def normalized_native_output(result):
-    """Remove observed PowerShell presentation and retain semantic diagnostics."""
-    presentation = ANSI_CONTROL.sub("", (result.stdout or "") + (result.stderr or ""))
-    presentation = re.sub(r"(?<!\S)\|(?=\s|$)", " ", presentation)
-    return " ".join(presentation.split())
 
 
 class PreparePrFixtureTest(unittest.TestCase):
@@ -566,8 +559,14 @@ raise SystemExit(2)
         )
         self.assertEqual(0, result.returncode, normalized_native_output(result))
         self.assertIn("Auto-merge: EXCLUDED", result.stdout)
+        gh_commands = self.fake_trace("gh")
+        git_commands = self.fake_trace("git")
+        self.assertTrue(any(args[:2] == ["pr", "list"] for args in gh_commands))
+        self.assertFalse(any(args[:2] == ["pr", "create"] for args in gh_commands))
+        self.assertFalse(any(args[:2] == ["pr", "ready"] for args in gh_commands))
         self.assertEqual([], self.auto_merge_commands())
-        self.assertFalse(any(args and args[0] == "api" for args in self.fake_trace("gh")))
+        self.assertFalse(any(args and args[0] == "api" for args in gh_commands))
+        self.assertFalse(any("--force" in args for args in git_commands))
 
     def test_wrong_repository_base_or_head_identity_refuses(self):
         reviewed_head = self.commit_current_worktree()
