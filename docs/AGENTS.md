@@ -283,11 +283,11 @@ When implementation reveals that a roadmap idea is no longer appropriate, update
 
 `main` is the known-good integration baseline and receives changes through pull requests. Do not perform active feature, fix, or maintenance development directly on it.
 
-Before synchronizing with the original project, read `docs/UPSTREAM_SYNC.md`. Never merge `upstream/main` directly into our `main`. Manual synchronization uses a dedicated `chore/sync-upstream-YYYY-MM-DD` branch, deliberate semantic conflict resolution, high-risk auto-merge review, Standard then Full local validation, and PR-only integration. The hosted v2 implementation instead prepares an ownership-aware normal or Draft `chore/sync-upstream-<upstream-SHA>-<downstream-SHA>` workspace in isolated GitHub jobs and relies on required PR Full CI without workstation validation. FOLLOW, REVIEW and DOWNSTREAM-OWNED policy never authorizes automatic semantic resolution or merge; conflicts remain blocked for human/Codex resolution in their Draft workspace. Activation status and credential prerequisites are recorded in the handoff and upstream policy.
+Before synchronizing with the original project, read `docs/UPSTREAM_SYNC.md`. Never merge `upstream/main` directly into our `main`. Manual synchronization uses a dedicated `chore/sync-upstream-YYYY-MM-DD` branch, deliberate semantic conflict resolution, high-risk auto-merge review, focused local feedback, and PR-only integration. The hosted v2 implementation prepares an ownership-aware normal or Draft `chore/sync-upstream-<upstream-SHA>-<downstream-SHA>` workspace in isolated GitHub jobs. Every upstream PR is forced through authoritative hosted Full. FOLLOW, REVIEW and DOWNSTREAM-OWNED policy never authorizes automatic semantic resolution or merge; conflicts remain blocked for human/Codex resolution in their Draft workspace. Activation status and credential prerequisites are recorded in the handoff and upstream policy.
 
 For a hosted I06 attention candidate, use `.\scripts\resolve-upstream.ps1` to discover/select an actionable downstream PR, or pass `-Pr <N>` directly. This is the standard re-entrant checkout/evidence/prompt/publication entry point; do not reconstruct candidate identities or bypass dependency, clean-tree, scope, mapping and non-divergence refusals. First use exits after creating the Codex prompt. After semantic resolution, run it again: only an explicit default-No `Ready to PUSH?` approval may delegate exact derived filters to prepare-pr for ordinary fast-forward update of the same Draft. Draft readiness and merge/reject remain separate human decisions.
 
-Pull requests targeting `main`, including upstream-sync pull requests, receive the required fork-owned `CI / Full validation` check. Every PR runs changed-range pre-commit and the complete offline tooling suite. The job deterministically classifies the complete PR range: proven non-Android scope emits `NON_ANDROID` policy evidence without Android validation; Android, build-sensitive, and unknown scope runs complete default-debug validation and emits `ANDROID_FULL` evidence. After a merge to protected `main`, the same job first authenticates the exact PR, workflow, run, parents, tested synthetic merge/tree, validation class, required outcomes, and unique unexpired `pr-policy-v1` artifact. Exact final-tree equivalence reuses that complete PR policy and skips the already-proven pre-commit, offline, Android setup, and Gradle work. Direct changes and any missing, failed, cancelled, expired, ambiguous, foreign, stale, parent-, tree-, class-, or contract-mismatched evidence run repository-wide pre-commit, the complete offline suite, Android setup, and complete default-debug validation on main. The conditional Release assembly remains authoritative on final main and is never reused from a PR artifact. Manual upstream conflict recovery still requires local Standard with meaningful focused filters followed by Full. CI is not a replacement for semantic review or Android TV visual, focus, and integration testing.
+Pull requests targeting `main`, including upstream-sync pull requests, receive the required fork-owned `CI / Full validation` check. Every PR runs changed-range pre-commit and the complete offline tooling suite. The job deterministically classifies the complete PR range: proven non-Android scope emits `NON_ANDROID` policy evidence without Android validation; Android, build-sensitive, and unknown scope runs complete default-debug validation and emits `ANDROID_FULL` evidence. After a merge to protected `main`, the same job first authenticates the exact PR, workflow, run, parents, tested synthetic merge/tree, validation class, required outcomes, and unique unexpired `pr-policy-v1` artifact. Exact final-tree equivalence reuses that complete PR policy and skips the already-proven pre-commit, offline, Android setup, and Gradle work. Direct changes and any missing, failed, cancelled, expired, ambiguous, foreign, stale, parent-, tree-, class-, or contract-mismatched evidence run repository-wide pre-commit, the complete offline suite, Android setup, and complete default-debug validation on main. The conditional Release assembly remains authoritative on final main and is never reused from a PR artifact. Resolved upstream candidates require meaningful focused local JVM feedback once; their PR classification is forced to `ANDROID_FULL`, replacing the former local Standard-then-Full duplicate gate. CI is not a replacement for semantic review or Android TV visual, focus, and integration testing.
 
 CI validation is deliberately read-only, requires no backend, extension, or signing secrets, and must remain safe for fork pull requests. The fork-owned `CI` workflow is the only supported Development delivery path; Stable Promotion and Hold Release own Stable publication and emergency containment. The obsolete inherited `main.yml` and `release.yml` publishers are intentionally absent and classified as downstream-owned absences so upstream sync cannot restore them. Baseline T0 does not support Appstore or Fire TV AAB distribution.
 
@@ -295,7 +295,7 @@ The protected `main` ruleset requires pull requests and the `CI / Full validatio
 
 ``` text
 user explicitly authorizes publication
-        -> autonomous audit / local validation / exact stage / commit / push / PR via gh
+        -> autonomous audit / cheap local checks / exact stage / commit / push / PR via gh
         -> GitHub takes over: required risk-tiered PR validation and mergeability
         -> user reviews completed PR and decides merge / reject
         -> authenticate exact PR-tested tree on the merged main push
@@ -306,7 +306,7 @@ PR CI reports release relevance, validation risk, and the checks actually select
 
 Codex does not decide independently that work should be published. Passing tests or completing implementation is not authority to stage for publication, commit, push, or create a PR. Publication begins only after an explicit user instruction such as “prepare the PR,” “publish this,” or an unambiguous equivalent.
 
-After that authorization, `scripts/prepare-pr.ps1` is the normal autonomous publication path. It audits the complete scope, applies the same deterministic classifier used by CI (while honoring explicit meaningful JVM filters), validates without drift, stages exactly, generates the title, commits, verifies tree identity, safely pushes, and uses authenticated `gh` to locate or create the PR without routine intermediate prompts. Upstream-sync branches still require Standard with meaningful focused patterns followed by Full. The user then reviews the completed GitHub PR and decides whether to merge. Read `docs/PREPARE_PR.md` for stop conditions and advanced diagnostic phases.
+After that authorization, `scripts/prepare-pr.ps1` is the normal autonomous publication path. It audits the complete scope, runs cheap changed-scope hygiene and relevant local feedback, refuses any mutation, stages exactly, generates the title, commits, verifies tree identity, safely pushes, and uses authenticated `gh` to locate or create the PR without routine intermediate prompts. It does not run routine broad local Full or the complete local offline suite; GitHub PR CI is authoritative. Upstream-sync branches require meaningful focused patterns once before the forced hosted Full. The user then reviews the completed GitHub PR and decides whether to merge. Read `docs/PREPARE_PR.md` for stop conditions and advanced diagnostic phases.
 
 Prepare-pr never makes ownership assumptions about a dirty tree. Normal use automatically selects one coherent non-ignored change set in the dedicated task worktree. If unrelated work is mixed in, use an explicit advanced scope only after review or preserve the work in a separate worktree; any remaining out-of-scope dirty path is refused because it would validate a different tree from the intended commit. Never bypass the script with a broad `git add .` merely for convenience.
 
@@ -346,19 +346,18 @@ The repository-supported commands are:
 .\scripts\validate-local.ps1 -Level Full
 ```
 
-Fast is very quick relevant feedback, Standard is the normal completed-task handoff, and Full is explicit comprehensive validation for high-risk or substantial checkpoints. Fast and Standard derive changed paths from `origin/main` through `HEAD` plus the current working tree and select focused tests deterministically; an explicit `-TestFilter '*RelevantTest*'` remains available. Python and `pre-commit` are local prerequisites. The script resolves Java and exposes its `bin` directory to child processes for that validation process only; validation tooling must never silently install dependencies or mutate global developer tooling.
+Fast is the normal local-feedback command, Standard is an optional broader developer diagnostic, and Full is explicit comprehensive validation on demand. They derive changed paths from `origin/main` through `HEAD` plus the current working tree; an explicit `-TestFilter '*RelevantTest*'` remains available. Fast deliberately does not turn an unknown/high-risk path into a local Full fallback because authoritative PR CI owns that integration decision. Python and `pre-commit` are local prerequisites. The script resolves Java and exposes its `bin` directory to child processes for that validation process only; validation tooling must never silently install dependencies or mutate global developer tooling.
 
 -   Prefer targeted validation for the code changed; do not automatically run the full Gradle test suite after every change.
--   During ordinary implementation, prefer fast, high-value feedback. Explicit publication authorization includes running the validation required by prepare-pr without another user handoff.
+-   During ordinary implementation, prefer fast, high-value feedback. Explicit publication authorization lets prepare-pr run its cheap local checks without another user handoff; GitHub PR CI performs authoritative validation.
 -   Maintain `scripts/validate-local.ps1` with the validation commands appropriate for the current work.
 -   Fast and Standard use the source-controlled validation policy and canonical change classifier. Explicit `-TestFilter` values override derived focused patterns; never invent a filter.
--   Unknown or sensitive inputs escalate to Full. An unmapped production path receives the broad all-JVM fallback rather than no tests.
--   Fast runs the smallest selected feedback path; Standard adds changed-scope pre-commit, offline tooling tests, and production compilation for targeted Android changes; Full runs repository-wide pre-commit, all offline tests, and one combined complete default-debug Gradle graph.
+-   Fast runs changed-scope pre-commit, mapped offline or focused JVM feedback when known, and `git diff --check`. Unknown or sensitive Fast scope relies on authoritative PR CI instead of silently expanding into local Full. Standard retains the broader classifier-selected diagnostic behavior; Full runs repository-wide pre-commit, all offline tests, and one combined complete default-debug Gradle graph.
 -   Pre-commit includes autofix hooks and may modify files before returning non-zero. If it fails, inspect the working-tree diff before rerunning validation; the script stops before Gradle rather than validating an unreviewed rewrite.
--   Local Standard/Full use `pre-commit` from `PATH` when available, then fall back to `python -m pre_commit`. If neither works, install it once with `python -m pip install pre-commit`; validation never mutates permanent developer tooling or `PATH`.
+-   Local validation uses `pre-commit` from `PATH` when available, then falls back to `python -m pre_commit`. If neither works, install it once with `python -m pip install pre-commit`; validation never mutates permanent developer tooling or `PATH`.
 -   Order validation from cheapest/most targeted to broader regression checks.
 -   The script fails fast, preserves exit codes, prints truthful start/pass/fail stages without fabricated percentages, and retains complete per-stage logs under `.logs/validation/<run>/`. The repository-root `validation.log` remains a replace-on-run compatibility snapshot, assembled and copied once after validation finishes so live command output has only one writer. Failures show only a bounded useful excerpt plus the absolute full-log path.
--   During ordinary implementation, hand off long validation to the user unless already authorized. During explicitly authorized publication, run the required validation autonomously.
+-   Do not make routine local Full a prerequisite for publication. Use Full only when the user explicitly requests comprehensive local regression evidence or diagnosis warrants it.
 -   When validation results are provided, analyze them and fix any failures attributable to the change.
 -   Before considering a larger feature/batch ready to merge, include the appropriate broader/full-suite validation.
 
@@ -372,21 +371,21 @@ Use a fenced PowerShell command block so supported Codex/VS Code interfaces can 
 
 Choose the validation level based on the state of the work:
 
--   `Fast` --- very quick classifier-selected feedback during iteration. It can run without a filter; use `-TestFilter` when a narrower real JVM seam is known.
--   `Standard` --- normal completed-task developer handoff. It works without a filter by deriving mapped coverage and adds the appropriate hygiene/tooling/compile evidence.
--   `Full` --- high-risk, substantial, explicit comprehensive, upstream-sync, or checkpoint validation. It always runs the complete local graph.
+-   `Fast` --- normal quick local feedback. It can run without a filter; use `-TestFilter` when a narrower real JVM seam is known.
+-   `Standard` --- optional broader classifier-selected developer diagnosis.
+-   `Full` --- explicit comprehensive local regression or diagnostic run. It always runs the complete local graph.
 
-Unknown/sensitive scope escalates conservatively even when Fast or Standard was requested. Explicit real filters remain supported; never invent one merely to change the tier.
+Unknown/sensitive Standard scope still escalates conservatively. Fast stays bounded and leaves authoritative broad validation to PR CI. Explicit real filters remain supported; never invent one merely to change the tier.
 
 Examples:
 
 **Run this**
 
 ``` powershell
-.\scripts\validate-local.ps1 -Level Standard
+.\scripts\validate-local.ps1 -Level Fast
 ```
 
-Or, when full validation is warranted:
+When comprehensive local validation is explicitly warranted:
 
 **Run this**
 
@@ -396,17 +395,17 @@ Or, when full validation is warranted:
 
 The test filter must reference the actual focused test class(es) changed or created for the task. Do not invent a test name merely for the handoff.
 
-For focused iterative validation:
+For a known focused JVM seam:
 
 **Run this**
 
 ``` powershell
-.\scripts\validate-local.ps1 -Level Fast
+.\scripts\validate-local.ps1 -Level Fast -TestFilter '*RelevantTest*'
 ```
 
 Do not make the user reconstruct or infer the appropriate validation command from prose.
 
-This user-run handoff applies to ordinary implementation. Once publication is explicitly authorized, prepare-pr runs Standard/Full itself; do not insert a routine validation confirmation or return the work to the user before the PR exists.
+This user-run handoff applies to ordinary implementation. Once publication is explicitly authorized, prepare-pr runs its Fast local checks itself; do not insert a routine Full confirmation or return the work to the user before the PR exists.
 
 If validation has already been run externally and the supplied results are sufficient, analyze those results normally rather than asking for the same validation again.
 

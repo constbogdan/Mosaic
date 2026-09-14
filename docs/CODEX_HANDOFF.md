@@ -8,13 +8,13 @@
 
 `Baseline T0 — IN PROGRESS`
 
-`T0-1 CP4B.2 — COMPLETE / HOSTED VALIDATED`
+`T0-1 CP4B.3 — IMPLEMENTED / FOCUSED VALIDATED`
 
-`Next: T0-1 CP4B.3 — Local / prepare-pr simplification`
+`Next: CP4B.3 hosted acceptance, then the next bounded CP4 item`
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
-`CP4B.2 COMPLETE / HOSTED VALIDATED`; `CP4B.3 NEXT`.
+`CP4B.2 COMPLETE / HOSTED VALIDATED`; `CP4B.3 IMPLEMENTED / FOCUSED VALIDATED`.
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -122,14 +122,36 @@ same validation; reuse remains conditional, and every uncertainty runs the compl
 fallback. See the
 [authoritative ledger](T0_1_OPERATOR_UX_INVENTORY.md#t0-1-cp4b2-boundary-and-approved-direction).
 
-CP4B.3 is next. Its target normal path is optional fast/relevant local feedback, prepare-pr
-scope/tree integrity, authoritative PR validation, merge, protected-main exact-tree reuse,
-Development eligibility, and Release Build/Sign/Publish only when required. It may challenge routine
-operator Full, mandatory prepare-pr Full, the complete local offline suite, redundant local
-pre-commit/whitespace work, upstream Standard-then-Full duplication, and validation/resume state
-without an independent consumer. These remain candidates, not completed behavior. Full stays
-available explicitly for diagnostics/on-demand use; local Full performance belongs to CP7 rather
-than CP4B.3.
+CP4B.3 is implemented and focused validated. The normal path is optional fast/relevant local
+feedback, prepare-pr scope/tree integrity plus cheap checks, authoritative PR validation, merge,
+protected-main exact-tree reuse, Development eligibility, and Release Build/Sign/Publish only when
+required. Prepare-pr defaults to Fast and no longer escalates high-risk/unknown scope into routine
+local Full, all offline tests, or Android Full. A single mapped offline suite remains useful local
+feedback; a multi-suite `test_*.py` expansion is deferred to authoritative PR CI. Resolved upstream candidates run one meaningful
+focused JVM pass rather than local Standard then Full; every upstream PR remains forced through
+hosted `ANDROID_FULL`. Explicit local Full remains available for diagnostics/on-demand use.
+
+The custom state was reduced rather than deleted wholesale. Its reviewed dirty-path scope,
+mode/type/object/deletion manifest, intended snapshot, staged tree, commit identity, and completed
+phase still protect the exact publication boundary and safe `-Phase Publish` resume; Git/GitHub
+cannot reconstruct that original working-tree intent. Validation-result history was removed and
+the state schema is now version 2, so older state refuses and requires a fresh Audit. Per-run logs
+remain under `.logs/prepare-pr/<run>/`. The unused repository-root `prepare-pr.log` was removed;
+root `validation.log` remains because prepare-pr consumes its completed diagnostic snapshot.
+
+Focused disposable-repository coverage proves default Fast and explicit filter forwarding,
+mutation refusal before staging, exact staged/commit trees, and commit-hook tree mismatch refusal.
+Existing fixtures retain remote divergence/no-force, PR reuse/no duplicate, and native upstream
+parent/tree/Draft safeguards. Hosted acceptance is still required: capture the first normal
+prepare-pr duration against the historical 5–6 minute validation-heavy path, observe authoritative
+PR policy, then verify protected main reuses the exact evidence. This branch should naturally be
+`NON_ANDROID`; do not manufacture an application change.
+
+Local checkpoint evidence is 4/4 disposable prepare-pr tests, 21/21 validation-policy/integration
+tests, and 34/34 resolver tests. PowerShell parsing passed. The final current-branch Fast run took
+2.7 seconds, classified `tooling-only / high`, selected `non-android`, deferred the multi-suite
+`test_*.py` expansion to authoritative PR CI, and passed changed-scope pre-commit plus
+`git diff --check`.
 
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-
@@ -348,7 +370,8 @@ episodes, or parent/tree drift. After the default-No `Ready to PUSH?` boundary, 
 is committed as a native two-parent merge: first parent is the exact remote blocked Draft head;
 second parent is the exact upstream tip. The Draft head has the recorded Mosaic baseline as its sole
 parent, which preserves baseline authentication while allowing a non-force fast-forward of the same
-Draft. `prepare-pr -PreserveMergeCommit` performs the established focused Standard-then-Full checks,
+Draft. `prepare-pr -PreserveMergeCommit` performs one meaningful focused Fast check before the
+authoritative hosted Full,
 verifies the exact parents/tree and remote Draft identity, creates no replacement commit, and refuses
 anything except one same-branch Draft at the resulting head. This is offline validated; natural
 hosted conflict acceptance remains checkpoint 4 and requires explicit authorization.
@@ -360,7 +383,7 @@ and downstream identities. No hosted state was changed. At inspection time its c
 commit ahead of and zero behind current `main`, so prepare-pr can safely update that same PR:
 the branch matches its upstream-sync pattern, an ordinary fast-forward push preserves human work,
 and exact-head PR lookup prevents a duplicate. It still requires meaningful focused JVM filters
-followed by Full and never marks the Draft Ready. If later `main` movement breaks the required
+locally, then forced hosted Full, and never marks the Draft Ready. If later `main` movement breaks the required
 ancestry, prepare-pr correctly refuses; reconcile deliberately rather than weakening that guard.
 
 **HISTORICAL PRE-CP5 IMPLEMENTATION RECORD.** Hosted Sync now loads

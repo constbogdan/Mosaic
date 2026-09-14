@@ -4,8 +4,8 @@ param(
     [string]$Phase = 'Guided',
     [string[]]$Files = @(),
     [string[]]$Exclude = @(),
-    [ValidateSet('Standard', 'Full')]
-    [string]$Level = 'Standard',
+    [ValidateSet('Fast', 'Full')]
+    [string]$Level = 'Fast',
     [string[]]$TestFilter = @(),
     [string]$Title,
     [switch]$ConfirmScope,
@@ -24,10 +24,10 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $configPath = Join-Path $PSScriptRoot 'prepare-pr.config.psd1'
 $config = Import-PowerShellDataFile -LiteralPath $configPath
 $startingLocation = Get-Location
-$logPath = Join-Path $repoRoot 'prepare-pr.log'
 $runId = '{0}-{1}' -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $PID
 $runDirectory = [IO.Path]::GetFullPath((Join-Path $repoRoot ".logs\prepare-pr\$runId"))
 New-Item -ItemType Directory -Path $runDirectory -Force | Out-Null
+$logPath = Join-Path $runDirectory 'prepare-pr.log'
 $summaryPath = Join-Path $runDirectory 'summary.txt'
 $logStream = [IO.FileStream]::new($logPath, [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::Read)
 $logWriter = [IO.StreamWriter]::new($logStream, [Text.UTF8Encoding]::new($false))
@@ -375,7 +375,7 @@ function Load-State([object]$Preflight) {
     $path = Get-StatePath
     if (-not (Test-Path -LiteralPath $path)) { throw 'No resumable prepare-pr state exists. Run the guided workflow or Audit first.' }
     $state = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
-    if ($state.version -ne 1) { throw 'Saved prepare-pr state uses an unsupported version. Run Audit again.' }
+    if ($state.version -ne 2) { throw 'Saved prepare-pr state uses an unsupported version. Run Audit again.' }
     if ($state.branch -ne $Preflight.Branch -or $state.baseCommit -ne $Preflight.BaseCommit -or $state.branchHead -ne $Preflight.Head) {
         throw 'Saved prepare-pr state is stale because the branch, base, or HEAD changed. Run Audit again.'
     }
@@ -457,7 +457,7 @@ function Resolve-AndSaveScope([object]$Preflight) {
 function Save-ConfirmedScope([object]$Preflight, [string[]]$Scope, [string[]]$Risks) {
     $snapshotHash = Get-WorkingSnapshotHash $Scope
     $state = @{
-        version = 1
+        version = 2
         branch = $Preflight.Branch
         baseRef = $Preflight.BaseRef
         baseCommit = $Preflight.BaseCommit
@@ -468,8 +468,7 @@ function Save-ConfirmedScope([object]$Preflight, [string[]]$Scope, [string[]]$Ri
         branchCommits = @($Preflight.BranchCommits)
         intendedSnapshotHash = $snapshotHash
         highRiskPaths = $Risks
-        validationLevel = $null
-        validationResults = @()
+        localCheckLevel = $null
         stagedTree = $null
         stagedSnapshotHash = $null
         approvedTitle = $null
@@ -482,8 +481,8 @@ function Save-ConfirmedScope([object]$Preflight, [string[]]$Scope, [string[]]$Ri
     return [pscustomobject]$state
 }
 
-function Invoke-Validation([object]$Preflight, [object]$State, [string]$RequestedLevel) {
-    Write-Section 'VALIDATE'
+function Invoke-LocalChecks([object]$Preflight, [object]$State, [string]$RequestedLevel) {
+    Write-Section 'LOCAL CHECKS'
     $scope = @($State.scope)
     $entries = @(Get-ChangedEntries)
     Assert-NoOutOfScope $scope $entries
@@ -492,55 +491,36 @@ function Invoke-Validation([object]$Preflight, [object]$State, [string]$Requeste
 
     $isUpstreamSync = $Preflight.Branch -like $config.UpstreamSyncBranchPattern
     $filters = @($TestFilter | Where-Object { $_ })
-    if ($RequestedLevel -eq 'Standard' -and -not $filters.Count -and $isUpstreamSync) {
-        throw 'Upstream-sync preparation requires Standard validation with meaningful focused JVM test patterns followed by Full. Supply -TestFilter.'
+    if (-not $filters.Count -and $isUpstreamSync) {
+        throw 'Upstream-sync preparation requires meaningful focused JVM test patterns before authoritative hosted Full. Supply -TestFilter.'
     }
 
-    if (-not $isUpstreamSync -and $RequestedLevel -eq 'Standard') {
-        $python = Get-Command python -ErrorAction SilentlyContinue
-        if (-not $python) { throw "Python is required to select validation. Install Python and expose 'python' on PATH." }
-        $policyArguments = @('-B', (Join-Path $PSScriptRoot 'mosaic_validation_policy.py'))
-        foreach ($path in @($State.publicationPaths)) { $policyArguments += @('--path', $path) }
-        foreach ($filter in $filters) { $policyArguments += @('--test-filter', $filter) }
-        $policyOutput = @(& $python.Source @policyArguments 2>&1)
-        if ($LASTEXITCODE -ne 0) { throw "Validation policy failed:`n$($policyOutput -join [Environment]::NewLine)" }
-        $policy = (($policyOutput -join "`n") | ConvertFrom-Json)
-        Write-PrepareLog "Validation policy: ReleaseRelevance=$($policy.releaseRelevance) ValidationRisk=$($policy.validationRisk) Mode=$($policy.validationMode)"
-        if ($policy.validationMode -eq 'full') { $RequestedLevel = 'Full' }
+    Write-PrepareLog "Local checks selected: $RequestedLevel; FocusedFilters=$($filters -join ',')"
+    $arguments = @('-Level', $RequestedLevel)
+    foreach ($filter in $filters) { $arguments += @('-TestFilter', $filter) }
+    foreach ($path in @($State.publicationPaths)) { $arguments += @('-ChangedPath', $path) }
+    Write-Host ".\$($config.ValidationScript) $($arguments -join ' ')"
+    & (Join-Path $repoRoot $config.ValidationScript) -Level $RequestedLevel -TestFilter $filters -ChangedPath @($State.publicationPaths)
+    $validationExitCode = $LASTEXITCODE
+    $validationLog = Join-Path $repoRoot 'validation.log'
+    if (Test-Path -LiteralPath $validationLog) {
+        Add-Content -LiteralPath $script:stageLogPath -Value "`n--- $RequestedLevel local-check output ---" -Encoding UTF8
+        Get-Content -LiteralPath $validationLog | Add-Content -LiteralPath $script:stageLogPath -Encoding UTF8
     }
-
-    $levels = if ($isUpstreamSync) { @('Standard', 'Full') } else { @($RequestedLevel) }
-    Write-PrepareLog "Validation selected: $($levels -join '+'); FocusedFilters=$($filters -join ',')"
-    $results = @()
-    foreach ($validationLevel in $levels) {
-        $arguments = @('-Level', $validationLevel)
-        foreach ($filter in $filters) { $arguments += @('-TestFilter', $filter) }
-        foreach ($path in @($State.publicationPaths)) { $arguments += @('-ChangedPath', $path) }
-        Write-Host ".\$($config.ValidationScript) $($arguments -join ' ')"
-        $focusedBeforeFull = $isUpstreamSync -and $validationLevel -eq 'Standard'
-        & (Join-Path $repoRoot $config.ValidationScript) -Level $validationLevel -TestFilter $filters -ChangedPath @($State.publicationPaths) -FocusedBeforeFull:$focusedBeforeFull
-        $validationExitCode = $LASTEXITCODE
-        $validationLog = Join-Path $repoRoot 'validation.log'
-        if (Test-Path -LiteralPath $validationLog) {
-            Add-Content -LiteralPath $script:stageLogPath -Value "`n--- $validationLevel validation output ---" -Encoding UTF8
-            Get-Content -LiteralPath $validationLog | Add-Content -LiteralPath $script:stageLogPath -Encoding UTF8
+    if ($validationExitCode -ne 0) {
+        Write-PrepareLog "$RequestedLevel local checks failed with exit code $validationExitCode."
+        $failedEntries = @(Get-ChangedEntries)
+        $failedPaths = @($failedEntries.Path | Sort-Object -Unique)
+        $failedOutside = @($failedPaths | Where-Object { $_ -notin $scope })
+        $failedSnapshot = Get-WorkingSnapshotHash $scope
+        if ($failedOutside.Count -or $failedSnapshot -ne $beforeSnapshot) {
+            Write-Host 'Failed local checks/autofix changed the working tree. Nothing was staged.' -ForegroundColor Yellow
+            $failedEntries | ForEach-Object { Write-Host "$($_.Code) $($_.Path)" }
+            throw 'Review the diff and rerun Audit/Validate against the reviewed snapshot.'
         }
-        if ($validationExitCode -ne 0) {
-            Write-PrepareLog "$validationLevel validation failed with exit code $validationExitCode."
-            $failedEntries = @(Get-ChangedEntries)
-            $failedPaths = @($failedEntries.Path | Sort-Object -Unique)
-            $failedOutside = @($failedPaths | Where-Object { $_ -notin $scope })
-            $failedSnapshot = Get-WorkingSnapshotHash $scope
-            if ($failedOutside.Count -or $failedSnapshot -ne $beforeSnapshot) {
-                Write-Host 'Failed validation/autofix changed the working tree. Nothing was staged.' -ForegroundColor Yellow
-                $failedEntries | ForEach-Object { Write-Host "$($_.Code) $($_.Path)" }
-                throw 'Review the diff and rerun Audit/Validate against the reviewed snapshot.'
-            }
-            throw "$validationLevel validation failed with exit code $validationExitCode; the intended snapshot was unchanged."
-        }
-        $results += [pscustomobject]@{ level = $validationLevel; passed = $true; completedAt = [DateTimeOffset]::UtcNow.ToString('o') }
-        Write-PrepareLog "$validationLevel validation passed."
+        throw "$RequestedLevel local checks failed with exit code $validationExitCode; the intended snapshot was unchanged."
     }
+    Write-PrepareLog "$RequestedLevel local checks passed."
 
     $afterEntries = @(Get-ChangedEntries)
     $afterPaths = @($afterEntries.Path | Sort-Object -Unique)
@@ -548,28 +528,27 @@ function Invoke-Validation([object]$Preflight, [object]$State, [string]$Requeste
     $outside = @($afterPaths | Where-Object { $_ -notin $scopePaths })
     $afterSnapshot = Get-WorkingSnapshotHash $scope
     if ($outside.Count -or $afterSnapshot -ne $beforeSnapshot) {
-        Write-Host 'Validation or autofix changed the working tree. Nothing was staged.' -ForegroundColor Yellow
+        Write-Host 'Local checks or autofix changed the working tree. Nothing was staged.' -ForegroundColor Yellow
         $afterEntries | ForEach-Object { Write-Host "$($_.Code) $($_.Path)" }
         throw 'Review the diff and rerun Audit/Validate against the reviewed snapshot.'
     }
 
     $updated = @{}
     $State.psobject.Properties | ForEach-Object { $updated[$_.Name] = $_.Value }
-    $updated.validationLevel = ($levels -join '+')
-    $updated.validationResults = $results
-    $updated.completedPhase = 'Validated'
+    $updated.localCheckLevel = $RequestedLevel
+    $updated.completedPhase = 'Checked'
     Save-State $updated
-    Write-Host "Validation passed for unchanged snapshot $afterSnapshot."
-    Write-PrepareLog "Validation completed for unchanged snapshot $afterSnapshot."
+    Write-Host "Local checks passed for unchanged snapshot $afterSnapshot."
+    Write-PrepareLog "Local checks completed for unchanged snapshot $afterSnapshot."
     return [pscustomobject]$updated
 }
 
 function Invoke-Stage([object]$Preflight, [object]$State) {
     Write-Section 'STAGE CONFIRMED SCOPE'
-    if ($State.completedPhase -ne 'Validated') { throw 'Current state is not validated.' }
+    if ($State.completedPhase -ne 'Checked') { throw 'Current state has not passed local checks.' }
     $scope = @($State.scope)
     Assert-NoOutOfScope $scope @(Get-ChangedEntries)
-    if ((Get-WorkingSnapshotHash $scope) -ne $State.intendedSnapshotHash) { throw 'Validated snapshot is stale. Run Audit and Validate again.' }
+    if ((Get-WorkingSnapshotHash $scope) -ne $State.intendedSnapshotHash) { throw 'Checked snapshot is stale. Run Audit and Validate again.' }
     $outsideStaged = @(Get-ChangedEntries | Where-Object { $_.Staged -and $_.Path -notin $scope })
     if ($outsideStaged.Count) { throw "Staged paths exist outside the confirmed scope:`n$($outsideStaged.Path -join [Environment]::NewLine)" }
     $pathsToAdd = @()
@@ -580,7 +559,7 @@ function Invoke-Stage([object]$Preflight, [object]$State) {
     if ($pathsToAdd.Count) { Invoke-Git -Arguments (@('add', '-A', '--') + $pathsToAdd) | Out-Null }
     $stagedSnapshotHash = Get-StagedSnapshotHash $scope
     $stagedTree = Get-GitText @('write-tree')
-    if ($stagedSnapshotHash -ne $State.intendedSnapshotHash) { throw 'The staged snapshot does not match the validated intended snapshot.' }
+    if ($stagedSnapshotHash -ne $State.intendedSnapshotHash) { throw 'The staged snapshot does not match the reviewed intended snapshot.' }
     Invoke-Git -Arguments @('status', '--short', '--untracked-files=all') | Select-Object -ExpandProperty Output | ForEach-Object { Write-Host $_ }
     Invoke-Git -Arguments @('diff', '--cached', '--stat') | Select-Object -ExpandProperty Output | ForEach-Object { Write-Host $_ }
     Write-Host "Staged tree: $stagedTree"
@@ -620,7 +599,7 @@ function Invoke-Commit([object]$Preflight, [object]$State) {
     if ((Get-GitText @('write-tree')) -ne $State.stagedTree) { throw 'The staged snapshot changed after review.' }
     $scope = @($State.scope)
     Assert-NoOutOfScope $scope @(Get-ChangedEntries)
-    if ((Get-WorkingSnapshotHash $scope) -ne $State.intendedSnapshotHash) { throw 'The working snapshot changed after validation/staging. Review and validate it again.' }
+    if ((Get-WorkingSnapshotHash $scope) -ne $State.intendedSnapshotHash) { throw 'The working snapshot changed after local checks/staging. Review it again.' }
     $commitTitle = New-CommitTitle $Preflight $State
     if (-not $commitTitle) { throw 'No honest conventional commit title could be generated from the task branch. Supply -Title.' }
     if ($commitTitle -notmatch '^(feat|fix|chore|ci|docs|test|refactor)(\([^)]+\))?: .+') { throw 'Commit title must use a supported Conventional Commit prefix.' }
@@ -692,7 +671,7 @@ Not recorded by prepare-pr. Add references or state that none apply.
 
 ### Testing
 
-- Local validation: $($State.validationLevel) passed for the committed snapshot.
+- Local checks: $($State.localCheckLevel) feedback passed for the committed snapshot.
 - Required `CI / Full validation`: pending.
 - Android TV/manual runtime validation: not recorded by prepare-pr; update if applicable.
 
@@ -782,6 +761,7 @@ function Invoke-Publish([object]$Preflight, [object]$State) {
     }
     Write-Host 'Required CI / Full validation pending.'
     Write-Host 'Review/merge in GitHub.'
+    Write-Host 'Done — authoritative validation is running on GitHub.'
     Write-PrepareLog "Publication completed. Branch=$branch Result=$prResult"
 }
 
@@ -793,7 +773,7 @@ try {
 
     if ($Phase -eq 'Guided') {
         $state = Resolve-AndSaveScope $preflight
-        $state = Invoke-Validation $preflight $state $Level
+        $state = Invoke-LocalChecks $preflight $state $Level
         $state = Invoke-Stage $preflight $state
         $state = Invoke-Commit $preflight $state
         Invoke-Publish $preflight $state
@@ -810,7 +790,7 @@ try {
         }
         'Validate' {
             $state = if ($Files.Count) { Resolve-AndSaveScope $preflight } else { Load-State $preflight }
-            Invoke-Validation $preflight $state $Level | Out-Null
+            Invoke-LocalChecks $preflight $state $Level | Out-Null
         }
         'Stage' { Invoke-Stage $preflight (Load-State $preflight) | Out-Null }
         'Commit' { Invoke-Commit $preflight (Load-State $preflight) | Out-Null }
@@ -829,6 +809,5 @@ try {
     $logWriter.Dispose()
     $logStream.Dispose()
     Set-Location -LiteralPath $startingLocation
-    Write-Host "Prepare-pr log: $logPath"
-    Write-Host "Prepare-pr stage logs: $runDirectory"
+    Write-Host "Prepare-pr logs: $runDirectory"
 }
