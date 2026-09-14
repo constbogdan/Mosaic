@@ -134,6 +134,16 @@ Development build required, and completed in about 26 seconds. The two earlier P
 useful evidence that authoritative hosted CI caught PowerShell diagnostic-presentation differences
 without requiring any production prepare-pr safety change.
 
+PR #64 then live-validated the committed-only publication follow-up. A clean branch ahead of
+`origin/main` is audited and published using its complete existing commit scope and exact
+`HEAD`/tree without manufacturing or amending a commit; clean/equal still refuses, dirty scope still
+uses the normal Fast/stage/commit path, and native upstream identity safeguards remain mandatory.
+Hosted PowerShell exposed three more presentation-sensitive refusal assertions, but the underlying
+nothing-to-publish, remote-divergence/no-force, and missing native-merge-identity guards all behaved
+correctly. One test-side normalization contract now removes the observed ANSI, wrapping, standalone
+column-marker, and whitespace presentation before semantic assertions. The corrected PR passed
+authoritative hosted validation and merged as `063ba3a26c7d93e5c90a6f0651ba11d273121b05`.
+
 The next bounded CP4 item is P04, prepare-pr native auto-merge. It must authenticate the same
 non-Draft PR head, preserve required CI and normal merge behavior, exclude upstream Drafts, and
 requires explicit repository auto-merge enablement before hosted acceptance. Do not infer that

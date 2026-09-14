@@ -10,6 +10,8 @@
 
 `T0-1 CP4B.3 — COMPLETE / HOSTED VALIDATED`
 
+`CP4B.3 committed-only publication follow-up — HOSTED VALIDATED (PR #64)`
+
 `Next: P04 — prepare-pr native auto-merge, after its repository-setting and safety prerequisites are explicitly approved`
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
@@ -196,19 +198,21 @@ publication reauthenticates the clean tree and retains ancestry, remote-divergen
 first-push, and existing-PR reuse checks. Clean/equal still refuses, and any dirty path selects the
 normal reviewed staging/commit flow. Clean upstream-native branches do not receive the shortcut
 unless the preserved-merge identity contract is supplied, and they retain focused validation plus
-parent/tree/Draft authentication. Twelve disposable prepare-pr fixtures pass; hosted acceptance of
-this committed-only path is still pending. P04 remains separate and unstarted.
+parent/tree/Draft authentication. Twelve disposable prepare-pr fixtures pass. PR #64 subsequently
+hosted-validated this committed-only path. P04 remains separate and unstarted.
 
-PR #64 provided partial hosted acceptance for that follow-up. Clean committed-only publication
+PR #64 provided final hosted acceptance for that follow-up. Clean committed-only publication
 without a new/amended commit, complete scope across multiple existing commits, and existing-PR reuse
 passed on the hosted runner. The three failing fixtures were presentation-only: production correctly
 refused clean/equal scope, remote divergence requiring force push, and an upstream branch missing
 preserved native-merge identity, but PowerShell inserted standalone `|` error-column markers between
-wrapped words. `test_prepare_pr.py` now centralizes the observed presentation boundaryâ€”ANSI CSI,
+wrapped words. `test_prepare_pr.py` now centralizes the observed presentation boundary: ANSI CSI,
 line wrapping, whitespace-delimited column pipes, and repeated whitespace normalize to semantic
 diagnostic text before assertions. All failure-message assertions use that shared helper where
 presentation can vary. No production prepare-pr, validation/provenance, workflow, or release
-behavior changed; hosted confirmation of the normalization correction remains pending.
+behavior changed. The corrected PR passed authoritative hosted validation and merged as
+`063ba3a26c7d93e5c90a6f0651ba11d273121b05`; the committed-only follow-up is **HOSTED VALIDATED**
+and does not reopen CP4B.3.
 
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-

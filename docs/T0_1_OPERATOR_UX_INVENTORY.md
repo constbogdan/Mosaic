@@ -1,6 +1,7 @@
 # Baseline T0-1 operator UX, workflow, and presentation inventory
 
 Status: **CP4B.3 COMPLETE / HOSTED VALIDATED**
+Committed-only publication follow-up: **HOSTED VALIDATED (PR #64)**
 Next: **P04 — prepare-pr native auto-merge, after its repository-setting and safety prerequisites are explicitly approved**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
@@ -837,17 +838,20 @@ had no PR scope. The follow-up now distinguishes clean/equal (nothing to publish
 validate/stage/commit path). The clean/ahead path binds the reviewed existing `HEAD` and tree, skips
 only uncommitted-content stages, never creates or amends a commit, and retains ancestry, remote
 divergence, no-force, PR reuse, and native-upstream safeguards. Disposable coverage is complete;
-hosted use of this new path remains pending rather than being folded into PR #63's earlier evidence.
+PR #64 subsequently hosted-validated this new path rather than folding it into PR #63's earlier
+evidence.
 
 PR #64 then exercised the committed-only fixtures in hosted authoritative CI. The positive clean
 publication, complete multi-commit scope, and existing-PR reuse cases passed. Three negative cases
-also refused correctlyâ€”clean `HEAD == origin/main`, divergent remote publication, and an upstream
-branch without preserved native-merge identityâ€”but their assertions encountered the already-known
+also refused correctly: clean `HEAD == origin/main`, divergent remote publication, and an upstream
+branch without preserved native-merge identity, but their assertions encountered the already-known
 PowerShell rendering behavior: hosted error-column formatting inserted standalone `|` markers at
 wrapped word boundaries. The fixture now has one central test-side presentation contract that
 removes ANSI CSI sequences, whitespace-delimited PowerShell column markers, line wrapping, and
 resulting repeated whitespace before semantic assertions. Production prepare-pr behavior remains
-unchanged; the centralized normalization correction still requires hosted confirmation.
+unchanged. The corrected PR then passed authoritative hosted validation and merged as
+`063ba3a26c7d93e5c90a6f0651ba11d273121b05`. The committed-only follow-up is therefore **HOSTED
+VALIDATED**; CP4B.3 remains closed.
 
 
 ---
