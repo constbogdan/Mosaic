@@ -12,13 +12,14 @@
 
 `CP4B.3 committed-only publication follow-up — HOSTED VALIDATED (PR #64)`
 
-`P04 — IMPLEMENTED / HOSTED ACCEPTANCE PENDING`
+`P04 — COMPLETE / HOSTED VALIDATED`
 
-`Next: verify/enable repository auto-merge if needed, then live-prove P04 on a natural tooling-only PR`
+`Next: correct the tooling-test-support classification gap without weakening unknown-path fallback`
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
-`CP4B.2 COMPLETE / HOSTED VALIDATED`; `CP4B.3 COMPLETE / HOSTED VALIDATED`.
+`CP4B.2 COMPLETE / HOSTED VALIDATED`; `CP4B.3 COMPLETE / HOSTED VALIDATED`; `P04 COMPLETE / HOSTED
+VALIDATED`.
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -187,10 +188,9 @@ remove authoritative testing or optimize explicit Full: every PR still runs the 
 suite, `ANDROID_FULL` still runs Full Debug when required, and Full/Gradle performance remains
 CP7/T0-2.
 
-The authoritative next bounded CP4 item is P04: authenticate the same non-Draft PR head and arm
-native auto-merge while preserving required checks and excluding upstream Drafts. It requires an
-explicit repository auto-merge setting decision and separate hosted acceptance; CP4B.3 does not
-authorize either action.
+The next bounded CP4 item after CP4B.3 was P04: authenticate the same non-Draft PR head and arm
+native auto-merge while preserving required checks and excluding upstream Drafts. PR #65 has now
+completed that hosted acceptance; P04 is closed below.
 
 One CP4B.3 follow-up was found while publishing its already-committed documentation checkpoint.
 Prepare-pr previously rejected an empty working tree even when `origin/main..HEAD` contained real
@@ -201,7 +201,7 @@ first-push, and existing-PR reuse checks. Clean/equal still refuses, and any dir
 normal reviewed staging/commit flow. Clean upstream-native branches do not receive the shortcut
 unless the preserved-merge identity contract is supplied, and they retain focused validation plus
 parent/tree/Draft authentication. Twelve disposable prepare-pr fixtures pass. PR #64 subsequently
-hosted-validated this committed-only path. P04 remains separate and unstarted.
+hosted-validated this committed-only path. P04 remained a separate follow-up and is now complete.
 
 PR #64 provided final hosted acceptance for that follow-up. Clean committed-only publication
 without a new/amended commit, complete scope across multiple existing commits, and existing-PR reuse
@@ -240,21 +240,51 @@ head/merge-identity checks; prepare-pr neither arms auto-merge nor changes readi
 
 The repository's previous authenticated rules evidence establishes required PR integration,
 `CI / Full validation`, blocked deletion/non-fast-forward updates and zero required approvals.
-Recent merged history proves merge commits remain supported. During P04 proposal generation the
-saved `gh` credential was invalid and public API execution was unavailable, so the live
-`allow_auto_merge` value and optional squash/rebase settings were not inferred. Prepare-pr reads the
-live repository flags and reports an actionable open-PR refusal when `Allow auto-merge` is disabled;
-only the operator may change that setting.
+Hosted PR #65 verified `allow_auto_merge=true` and `allow_merge_commit=true`. Squash and rebase being
+enabled do not affect P04 because prepare-pr explicitly requests merge-commit mode. Prepare-pr reads
+these flags but never changes repository settings; only the operator may do so.
 
 Disposable fixtures cover new and existing PRs, idempotent already-enabled state, exact
 repository/base/branch/head authentication, Draft and preserved upstream Draft exclusion, closed,
 merged and ambiguous candidates, pre-mutation and atomic expected-head drift, disabled settings,
 merge-method incompatibility, CLI failure, committed-only and mixed-work publication, no force or
-administrative bypass, and merge-commit selection. Hosted acceptance remains: one natural
-non-release/tooling PR arms auto-merge while CI is pending, required CI succeeds, GitHub creates the
-normal merge commit, protected main authenticates exact `NON_ANDROID` evidence, and Development
-correctly skips. Draft exclusion requires fixtures/existing evidence rather than a manufactured
-conflict.
+administrative bypass, and merge-commit selection.
+
+PR #65 supplied stronger hosted acceptance than a single successful head. Prepare-pr authenticated
+the ordinary non-Draft PR and armed exact head A; authoritative CI failed on one stale test
+source-spelling assertion, and GitHub correctly did not merge. A complete audit of 14 offline test
+files / 259 discovered tests found no production defect. The test-only correction replaced brittle
+implementation spelling with behavioral disposable fixtures while retaining machine-consumed exact
+contracts; `test_prepare_pr.py` passed 20/20 and `test_resolve_upstream.py` passed 33/33. Prepare-pr
+then reused the same PR, armed corrected head B, authoritative CI passed, and GitHub automatically
+created the normal two-parent merge commit without manual merge or bypass. Protected main
+authenticated exact `ANDROID_FULL` `pr-policy-v1` evidence from PR #65 and reused Full in about 11
+seconds.
+
+```text
+exact head A -> auto-merge armed -> required CI failed -> no merge
+exact head B -> same PR reused -> auto-merge re-armed -> required CI passed -> GitHub native merge
+```
+
+This proves that P04 follows the current authenticated head and remains subordinate to required
+branch protection. Prepare-pr used no `--admin`, force push, direct bypass, readiness mutation, or
+repository-setting mutation. Upstream REVIEW/conflict Drafts remain excluded and human-controlled.
+P04 is **COMPLETE / HOSTED VALIDATED**.
+
+Immediate follow-up, not a P04 defect: the new `scripts/tooling_test_support.py` path was
+conservatively unknown. That correctly selected `ANDROID_FULL` and then caused Development release
+eligibility, Release APK build/sign/publish, and Development v1.0.46. Determine whether the
+legitimate tooling path warrants a narrow tooling-only mapping and regression coverage; retain
+unknown-path conservative Full/release behavior.
+
+After that classification correction, improve the already-computed PR Validation plan's early
+visibility using the smallest native GitHub presentation change. Then continue the existing upstream
+presentation backlog recorded from manual Upstream check #39: current Scheduled/Manual run names are
+adequate; preserve existing-candidate reuse/no-duplicate behavior; add a prominent final candidate
+PR/Draft link; reduce duplicate Observe/Publish outcome text; put REVIEW attention before bulk
+incoming history; and provide truthful current-upstream comparison/navigation when preserved REVIEW
+paths are absent from Files changed. Keep `resolve-upstream.ps1` as the semantic entry point and its
+automatic Codex handoff.
 
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-
