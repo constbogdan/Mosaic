@@ -115,13 +115,17 @@ try {
     } else {
         @($plan.focusedTests)
     }
-    Write-Host 'Wholphin validation'
-    Write-Host "Requested level: $Level"
-    Write-Host "Release relevance: $($plan.releaseRelevance)"
-    Write-Host "Validation risk: $($plan.validationRisk)"
-    Write-Host "Selected path: $effectiveMode"
-    if ($effectiveMode -eq 'full' -and $Level -ne 'Full') { Write-Host "$Level escalated to Full: $($plan.reason)" }
-    if ($Level -eq 'Fast' -and $plan.validationMode -eq 'full') { Write-Host 'Fast provides local feedback only; authoritative PR CI will run the required Full policy.' }
+    if ($env:MOSAIC_OUTPUT_COMPACT -eq '1') {
+        Write-Host ((Get-MosaicConsolePrefix) + "Validation: $Level $([char]0xB7) $effectiveMode")
+    } else {
+        Write-Host 'Wholphin validation'
+        Write-Host "Requested level: $Level"
+        Write-Host "Release relevance: $($plan.releaseRelevance)"
+        Write-Host "Validation risk: $($plan.validationRisk)"
+        Write-Host "Selected path: $effectiveMode"
+        if ($effectiveMode -eq 'full' -and $Level -ne 'Full') { Write-Host "$Level escalated to Full: $($plan.reason)" }
+        if ($Level -eq 'Fast' -and $plan.validationMode -eq 'full') { Write-Host 'Fast provides local feedback only; authoritative PR CI will run the required Full policy.' }
+    }
     Write-MosaicRunLog $output "RequestedLevel=$Level; EffectiveMode=$effectiveMode; ReleaseRelevance=$($plan.releaseRelevance); ValidationRisk=$($plan.validationRisk); ChangedPaths=$(@($plan.paths).Count); Filters=$($selectedTests -join ',')"
 
     $stages = [Collections.Generic.List[object]]::new()
@@ -149,7 +153,7 @@ try {
     }
     $deferCompleteOfflineToPr = $Level -eq 'Fast' -and $plan.offlineTestPattern -eq 'test_*.py'
     if ($deferCompleteOfflineToPr) {
-        Write-Host 'Fast skipped the complete offline suite; authoritative PR CI will run it.'
+        if ($env:MOSAIC_OUTPUT_COMPACT -ne '1') { Write-Host 'Fast skipped the complete offline suite; authoritative PR CI will run it.' }
         Write-MosaicRunLog $output 'Complete offline tooling deferred to authoritative PR CI.'
     }
     if ($isFullPath -or ($plan.offlineTestPattern -and -not $deferCompleteOfflineToPr)) {
@@ -186,6 +190,6 @@ try {
 } finally {
     Set-Location -LiteralPath $repoRoot
     if (Publish-MosaicLegacyLog $output) {
-        Write-Host "Compatibility log: $legacyLogPath"
+        if ($env:MOSAIC_OUTPUT_COMPACT -ne '1') { Write-Host "Compatibility log: $legacyLogPath" }
     }
 }

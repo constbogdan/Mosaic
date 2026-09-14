@@ -403,6 +403,37 @@ class ValidationIntegrationContractTest(unittest.TestCase):
         self.assertIn("Full log:", result.stdout)
         self.assertEqual(2, len(stage_logs))
 
+    def test_compact_stage_log_link_appears_once_on_run(self):
+        shell = shutil.which("pwsh") or shutil.which("powershell")
+        if not shell:
+            self.skipTest("PowerShell is unavailable")
+        helper = str(ROOT / "scripts/mosaic_output.ps1").replace("'", "''")
+        with tempfile.TemporaryDirectory() as directory:
+            escaped = directory.replace("'", "''")
+            script = (
+                f". '{helper}'; $root='{escaped}'; $legacy=Join-Path $root 'legacy.log'; "
+                "$env:MOSAIC_OUTPUT_COMPACT='1'; $env:MOSAIC_TERMINAL_HYPERLINKS='never'; "
+                "$c=New-MosaicRunOutput $root validation $legacy; "
+                "Start-MosaicStage $c 1 2 'Pre-commit' 'pre-commit.log'; Complete-MosaicStage $c; "
+                "Start-MosaicStage $c 2 2 'Compile' 'compile.log'; Fail-MosaicStage $c 'exit 1'"
+            )
+            shell_arguments = [shell, "-NoProfile"]
+            if os.name == "nt":
+                shell_arguments += ["-ExecutionPolicy", "Bypass"]
+            result = subprocess.run(
+                shell_arguments + ["-Command", script], capture_output=True, text=True, timeout=30
+            )
+        self.assertEqual(0, result.returncode, result.stderr)
+        lines = result.stdout.splitlines()
+        run_lines = [line for line in lines if "[RUN]" in line]
+        result_lines = [line for line in lines if "[PASS]" in line or "[FAIL]" in line]
+        self.assertEqual(2, len(run_lines))
+        self.assertTrue(all("[log:" in line for line in run_lines))
+        self.assertTrue(all("[log" not in line for line in result_lines))
+        self.assertEqual(2, result.stdout.count("[log:"))
+        self.assertIn("FAILED: Compile", result.stdout)
+        self.assertIn("exit 1", result.stdout)
+
     def test_legacy_log_is_only_published_after_live_logging(self):
         shell = shutil.which("pwsh") or shutil.which("powershell")
         if not shell:
