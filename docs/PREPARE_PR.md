@@ -14,6 +14,15 @@ From a purpose-specific branch rooted in current `origin/main`:
 
 After that one publication authorization, the script performs preflight, audits the complete eventual PR scope, runs cheap local feedback, verifies snapshot stability, stages only the exact scope, verifies the staged tree, generates a Conventional Commit title, commits, verifies the committed tree, safely pushes, and delegates existing-PR lookup or PR creation to authenticated GitHub CLI. Authoritative integration validation runs on the PR in GitHub. The script does not ask routine scope, local-check, stage, title, commit, push, or PR questions when policy provides one safe answer.
 
+A clean branch that is already ahead of `origin/main` is also valid publication input. Prepare-pr
+audits every branch-only commit and changed path as the complete PR scope, records the exact existing
+`HEAD` and `HEAD^{tree}`, and skips local checks, staging, and commit creation that apply only to
+uncommitted content. It then applies the same ancestry, remote-divergence, no-force, and PR-reuse
+checks before publication. It never creates an empty commit or amends the reviewed commits. A clean
+branch equal to `origin/main` still refuses because it has nothing to publish; any working-tree or
+index change keeps the normal reviewed validate/stage/commit path. Committed-only publication always
+uses the complete branch diff, so `-Files` and `-Exclude` do not apply.
+
 Supply actual focused JVM test patterns when a narrower known seam is useful:
 
 ``` powershell
@@ -29,6 +38,10 @@ Full remains available as an explicit diagnostic or on-demand regression command
 ```
 
 Resolved upstream-sync branches still require meaningful explicitly derived JVM filters before publication. Prepare-pr runs that focused Fast feedback once; the upstream PR is forced through authoritative hosted Full. It does not repeat the former local Standard-then-Full sequence.
+
+The committed-only shortcut does not bypass native upstream safeguards. A clean upstream-sync
+branch must use the existing preserved-merge identity arguments; it continues through focused local
+feedback and the parent/tree/Draft checks instead of taking the ordinary committed-only skips.
 
 ## Authority and safety boundaries
 

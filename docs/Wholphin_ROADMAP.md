@@ -12,13 +12,13 @@ minimal emergency Hold Release followed by forward-fix and zero-input Stable Pro
 
 **Baseline T0 — IN PROGRESS. T0-1 CP4B.1 exact-tree reuse contract repair is COMPLETE / HOSTED
 VALIDATED. CP4B.2 — Authoritative PR Validation Model — is COMPLETE / HOSTED VALIDATED for both
-`ANDROID_FULL` and `NON_ANDROID`. CP4B.3 — Local / prepare-pr simplification — is IMPLEMENTED /
-FOCUSED VALIDATED with hosted acceptance pending.** Baseline T0 is an
+`ANDROID_FULL` and `NON_ANDROID`. CP4B.3 — Local / prepare-pr simplification — is COMPLETE / HOSTED
+VALIDATED.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 Checkpoint sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
-CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 IMPLEMENTED / FOCUSED VALIDATED.**
+CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED.**
 
 CP4B.2 evidence classes: **`ANDROID_FULL` — HOSTED VALIDATED; `NON_ANDROID` — HOSTED VALIDATED.**
 
@@ -125,8 +125,19 @@ candidates keep one meaningful focused pass and forced hosted Full instead of lo
 Full. Explicit `validate-local.ps1 -Level Full` remains supported for diagnosis/on-demand evidence.
 The scope/snapshot/staged-tree/commit identity state remains because Git alone cannot reconstruct
 the operator's reviewed dirty-tree intent; validation-result history and the unused root
-`prepare-pr.log` compatibility surface are removed. Hosted acceptance must measure the first normal
-prepare-pr run and prove authoritative PR policy followed by protected-main exact-tree reuse.
+`prepare-pr.log` compatibility surface are removed. PR #63 completed hosted acceptance: Fast local
+feedback took about 4 seconds; its publication stage took about 8 seconds without routine broad
+local Full; final PR CI passed changed-range pre-commit and the complete offline suite in about
+1m08s, correctly omitted Android validation, and emitted `NON_ANDROID` evidence. Protected main
+authenticated that exact-tree evidence, skipped repeated validation, independently reported no
+Development build required, and completed in about 26 seconds. The two earlier PR attempts remain
+useful evidence that authoritative hosted CI caught PowerShell diagnostic-presentation differences
+without requiring any production prepare-pr safety change.
+
+The next bounded CP4 item is P04, prepare-pr native auto-merge. It must authenticate the same
+non-Draft PR head, preserve required CI and normal merge behavior, exclude upstream Drafts, and
+requires explicit repository auto-merge enablement before hosted acceptance. Do not infer that
+repository-setting authority from CP4B.3 completion.
 
 Hosted CP2 evidence also establishes bounded later work: CP7 must separate runner queue, setup,
 cache/tool installation, test/build execution, Environment wait, and publication timing, and must
