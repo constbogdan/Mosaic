@@ -28,6 +28,19 @@ class ValidationPolicyTest(unittest.TestCase):
         self.assertEqual(policy.NON_ANDROID, plan["validationMode"])
         self.assertEqual("test_mosaic_validation_policy.py", plan["offlineTestPattern"])
 
+    def test_shared_offline_tooling_support_uses_non_android_with_complete_fixtures(self):
+        for path in (
+            "scripts/tooling_test_support.py",
+            "scripts/example_test_support.py",
+        ):
+            with self.subTest(path=path):
+                plan = policy.plan_paths([path])
+                self.assertEqual("tooling-only", plan["releaseRelevance"])
+                self.assertEqual("normal", plan["validationRisk"])
+                self.assertFalse(plan["releaseRequired"])
+                self.assertEqual(policy.NON_ANDROID, plan["validationMode"])
+                self.assertEqual("test_*.py", plan["offlineTestPattern"])
+
     def test_upstream_automation_uses_explicit_release_and_offline_boundaries(self):
         ownership = policy.plan_paths(["scripts/upstream_ownership_policy.json"])
         self.assertEqual("tooling-only", ownership["releaseRelevance"])
@@ -101,10 +114,13 @@ class ValidationPolicyTest(unittest.TestCase):
                 self.assertEqual(policy.FULL, plan["validationMode"])
 
     def test_unknown_path_uses_conservative_full(self):
-        plan = policy.plan_paths(["unexpected/new-boundary.file"])
-        self.assertEqual("unknown", plan["releaseRelevance"])
-        self.assertEqual("high", plan["validationRisk"])
-        self.assertEqual(policy.FULL, plan["validationMode"])
+        for path in ("unexpected/new-boundary.file", "scripts/new_unclassified_tool.py"):
+            with self.subTest(path=path):
+                plan = policy.plan_paths([path])
+                self.assertEqual("unknown", plan["releaseRelevance"])
+                self.assertEqual("high", plan["validationRisk"])
+                self.assertTrue(plan["releaseRequired"])
+                self.assertEqual(policy.FULL, plan["validationMode"])
 
     def test_unmapped_production_path_gets_broad_fallback(self):
         path = "app/src/main/java/com/github/damontecres/wholphin/newarea/NewThing.kt"

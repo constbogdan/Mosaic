@@ -61,6 +61,27 @@ class ClassificationTests(unittest.TestCase):
         self.assertEqual(result["validationRisk"], classification.HIGH)
         self.assertTrue(result["releaseRequired"])
 
+    def test_flat_offline_tooling_test_support_is_known_without_broadening_scripts(self):
+        for path in (
+            "scripts/tooling_test_support.py",
+            "scripts/example_test_support.py",
+        ):
+            with self.subTest(path=path):
+                result = classification.classify_paths([path])
+                self.assertEqual(result["releaseRelevance"], classification.TOOLING_ONLY)
+                self.assertEqual(result["validationRisk"], classification.NORMAL)
+                self.assertFalse(result["releaseRequired"])
+
+        for path in (
+            "scripts/new_unclassified_tool.py",
+            "scripts/helpers/tooling_test_support.py",
+        ):
+            with self.subTest(path=path):
+                result = classification.classify_paths([path])
+                self.assertEqual(result["releaseRelevance"], classification.UNKNOWN)
+                self.assertEqual(result["validationRisk"], classification.HIGH)
+                self.assertTrue(result["releaseRequired"])
+
     def test_indirect_build_and_security_inputs_are_conservative(self):
         paths = [
             "gradle/libs.versions.toml",
