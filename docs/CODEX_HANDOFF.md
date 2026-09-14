@@ -153,16 +153,17 @@ tests, and 34/34 resolver tests. PowerShell parsing passed. The final current-br
 `test_*.py` expansion to authoritative PR CI, and passed changed-scope pre-commit plus
 `git diff --check`.
 
-PR #63 produced a useful hosted-only CP4B.3 finding before acceptance could complete. The
-authoritative complete offline suite ran the new disposable prepare-pr coverage on Linux and found
-that PowerShell ANSI formatting and line wrapping made the expected tree-mismatch phrase
-non-contiguous in captured stdout/stderr. The safety behavior itself was correct: the hook-mutated
-commit tree differed from the reviewed staged tree, COMMIT failed, resumable state remained
-`Staged`, and publication was refused. The fixture now normalizes ANSI/control presentation and
-whitespace solely for its diagnostic assertion and separately verifies the actual tree mismatch and
-refused state. Production prepare-pr, validation authority, provenance, and release behavior are
-unchanged. CP4B.3 remains hosted-acceptance-in-progress until PR #63 passes and its normal hosted
-policy/main-reuse evidence is recorded.
+PR #63 produced two useful hosted-only CP4B.3 findings before acceptance could complete. The
+authoritative complete offline suite ran the new disposable prepare-pr coverage on Linux and first
+found ANSI formatting plus line wrapping, then found literal PowerShell `|` error-column markers
+between wrapped message segments. The safety behavior itself was correct in both runs: the
+hook-mutated commit tree differed from the reviewed staged tree, COMMIT failed, resumable state
+remained `Staged`, and publication was refused. The fixture removes ANSI control presentation,
+folds whitespace, and asserts stable semantic components independently of visual column formatting;
+it separately proves COMMIT failure, the actual tree mismatch, and refused state. Production
+prepare-pr, validation authority, provenance, and release behavior are unchanged. CP4B.3 remains
+hosted-acceptance-in-progress until PR #63 passes and its normal hosted policy/main-reuse evidence
+is recorded.
 
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-

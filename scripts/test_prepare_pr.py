@@ -22,17 +22,20 @@ def normalized_native_output(result):
 
 
 class PreparePrFixtureTest(unittest.TestCase):
-    def test_native_diagnostic_normalization_handles_ansi_and_wrapping(self):
+    def test_native_diagnostic_normalization_handles_ansi_wrapping_and_columns(self):
         result = subprocess.CompletedProcess(
             args=[],
             returncode=1,
-            stdout="\x1b[31;1mThe produced commit tree does\x1b[0m\n",
-            stderr="\x1b[31;1mnot match the reviewed staged tree; publication is refused.\x1b[0m\n",
+            stdout="\x1b[31;1mThe produced commit tree does |\x1b[0m\n",
+            stderr=(
+                "\x1b[31;1mnot match the reviewed staged tree |\x1b[0m\n"
+                "\x1b[31;1mpublication is refused.\x1b[0m\n"
+            ),
         )
-        self.assertIn(
-            "does not match the reviewed staged tree",
-            normalized_native_output(result),
-        )
+        diagnostic = normalized_native_output(result)
+        self.assertIn("produced commit tree", diagnostic)
+        self.assertIn("reviewed staged tree", diagnostic)
+        self.assertIn("publication is refused", diagnostic)
 
     def setUp(self):
         if not POWERSHELL:
@@ -181,7 +184,9 @@ $global:LASTEXITCODE = 0
         )
         self.assertNotEqual(0, result.returncode)
         diagnostic = normalized_native_output(result)
-        self.assertIn("does not match the reviewed staged tree", diagnostic)
+        self.assertIn("COMMIT [FAIL]", diagnostic)
+        self.assertIn("produced commit tree", diagnostic)
+        self.assertIn("reviewed staged tree", diagnostic)
         self.assertIn("publication is refused", diagnostic)
         self.assertNotEqual(reviewed_tree, self.git("rev-parse", "HEAD^{tree}").stdout.strip())
         self.assertEqual("Staged", self.state()["completedPhase"])

@@ -242,14 +242,15 @@ tests, 21 validation-policy/integration tests, and 34 resolver tests. A real cur
 classified `tooling-only / high`, selected `non-android`, deliberately deferred the complete offline
 suite to PR CI, passed changed-scope pre-commit and whitespace checking, and completed in 2.7 seconds.
 
-PR #63 supplied the first hosted CP4B.3 finding. Authoritative PR CI correctly exercised the new
-disposable prepare-pr fixtures and caught a Linux/PowerShell presentation portability defect that
-local focused validation had not exposed: ANSI formatting plus host line wrapping split the stable
-tree-mismatch phrase across physical output lines. The production guard behaved correctly—the
-commit hook changed `HEAD^{tree}`, COMMIT failed, state remained `Staged`, and publication was
-refused. Coverage now removes ANSI control sequences and folds presentation whitespace before
-asserting the diagnostic, while independently asserting the mismatched tree and unchanged state.
-No prepare-pr safety or publication behavior changed. A successful PR #63 rerun remains required
+PR #63 supplied two hosted CP4B.3 portability findings. Authoritative PR CI correctly exercised the
+new disposable prepare-pr fixtures and first caught ANSI formatting plus host line wrapping that
+made a stable tree-mismatch phrase non-contiguous. Its second run showed that PowerShell also emits
+literal `|` error-column markers between wrapped message segments. The production guard behaved
+correctly in both runs—the commit hook changed `HEAD^{tree}`, COMMIT failed, state remained
+`Staged`, and publication was refused. Coverage removes ANSI control sequences, folds presentation
+whitespace, and asserts the stable semantic components independently of visual error-column
+formatting; it separately asserts COMMIT failure, the mismatched tree, and unchanged state. No
+prepare-pr safety or publication behavior changed. A successful PR #63 rerun remains required
 before CP4B.3 hosted acceptance is complete.
 
 The first normal PR after merge must capture prepare-pr duration against the historical roughly
