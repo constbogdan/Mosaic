@@ -18,13 +18,15 @@
 
 `prepare-pr terminal UX — COMPLETE / HOSTED VALIDATED (PR #70)`
 
-`Next: Operator UX batch`
+`Operator UX batch — IMPLEMENTED / HOSTED ACCEPTANCE PENDING`
+
+`Next: natural hosted Operator UX acceptance`
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
 `CP4B.2 COMPLETE / HOSTED VALIDATED`; `CP4B.3 COMPLETE / HOSTED VALIDATED`; `P04 COMPLETE / HOSTED
 VALIDATED`; `Validation-plan visibility COMPLETE / HOSTED VALIDATED`; `prepare-pr terminal UX
-COMPLETE / HOSTED VALIDATED`.
+COMPLETE / HOSTED VALIDATED`; `Operator UX batch IMPLEMENTED / HOSTED ACCEPTANCE PENDING`.
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -302,13 +304,20 @@ changing preparation or publication semantics. Its initial older-base branch cor
 `Current branch does not descend from validated origin/main.`; rebasing onto current `origin/main`
 resolved the condition without weakening the ancestry guard.
 
-The next bounded work is an **Operator UX batch**. It may combine presentation-only ordinary
-prepare-pr PR-body/scope cleanup with prominent upstream candidate/Draft links, REVIEW-first
-attention, reduced Observe/Publish duplication, and truthful downstream/upstream comparison
-navigation. Preserve `resolve-upstream.ps1` and its Codex handoff. `Upstream check · Scheduled` and
-`Upstream check · Manual` are already satisfactory; GitHub supplies run number/date. Any bounded
-publication-failure wording improvement must leave lifecycle, permission, validation, and
-publication semantics unchanged.
+The **Operator UX batch is implemented with hosted acceptance pending**. For candidate-producing
+upstream runs, Observe now records the authenticated handoff while Publish owns the single final
+operator outcome. Publish leads with REVIEW attention or readiness and the exact downstream PR;
+semantic REVIEW and Git textual conflicts are distinct, and exact authenticated current-Mosaic and
+incoming-upstream blob links support paths absent from Files changed. Candidate bodies follow the
+same decision-first order and keep the resolver/Codex handoff authoritative. Ordinary prepare-pr
+bodies now lead with compact scope/relevance/risk, retain high-risk paths prominently, collapse the
+complete path inventory, and preserve validation/release implications.
+
+Natural hosted acceptance must verify the final GitHub rendering, direct PR link, single outcome
+ownership and exact REVIEW navigation before this batch is marked complete. No upstream lifecycle,
+ownership, quiet-surface, ancestry, evidence, permission, required-CI, P04 auto-merge, or release
+authority contract changed. Remaining T0-1 work is the optional CP5 machine-contract migration,
+broader PR/Release presentation, measured performance work, and CP8 consistency sweep.
 
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-

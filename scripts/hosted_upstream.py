@@ -221,6 +221,65 @@ def blob_url(repository, sha, path):
     return f"https://github.com/{repository}/blob/{sha}/{quote(path, safe='/')}"
 
 
+def candidate_pr_navigation(observation):
+    """Return one canonical downstream PR link, never an upstream-controlled URL."""
+    number = str(observation.get("pr_number") or "")
+    supplied_url = str(observation.get("pr_url") or "").rstrip("/")
+    if not number and supplied_url:
+        match = re.fullmatch(rf"https://github\.com/{re.escape(ORIGIN)}/pull/(\d+)", supplied_url)
+        number = match.group(1) if match else ""
+    if not number.isdigit() or int(number) <= 0:
+        return ""
+    canonical = f"https://github.com/{ORIGIN}/pull/{number}"
+    if supplied_url and supplied_url != canonical:
+        return ""
+    return f"PR #{number}  [open]({canonical})"
+
+
+def candidate_branch_navigation(observation):
+    branch = str(observation.get("branch") or "")
+    if not BRANCH.fullmatch(branch):
+        return ""
+    return f"Candidate branch  [inspect](https://github.com/{ORIGIN}/tree/{quote(branch, safe='/')})"
+
+
+def ownership_rows(observation, category):
+    return [change for change in observation.get("automation_changes", [])
+            if change.get("ownership") == category]
+
+
+def attention_evidence(observation, *, rich_upstream=False):
+    """Render the human decision before bulk history, with optional trusted blob links."""
+    paths = attention_paths(observation)
+    changes = {change.get("path"): change for change in observation.get("automation_changes", [])}
+    conflict_paths = set(observation.get("conflict_paths", []))
+    lines = []
+    for path in paths:
+        change = changes.get(path, {})
+        rendered_path = f"<code>{display_text(path)}</code>"
+        if rich_upstream:
+            upstream_side = (f"[Incoming upstream]({blob_url(UPSTREAM, observation.get('upstream_sha'), path)})"
+                             if change.get("new_blob") else "incoming upstream absent")
+            if change.get("downstream_blob"):
+                downstream_side = f"[Current Mosaic]({blob_url(ORIGIN, observation.get('downstream_sha'), path)})"
+            elif change.get("downstream_old_blob") and change.get("counterpart"):
+                counterpart = change["counterpart"]
+                downstream_side = (f"[Current Mosaic prior path]({blob_url(ORIGIN, observation.get('downstream_sha'), counterpart)}) "
+                                   f"<code>{display_text(counterpart)}</code>")
+            else:
+                downstream_side = "current Mosaic absent"
+            rendered_path += f" · {downstream_side} | {upstream_side}"
+        lines.append(f"- {rendered_path}")
+        if path in conflict_paths:
+            lines.append("  - Git textual conflict: human semantic resolution is required.")
+        if change.get("ownership") == "REVIEW" or path in observation.get("review_paths", []):
+            reason = display_text(change.get("reason") or observation.get("cross_file_review")
+                                  or "downstream policy requires semantic review")
+            textual_note = "" if path in conflict_paths else " Git merged textually, but that does not resolve the semantic review."
+            lines.append(f"  - Semantic REVIEW: {reason}.{textual_note}".replace("..", "."))
+    return lines
+
+
 def pull_reference_numbers(subject):
     patterns = (
         rf"https?://github\.com/{re.escape(UPSTREAM)}/(?:pull|issues)/(\d+)",
@@ -272,37 +331,19 @@ def technical_evidence(observation):
     }, indent=2, ensure_ascii=True)
 
 
-def human_evidence(observation, *, rich_upstream=False, include_technical=True):
+def human_evidence(observation, *, rich_upstream=False, include_technical=True,
+                   include_attention=True):
     lines = []
+    paths = attention_paths(observation)
+    if include_attention:
+        lines += [f"{len(paths)} requiring attention", ""]
+        lines += attention_evidence(observation, rich_upstream=rich_upstream) or ["- None"]
     commits = observation.get("incoming_commits", [])
-    lines += [f"{len(commits)} incoming", ""]
+    lines += ["", f"{len(commits)} incoming", ""]
     lines += [f"- {commit_presentation(commit, rich_upstream=rich_upstream)}"
               for commit in commits[:10]] or ["- None"]
     if len(commits) > 10:
         lines.append(f"- {len(commits) - 10} additional incoming commits are retained in the observation artifact.")
-    paths = attention_paths(observation)
-    lines += ["", f"{len(paths)} requiring attention", ""]
-    changes = {change.get("path"): change for change in observation.get("automation_changes", [])}
-    for path in paths:
-        change = changes.get(path, {})
-        if rich_upstream:
-            upstream_side = (f"[Upstream file]({change.get('upstream_url') or blob_url(UPSTREAM, observation.get('upstream_sha'), path)})"
-                             if change.get("new_blob") else "upstream absent")
-            if change.get("downstream_blob"):
-                downstream_side = f"[Mosaic file]({change.get('downstream_url') or blob_url(ORIGIN, observation.get('downstream_sha'), path)})"
-            elif change.get("downstream_old_blob") and change.get("counterpart"):
-                counterpart = change["counterpart"]
-                prior_url = change.get("downstream_old_url") or blob_url(
-                    ORIGIN, observation.get("downstream_sha"), counterpart)
-                downstream_side = (f"[Mosaic prior path]({prior_url}) "
-                                   f"<code>{display_text(counterpart)}</code>")
-            else:
-                downstream_side = "Mosaic absent"
-            lines.append(f"- <code>{display_text(path)}</code> \N{MIDDLE DOT} {upstream_side} | {downstream_side}")
-        else:
-            lines.append(f"- <code>{display_text(Path(path).name)}</code>")
-    if not paths:
-        lines.append("- None")
     clean = int(observation.get("clean_path_count") or 0)
     if clean:
         verb = "integrates" if clean == 1 else "integrate"
@@ -330,16 +371,38 @@ def candidate_title(observation, draft):
     return "chore: synchronize official upstream"
 
 
+def observation_handoff_summary(observation):
+    """Keep Observe technical; Publish owns the final non-no-delta operator outcome."""
+    return (
+        "## Upstream observation recorded\n\n"
+        "The Publish candidate job will reauthenticate these exact inputs and report the final "
+        "operator action.\n\n"
+        "<details>\n<summary>Observation evidence</summary>\n\n<pre>" +
+        html.escape(json.dumps(observation, indent=2, ensure_ascii=True)) +
+        "</pre>\n\n</details>\n"
+    )
+
+
 def upstream_summary(observation, *, publication=False, operation_error=False):
     outcome = observation['outcome']
+    handed_off = {'observed_excluded', 'ready', 'review_required', 'semantic_conflict',
+                  'existing_pr', 'existing_draft_pr'}
+    if not publication and not operation_error and outcome in handed_off:
+        return observation_handoff_summary(observation)
     changes = observation.get('automation_changes', [])
     change_count = len(changes)
     change_word = 'change' if change_count == 1 else 'changes'
     attention_count = len(attention_paths(observation))
     attention_verb = 'requires' if attention_count == 1 else 'require'
+    pr_navigation = candidate_pr_navigation(observation)
+    branch_navigation = candidate_branch_navigation(observation)
     if operation_error:
         heading = 'Upstream publication failed' if publication else 'Upstream observation failed'
-        action = 'No candidate change is confirmed. Inspect the refusal below before retrying.'
+        if publication and not pr_navigation:
+            action = ('No candidate PR was confirmed. The deterministic branch may already exist if '
+                      'publication stopped after its push; inspect the outcome artifact and branch before rerunning.')
+        else:
+            action = 'Inspect the refusal below before retrying.'
     elif outcome in {'blocked', 'semantic_conflict'}:
         heading = f'{change_count} upstream {change_word} · review required'
         action = (f'{attention_count} path{"s" if attention_count != 1 else ""} {attention_verb} semantic resolution. '
@@ -393,8 +456,31 @@ def upstream_summary(observation, *, publication=False, operation_error=False):
                        display_text(observation.get('configured_schedule_utc', 'unknown')) +
                        '</code>; observed start: <code>' +
                        display_text(observation.get('observed_at', 'unknown')) + '</code>.']
-    navigation = human_evidence(observation, rich_upstream=True, include_technical=False)
-    return (f'## {heading}\n\n{action}{failure_reason}\n\n'
+    primary = []
+    if attention_count:
+        primary += ['### Review required', '']
+        if pr_navigation:
+            primary += [pr_navigation, '']
+        elif operation_error and publication and branch_navigation:
+            primary += [branch_navigation, '']
+        primary += [f'{attention_count} path{"s" if attention_count != 1 else ""} '
+                    f'{attention_verb} semantic review:', '']
+        primary += attention_evidence(observation, rich_upstream=True)
+        if pr_navigation:
+            primary += ['', 'Next: run `.\\scripts\\resolve-upstream.ps1`, enter this Draft PR number, '
+                        'and follow its authenticated semantic-resolution handoff.']
+    elif pr_navigation:
+        primary += ['### Candidate ready', '', pr_navigation]
+    elif operation_error and publication and branch_navigation:
+        primary += ['### Publication state', '', branch_navigation]
+    if counts:
+        primary += ['', f"- {attention_count} requiring attention",
+                    f"- {counts.get('FOLLOW', 0)} follow upstream",
+                    f"- {counts.get('DOWNSTREAM-OWNED', 0)} preserved downstream"]
+    primary_text = ('\n'.join(primary) + '\n\n') if primary else ''
+    navigation = human_evidence(observation, rich_upstream=True, include_technical=False,
+                                include_attention=False)
+    return (f'## {heading}\n\n{primary_text}{action}{failure_reason}\n\n'
             '<details>\n<summary>Operator navigation</summary>\n\n' + navigation + '\n</details>\n\n'
             '<details>\n<summary>Technical details</summary>\n\n' + '\n'.join(count_text) +
             '\n\n### Complete machine evidence\n\n<pre>' +
@@ -783,10 +869,64 @@ def publish(git, github, observation, expected_up, expected_down):
 
 
 def description(o):
-    heading = ("## Draft upstream integration requiring semantic review" if attention_paths(o)
-               else "## Official upstream integration")
-    lines = [heading, "", human_evidence(o).rstrip(), "",
-             "Human review and merge/reject remain required. No automatic semantic resolution or merge is performed."]
+    attention = attention_paths(o)
+    follow = ownership_rows(o, "FOLLOW")
+    preserved = ownership_rows(o, "DOWNSTREAM-OWNED")
+    lines = ["## What requires attention?", ""]
+    if attention:
+        lines += [f"{len(attention)} path{'s' if len(attention) != 1 else ''} "
+                  f"{'requires' if len(attention) == 1 else 'require'} semantic review:", ""]
+        lines += attention_evidence(o)
+    else:
+        lines += ["No REVIEW paths or Git textual conflicts were identified."]
+
+    lines += ["", "## Why?", ""]
+    if o.get("textual_conflicts") or o.get("conflict_paths"):
+        lines += ["Git found textual conflicts. Their downstream-preserved workspace is not a resolved merge; human semantic resolution is required."]
+    elif attention:
+        lines += ["Git produced a textually clean candidate, but downstream ownership policy still requires semantic REVIEW for the paths above."]
+    else:
+        lines += ["The complete upstream range is classified for normal integration and still requires ordinary PR review and required CI."]
+
+    lines += ["", "## What integrates automatically?", "",
+              f"{len(follow)} FOLLOW path{'s' if len(follow) != 1 else ''} "
+              f"{'is' if len(follow) == 1 else 'are'} included by the native candidate."
+              if follow else "No FOLLOW paths are present in this episode."]
+    clean = int(o.get("clean_path_count") or 0)
+    if clean:
+        lines += [f"{clean} candidate path{'s' if clean != 1 else ''} "
+                  f"{'requires' if clean == 1 else 'require'} no semantic decision."]
+
+    lines += ["", "## What is intentionally preserved downstream?", ""]
+    if preserved:
+        lines += [f"{len(preserved)} DOWNSTREAM-OWNED path{'s' if len(preserved) != 1 else ''} retain Mosaic semantics:", ""]
+        lines += [f"- <code>{display_text(change.get('path', 'unknown'))}</code>"
+                  for change in preserved]
+    else:
+        lines += ["No DOWNSTREAM-OWNED paths are present in this episode."]
+
+    lines += ["", "## What should the operator do next?", ""]
+    if attention:
+        lines += ["Run `.\\scripts\\resolve-upstream.ps1`, enter this Draft PR number, and follow the generated authenticated Codex handoff."]
+    else:
+        lines += ["Review the candidate tree and required CI. Merge or reject remains a human decision."]
+    lines += ["Human review and merge/reject remain required.",
+              "No automatic semantic resolution or merge is performed."]
+
+    lines += ["", "<details>", "<summary>Technical provenance and upstream history</summary>", "",
+              f"{len(o.get('incoming_commits', []))} incoming", ""]
+    lines += [f"- {commit_presentation(commit)}" for commit in o.get("incoming_commits", [])[:10]] or ["- None"]
+    if len(o.get("incoming_commits", [])) > 10:
+        lines += [f"- {len(o['incoming_commits']) - 10} additional incoming commits are retained in the observation artifact."]
+    if o.get("run_url"):
+        run_url = display_text(o["run_url"])
+        lines += ["", f"Latest observation: [{run_url}]({o['run_url']})"]
+    lines += ["", "```json", technical_evidence(o), "```", "", "</details>"]
+    marker = episode_marker(o)
+    if marker:
+        lines += ["", marker]
+    if o.get("upstream_sha") and o.get("ancestry_validated"):
+        lines += ["", f"<!-- wholphin-upstream-observed:{o['upstream_sha']} -->"]
     body = "\n".join(lines)
     # Full structured evidence remains in the retained observation artifact. The
     # bounded technical section keeps durable identity without making it the

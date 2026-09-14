@@ -95,6 +95,7 @@ function Write-AuditDetail([string]$Name) {
 function Get-PrepareValidationPlan([string[]]$Paths) {
     $fallback = [pscustomobject]@{
         releaseRelevance = 'unknown'
+        releaseRequired = $true
         validationRisk = 'high'
         validationMode = 'full'
     }
@@ -958,46 +959,59 @@ function Invoke-Commit([object]$Preflight, [object]$State) {
 
 function New-PullRequestBody([object]$State) {
     $riskText = if (@($State.highRiskPaths).Count) { (@($State.highRiskPaths) | ForEach-Object { "- ``$($_)``" }) -join "`n" } else { 'None flagged.' }
-    $docPaths = @($State.publicationPaths | Where-Object { $_ -like 'docs/*' })
-    $docsText = if ($docPaths.Count) { ($docPaths | ForEach-Object { "- ``$($_)``" }) -join "`n" } else { 'Not applicable.' }
     $uiChanged = @($State.publicationPaths | Where-Object { $_ -like 'app/src/*/java/*/ui/*' -or $_ -like 'app/src/*/res/*' }).Count -gt 0
     $applicationChanged = @($State.publicationPaths | Where-Object { $_ -like 'app/*' }).Count -gt 0
     $screenshots = if ($uiChanged) { 'Not supplied by prepare-pr; add screenshots or explain why they are not applicable before merge.' } else { 'Not applicable; no UI path was detected.' }
     $scopeText = (@($State.publicationPaths) | ForEach-Object { "- ``$($_)``" }) -join "`n"
+    $scopeCount = @($State.publicationPaths).Count
+    $scopeLabel = if ($scopeCount -eq 1) { 'file' } else { 'files' }
+    $plan = if ($script:validationPlan) { $script:validationPlan } else { Get-PrepareValidationPlan @($State.publicationPaths) }
+    $script:validationPlan = $plan
+    $separator = [char]0xB7
+    $scopeSummary = "$scopeCount $scopeLabel $separator $($plan.releaseRelevance) $separator $($plan.validationRisk) risk"
+    $hostedPath = Get-ExpectedHostedPath $plan
+    $releaseText = if ($plan.releaseRequired) {
+        'required after protected-main eligibility rechecks the merged range.'
+    } else {
+        'not required for the currently classified scope; protected main rechecks independently.'
+    }
     $localChecksText = if ($State.committedOnly -and -not $State.localCheckLevel) {
         'Not rerun for the already-committed clean scope; authoritative PR validation is pending.'
     } else {
         "$($State.localCheckLevel) feedback passed for the committed snapshot."
     }
     return @"
-## Description
+## What changed
 
 $($State.approvedTitle)
 
-Confirmed paths:
-
-$scopeText
+Scope: $scopeSummary
 
 Application paths changed: $(if ($applicationChanged) { 'yes' } else { 'no' }).
 UI paths changed: $(if ($uiChanged) { 'yes' } else { 'no' }).
 
-### Related issues
-
-Not recorded by prepare-pr. Add references or state that none apply.
-
-### Testing
-
-- Local checks: $localChecksText
-- Required `CI / Full validation`: pending.
-- Android TV/manual runtime validation: not recorded by prepare-pr; update if applicable.
-
-### Review-sensitive paths
+## Review-sensitive areas
 
 $riskText
 
-### Documentation
+<details>
+<summary>Confirmed paths ($scopeCount)</summary>
 
-$docsText
+$scopeText
+
+</details>
+
+## Validation and release
+
+- Local checks: $localChecksText
+- Expected hosted path: $hostedPath.
+- Required `CI / Full validation`: pending.
+- Development APK: $releaseText
+- Android TV/manual runtime validation: not recorded by prepare-pr; update if applicable.
+
+### Related issues
+
+Not recorded by prepare-pr. Add references or state that none apply.
 
 ## Screenshots
 

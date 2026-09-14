@@ -287,6 +287,10 @@ if args[:2] == [\"pr\", \"list\"]:
         print(json.dumps([summary()]))
     raise SystemExit(0)
 if args[:2] == [\"pr\", \"create\"]:
+    body_file = Path(args[args.index(\"--body-file\") + 1])
+    (state_dir / \"pr-body.md\").write_text(
+        body_file.read_text(encoding=\"utf-8-sig\"), encoding=\"utf-8\"
+    )
     created.touch()
     print(\"https://example.invalid/pr/63\")
     raise SystemExit(0)
@@ -464,40 +468,48 @@ raise SystemExit(2)
         self.git("restore", "--", "file.txt")
         path = self.root / "scripts/test_terminal_fixture.py"
         path.write_text("# tooling fixture\n", encoding="utf-8")
-        result = self.prepare(
-            "Guided",
-            env={
-                **self.fake_publish_env(scenario="non-android"),
-                "MOSAIC_TERMINAL_HYPERLINKS": "never",
-            },
-            check=False,
-        )
+        env = {
+            **self.fake_publish_env(scenario="non-android"),
+            "MOSAIC_TERMINAL_HYPERLINKS": "never",
+        }
+        result = self.prepare("Guided", env=env, check=False)
         self.assertEqual(0, result.returncode, normalized_native_output(result))
         self.assertIn("Scope: 1 path · tooling-only · normal risk", result.stdout)
         self.assertIn(
             "Expected path: Non-Android authoritative validation",
             result.stdout,
         )
+        body = (Path(env["FAKE_GH_STATE"]) / "pr-body.md").read_text(encoding="utf-8")
+        self.assertIn("## What changed", body)
+        self.assertIn("Scope: 1 file", body)
+        self.assertIn("tooling-only", body)
+        self.assertIn("<summary>Confirmed paths (1)</summary>", body)
+        self.assertNotIn("Confirmed paths:\n\n-", body)
+        self.assertIn("## Review-sensitive areas", body)
+        self.assertLess(body.index("## Review-sensitive areas"),
+                        body.index("<summary>Confirmed paths (1)</summary>"))
+        self.assertIn("Expected hosted path: Non-Android authoritative validation.", body)
+        self.assertIn("Development APK: not required", body)
 
     def test_expected_hosted_path_uses_existing_policy_for_android(self):
         self.git("restore", "--", "file.txt")
         path = self.root / "app/src/main/java/example/Feature.kt"
         path.parent.mkdir(parents=True)
         path.write_text("class Feature\n", encoding="utf-8")
-        result = self.prepare(
-            "Guided",
-            env={
-                **self.fake_publish_env(scenario="android"),
-                "MOSAIC_TERMINAL_HYPERLINKS": "never",
-            },
-            check=False,
-        )
+        env = {
+            **self.fake_publish_env(scenario="android"),
+            "MOSAIC_TERMINAL_HYPERLINKS": "never",
+        }
+        result = self.prepare("Guided", env=env, check=False)
         self.assertEqual(0, result.returncode, normalized_native_output(result))
         self.assertIn("Scope: 1 path · apk-relevant · normal risk", result.stdout)
         self.assertIn(
             "Expected path: Android Full authoritative validation",
             result.stdout,
         )
+        body = (Path(env["FAKE_GH_STATE"]) / "pr-body.md").read_text(encoding="utf-8")
+        self.assertIn("Expected hosted path: Android Full authoritative validation.", body)
+        self.assertIn("Development APK: required after protected-main eligibility", body)
 
     def test_default_local_checks_are_fast_and_preserve_explicit_filter(self):
         self.prepare("Audit")

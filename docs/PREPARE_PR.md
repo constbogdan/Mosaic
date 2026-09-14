@@ -95,6 +95,14 @@ The first push uses `git push -u origin <branch>`; subsequent pushes use ordinar
 
 Authenticated `gh` is required. The script checks `gh auth status` before pushing, reuses an existing open PR, or creates one with a factual generated title/body. Missing or unauthenticated `gh` stops before push with setup guidance; after setup, resume the already verified local commit with `.\scripts\prepare-pr.ps1 -Phase Publish`. There is no parallel PowerShell GitHub API or manual compare-URL fallback.
 
+The generated ordinary PR body leads with the approved change title and a compact scope line
+(`N files`, release relevance and validation risk). Review-sensitive paths stay prominent; the
+complete confirmed path inventory is retained in a collapsed section. The body also states the
+already-selected hosted validation path, pending required check, local-feedback status, and whether
+the current classification requires a Development APK. Protected main still rechecks release
+eligibility independently. This is presentation only: the complete publication scope and all tree,
+staging, mutation, PR-head and no-force checks are unchanged.
+
 For an ordinary PR, prepare-pr requires one unambiguous open non-Draft PR and authenticates its repository, base branch, head repository/branch, exact reviewed head SHA, and current auto-merge state. It confirms that repository auto-merge and merge commits are enabled, rereads the PR immediately before mutation, and invokes:
 
 ``` powershell

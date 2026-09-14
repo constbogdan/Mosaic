@@ -2,15 +2,15 @@
 
 Status: **CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED VALIDATED;
 Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX COMPLETE / HOSTED
-VALIDATED**
+VALIDATED; Operator UX batch IMPLEMENTED / HOSTED ACCEPTANCE PENDING**
 Committed-only publication follow-up: **HOSTED VALIDATED (PR #64)**
-Next: **Operator UX batch**
+Next: **Operator UX batch hosted acceptance**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED
 VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX COMPLETE /
-HOSTED VALIDATED.**
+HOSTED VALIDATED; Operator UX batch IMPLEMENTED / HOSTED ACCEPTANCE PENDING.**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
 baseline; historical names in acceptance records are evidence, not active UX. CP2 removed only
@@ -106,15 +106,35 @@ Acceptance also encountered `Current branch does not descend from validated orig
 a legitimate ancestry refusal because the branch was based on an older `main`. Rebasing onto the
 current `origin/main` resolved the stale base; ancestry protection was not weakened.
 
-The next bounded work is an **Operator UX batch**. It may combine presentation-only improvements to
-ordinary prepare-pr PR bodies and upstream synchronization: prominently link the candidate/Draft PR
-in Actions summaries; reduce duplicate Observe/Publish outcome text; make REVIEW attention primary;
-provide truthful current-downstream/incoming-upstream navigation for preserved REVIEW paths that may
-not appear in GitHub Files changed; retain `resolve-upstream.ps1` and its generated Codex handoff;
-improve noisy/raw ordinary PR scope presentation; and, if naturally bounded without lifecycle or
-security changes, improve upstream publication-failure wording/navigation. The existing
-`Upstream check · Scheduled` and `Upstream check · Manual` names are already satisfactory because
-GitHub supplies run number and date; no further upstream run-title work is required.
+## T0-1 operator UX batch
+
+Status: **IMPLEMENTED / HOSTED ACCEPTANCE PENDING**
+
+The final upstream outcome now belongs to Publish whenever publication is required. Observe emits a
+compact authenticated handoff instead of repeating the same candidate/review headline; no-delta and
+observation failures remain final in Observe. Publish leads with REVIEW attention or candidate
+readiness and a canonical direct link to the exact downstream PR. REVIEW paths show distinct
+semantic-policy and Git textual-conflict explanations plus exact current-Mosaic/incoming-upstream
+blob links. Bulk commit/source navigation and complete evidence remain below the operator decision.
+
+Candidate PR bodies now answer attention, reason, automatic FOLLOW integration, intentionally
+preserved downstream state and next action before collapsed technical provenance/history. They stay
+quiet toward upstream and direct semantic work through `resolve-upstream.ps1`; the authenticated
+Codex prompt remains resolver-owned. Ordinary prepare-pr bodies now present a concise count,
+release relevance and risk, keep review-sensitive paths prominent, collapse the exhaustive confirmed
+path list, and retain validation and Development-release implications.
+
+Publication failure presentation now says whether a PR was confirmed and links the authenticated
+candidate PR or deterministic branch when available, while retaining the refusal and complete
+outcome artifact. This batch changes no lifecycle, ownership, evidence, ancestry, permission,
+validation, P04 auto-merge, or release authority contract. `Upstream check · Scheduled` and
+`Upstream check · Manual` remain unchanged.
+
+Hosted acceptance should confirm one natural candidate/reuse run renders a single Publish-owned
+outcome with its exact PR link and that an attention candidate renders REVIEW first with working
+exact blob navigation. Until then the batch is not complete. This closes the bounded ordinary PR
+body and upstream candidate-summary presentation backlog; broader CP5 machine-name migration,
+remaining release presentation, performance work and the final consistency sweep remain separate.
 
 ## T0-1 CP4B.1 exact-tree reuse contract repair
 
@@ -1259,15 +1279,14 @@ VALIDATED**.
 Three bounded follow-ups are now closed: PR #67 added the narrow tooling-support classification
 while retaining unknown-path fail-closed behavior; PR #68 made the existing PR Validation plan
 visible early without changing its authority contract; and PR #70 live-validated the concise
-prepare-pr terminal UX specified above. The next Operator UX batch retains manual Upstream check #39
-evidence in the presentation backlog: `Upstream check · Scheduled` / `Upstream check · Manual` plus
-GitHub's run number are adequate; candidate reuse
-   creates no duplicate; the final summary should prominently link the candidate PR/Draft, reduce
-   duplicated Observe/Publish outcome text, and put REVIEW attention before bulk incoming history.
-   REVIEW paths deliberately preserved/excluded downstream may be absent from Files changed, so
-   provide truthful current-upstream comparison/navigation rather than pretending they are candidate
-   diffs. Keep `resolve-upstream.ps1` as the semantic entry point; it already generates the Codex
-   handoff.
+prepare-pr terminal UX specified above. The implemented Operator UX batch retains manual Upstream
+check #39 evidence: `Upstream check · Scheduled` / `Upstream check · Manual` plus GitHub's run
+number are adequate. Candidate reuse creates no duplicate; Publish now owns the final summary and
+prominently links the candidate PR/Draft, while REVIEW attention precedes bulk incoming history.
+REVIEW paths deliberately preserved/excluded downstream may be absent from Files changed, so the
+summary provides exact current-Mosaic and incoming-upstream blob navigation rather than pretending
+they are candidate diffs. `resolve-upstream.ps1` remains the semantic entry point and sole generator
+of the authenticated Codex handoff. Natural hosted rendering remains pending.
 
 ## Release and artifact presentation
 
