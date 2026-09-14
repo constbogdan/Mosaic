@@ -2,7 +2,7 @@
 
 `scripts/prepare-pr.ps1` is Wholphin's publication command. Codex and repository tooling must not invoke it merely because work appears complete. Running it, or explicitly instructing Codex to run it, is the user's **READY TO PUBLISH** decision. The next normal human decision is **READY TO MERGE** after the pull request and required checks are available in GitHub.
 
-**CURRENT:** Autonomous PR handoff v2 is integrated on `main` through [PR #9](https://github.com/constbogdan/Wholphin/pull/9). Validation and dogfooding evidence is preserved in [the handoff](CODEX_HANDOFF.md#current-workflow-continuity).
+**CURRENT:** Autonomous PR handoff v2 is integrated on `main` through [PR #9](https://github.com/constbogdan/Wholphin/pull/9). Validation and dogfooding evidence is preserved in [the handoff](CODEX_HANDOFF.md).
 
 ## Normal autonomous workflow
 
@@ -12,7 +12,7 @@ From a purpose-specific branch rooted in current `origin/main`:
 .\scripts\prepare-pr.ps1
 ```
 
-After that one publication authorization, the script performs preflight, audits the complete eventual PR scope, selects validation, verifies snapshot stability, stages only the exact scope, verifies the staged tree, generates a Conventional Commit title, commits, verifies the committed tree, safely pushes, and delegates existing-PR lookup or PR creation to authenticated GitHub CLI. It does not ask routine scope, validation, stage, title, commit, push, or PR questions when policy provides one safe answer.
+After that one publication authorization, the script performs preflight, audits the complete eventual PR scope, runs cheap local feedback, verifies snapshot stability, stages only the exact scope, verifies the staged tree, generates a Conventional Commit title, commits, verifies the committed tree, safely pushes, and delegates existing-PR lookup or PR creation to authenticated GitHub CLI. Authoritative integration validation runs on the PR in GitHub. The script does not ask routine scope, local-check, stage, title, commit, push, or PR questions when policy provides one safe answer.
 
 Supply actual focused JVM test patterns when a narrower known seam is useful:
 
@@ -20,15 +20,15 @@ Supply actual focused JVM test patterns when a narrower known seam is useful:
 .\scripts\prepare-pr.ps1 -TestFilter '*RelevantTest*'
 ```
 
-Standard is the autonomous default. Without explicit filters, the source-controlled validation policy classifies the complete publication scope and derives mapped focused coverage, a broad safe fallback, non-Android checks, or a conservative Full escalation. Explicit patterns remain authoritative focused input; an explicit `-Level Full` remains available.
+Fast is the autonomous default. It runs changed-scope pre-commit, one narrow existing offline-tooling mapping when one applies, explicitly supplied focused JVM tests, and the cheap whitespace check. If multiple tooling mappings would expand to `test_*.py`, Fast defers that complete suite to authoritative PR CI. A high-risk or unmapped path likewise does not make normal preparation run a broad local fallback. Explicit patterns remain local feedback, not reusable authority.
 
-Use Full locally for major architecture, release-sensitive work, or an explicit comprehensive requirement:
+Full remains available as an explicit diagnostic or on-demand regression command, but it is not a normal publication prerequisite:
 
 ``` powershell
 .\scripts\prepare-pr.ps1 -Level Full
 ```
 
-Upstream-sync branches automatically run a meaningful explicitly filtered Standard pass followed by Full and retain the semantic-resolution requirements in `docs/UPSTREAM_SYNC.md`; classifier-derived no-filter coverage does not replace that integration-specific sequence.
+Resolved upstream-sync branches still require meaningful explicitly derived JVM filters before publication. Prepare-pr runs that focused Fast feedback once; the upstream PR is forced through authoritative hosted Full. It does not repeat the former local Standard-then-Full sequence.
 
 ## Authority and safety boundaries
 
@@ -40,9 +40,9 @@ In a dedicated task worktree, one coherent non-ignored dirty set is selected aut
 
 ## Resumable state and advanced phases
 
-Human-readable state is stored at the Git path `.git/wholphin-prepare-pr-state.json` (or the worktree-specific equivalent). It records branch/base/HEAD, already committed PR paths and commits, confirmed candidate paths, their complete publication union, intended snapshot hash, validation results, staged snapshot/tree hashes, approved title, and completed phase. A changed branch, base, HEAD, working snapshot, or index invalidates the relevant phase.
+Human-readable state is stored at the Git path `.git/wholphin-prepare-pr-state.json` (or the worktree-specific equivalent). It records only data needed to preserve the otherwise unreconstructable reviewed scope/tree boundary across diagnostic phases: branch/base/HEAD, already committed PR paths and commits, confirmed candidate paths, their publication union, intended snapshot hash, local-check level, staged snapshot/tree hashes, approved title, and completed phase. It is not validation authority. A changed branch, base, HEAD, working snapshot, or index invalidates the relevant phase.
 
-Each invocation replaces the ignored repository-root `prepare-pr.log` and creates ignored per-stage logs under `.logs/prepare-pr/<run>/`. The console prints concise truthful stage start/pass/fail summaries and absolute log paths; complete Git diagnostics and deterministic evidence remain in the logs. The summary records branch/base/HEAD, confirmed scope, validation choice/result, snapshot and tree identities, staging/commit/publication outcomes, refusals/errors, and a PR URL when known. The script does not log credentials, tokens, environment dumps, or PR-body contents.
+Each invocation creates one ignored run directory under `.logs/prepare-pr/<run>/`, including `prepare-pr.log`, a summary, and per-stage logs. The obsolete repository-root compatibility log is no longer written because it had no runtime consumer. The console prints concise truthful stage start/pass/fail summaries and the run-log location; complete Git diagnostics and deterministic evidence remain in the logs. Logs are diagnostic and non-authoritative, and never contain credentials, tokens, environment dumps, or PR-body contents.
 
 Advanced diagnostic commands remain available after an intentional stop:
 
@@ -56,11 +56,11 @@ Advanced diagnostic commands remain available after an intentional stop:
 
 The advanced phase/state interface does not define normal usage and is not a custom rollback engine. Recovery must use safe Git-native inspection and corrective operations without resetting, restoring, cleaning, or stashing unrelated work.
 
-## Validation and autofixes
+## Local checks and autofixes
 
-Validation selection is deterministic and shared with CI: release relevance and validation risk remain independent, normal Android scope maps to focused JVM coverage, proven non-Android scope avoids Android, and unknown/sensitive scope escalates to Full. Explicit meaningful filters are supported. Upstream-sync branches continue to require meaningful Standard filters followed by Full. Validation runs before real staging and is bound to a read-only, Git-filter-aware identity of each intended working entry, including mode, object type, object ID, and deletion state.
+Prepare-pr uses the shared classifier only to select useful local Fast feedback. It does not claim that feedback is the authoritative PR policy and does not fall back to all offline tests or Android Full merely because local mapping is incomplete. Explicit meaningful filters are supported and required for resolved upstream candidates. Local checks run before real staging and are bound to a read-only, Git-filter-aware identity of each intended working entry, including mode, object type, object ID, and deletion state.
 
-Selected pre-commit hooks may apply autofixes. Full uses the repository-wide baseline; relevant Fast/Standard paths use changed-scope checks. If validation changes any file, prepare-pr stops without staging, reports the dirty paths, and requires review followed by a new Audit/Validate pass. Formatter changes are never silently included.
+Selected pre-commit hooks may apply autofixes. The normal Fast path uses changed-scope checks; explicit Full uses the repository-wide baseline and complete local graph. If any local check changes a file, prepare-pr stops without staging, reports the dirty paths, and requires review followed by a new Audit/Validate pass. Formatter changes are never silently included.
 
 ## Publishing and GitHub CLI
 
@@ -87,6 +87,6 @@ Other downstream repositories should reuse this UX and safety contract, not Whol
 
 ## Current boundary
 
-Prepare-pr owns repository/worktree safety, complete-scope audit, repository-specific validation, exact staging, actionable Git diagnostics, Git index/tree identity, safe ordinary push, and PR handoff through `gh`. Required checks, durable PR status, review, merge, notifications, and post-publication recovery belong to GitHub.
+Prepare-pr owns repository/worktree safety, complete-scope audit, cheap local feedback, exact staging, actionable Git diagnostics, Git index/tree identity, safe ordinary push, and PR handoff through `gh`. Authoritative validation, durable PR status, review, merge, notifications, and post-publication recovery belong to GitHub.
 
-Keep this adapter thin and autonomous after authorization, using `gh` as the standard GitHub interface. The separate [hosted upstream v1 path](UPSTREAM_SYNC.md#hosted-upstream-synchronization-v1) uses required PR CI without workstation validation and does not call prepare-pr. This does not exempt ordinary local publication or manual sync recovery from this document's validation. Deterministic lightweight-change and focused Android validation are operational through I03; security/review tooling, release-policy changes, and specialized agents remain later roadmap work.
+Keep this adapter thin and autonomous after authorization, using `gh` as the standard GitHub interface. Hosted clean upstream candidates do not call prepare-pr; resolved Draft candidates use it only for the focused semantic check and exact native-merge publication boundary. The normal flow is implementation, optional focused local feedback, prepare-pr, then authoritative GitHub PR validation. Full remains an explicit diagnostic/on-demand command.

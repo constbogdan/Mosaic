@@ -1,11 +1,11 @@
 # Baseline T0-1 operator UX, workflow, and presentation inventory
 
-Status: **CP4B.2 IMPLEMENTED; ANDROID_FULL HOSTED VALIDATED; NON_ANDROID HOSTED ACCEPTANCE PENDING**
-Next: **live-prove NON_ANDROID reuse before simplifying local validation**
+Status: **CP4B.3 IMPLEMENTED / FOCUSED VALIDATED; HOSTED ACCEPTANCE IN PROGRESS**
+Next: **Revalidate PR #63 after its hosted-only output portability correction, then complete CP4B.3 hosted acceptance**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
-CP4B.2 IMPLEMENTED; ANDROID_FULL HOSTED VALIDATED; NON_ANDROID HOSTED ACCEPTANCE PENDING.**
+CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 IMPLEMENTED / FOCUSED VALIDATED / HOSTED ACCEPTANCE IN PROGRESS.**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
 baseline; historical names in acceptance records are evidence, not active UX. CP2 removed only
@@ -13,8 +13,9 @@ the two obsolete inherited workflow surfaces and updated their ownership contrac
 operator presentation without changing machine contracts. CP4A records the measured behavior
 from local edits through hosted validation and Development publication. CP4B.1 repaired and
 live-proved the exact-tree reuse selector contract exposed by that audit. CP4B.2 implements the
-complete two-class PR policy contract. `ANDROID_FULL` is hosted validated; `NON_ANDROID` remains the
-last acceptance requirement before later validation simplification begins.
+complete two-class PR policy contract. Natural hosted runs validated both `ANDROID_FULL` and
+`NON_ANDROID`; CP4B.3 now removes duplicate routine local authority while leaving that hosted
+contract unchanged.
 
 ## T0-1 CP4B.1 exact-tree reuse contract repair
 
@@ -52,7 +53,10 @@ or weakening the conservative fallback.
 
 ## T0-1 CP4B.2 boundary and approved direction
 
-Status: **IMPLEMENTED; ANDROID_FULL HOSTED VALIDATED; NON_ANDROID HOSTED ACCEPTANCE PENDING**
+Status: **COMPLETE / HOSTED VALIDATED**
+
+- `ANDROID_FULL` — **HOSTED VALIDATED**
+- `NON_ANDROID` — **HOSTED VALIDATED**
 
 CP4B.2 establishes the simplest complete PR evidence contract before removing any later local gate.
 The implemented architecture is broad hosted authority with coarse relevance gates:
@@ -105,7 +109,9 @@ contract-mismatched, or otherwise uncertain evidence retains the complete protec
 
 ### ANDROID_FULL hosted acceptance — PR #61
 
-PR #61 naturally exercised the new `ANDROID_FULL` authority contract. Required PR run
+PR #61 naturally exercised the new `ANDROID_FULL` authority contract. Changing the validation and
+provenance authority contract was itself build/CI-sensitive, so `ANDROID_FULL` was the correct
+conservative class even though Development eligibility later found no APK release requirement. Required PR run
 `34783794209`, attempt `1`, ran changed-range pre-commit, the complete offline tooling suite, Android
 setup, and complete defaultDebug validation successfully. It emitted the single unexpired
 `pr-policy-v1` artifact `10325034747`, bound to PR head
@@ -129,14 +135,39 @@ tooling, and skipped Release setup/build, Sign, and Publish. The complete protec
 about 28 seconds. Release Build, signing, publication, Stable, Hold, permissions, Environments, and
 upstream authority remained separate and unchanged.
 
-Later simplification candidates, after replacement evidence is implemented and hosted-proven, are:
-remove operator Full from the normal publication recipe while retaining it on demand; remove
-mandatory prepare-pr Full and mandatory complete local offline execution; avoid authoritative
-fine-grained offline/Android mapping; make blanket protected-main validation a fallback rather than
-the normal exact-tree path; move Android setup behind a failed reuse decision; avoid a local
-attestation subsystem; challenge prepare-pr resumable validation state where Git/GitHub state is
-sufficient; remove the Signing Diagnostic manual SHA separately; and remove root compatibility logs
-only if no consumer remains.
+### NON_ANDROID hosted acceptance — PR #62
+
+The documentation-only PR #62 from `chore/t0-1-cp4b2-checkpoint` naturally exercised the
+`NON_ANDROID` contract. PR CI completed successfully in about 45 seconds. Its rendered plan stated
+that Android application validation was not required and reported `docs-only / low`, selected path
+`non-android`, four changed paths, and the policy reason `proven non-Android scope uses repository
+tooling checks only`. Changed-range pre-commit and the complete offline tooling suite passed,
+Android application validation was not required, and exact `NON_ANDROID` policy evidence was
+emitted for protected-main reuse.
+
+After the normal two-parent merge, protected-main CI completed in about 26 seconds. Its roughly
+9-second validation job reported:
+
+```text
+PR validation reused — this exact tree passed NON_ANDROID on PR #62.
+```
+
+The summary authenticated validation contract `pr-policy-v1`, required PR run `34787725082`,
+attempt `1`, and identical tested/final-main tree `e8fa31e0b771b98e136bdd85ee6c9ffa68b069b6e`.
+Protected main therefore did not repeat repository pre-commit, the complete offline tooling suite,
+Android setup, or Gradle. Development eligibility remained independent, completed in about 11
+seconds, and skipped Sign and Publish. Both authoritative evidence classes are now live-proven;
+protected main normally authenticates exact PR policy evidence rather than executing the same
+validation twice, while every uncertainty retains the complete conservative fallback.
+
+CP4B.3 applied that evidence: operator Full and prepare-pr Full are no longer normal publication
+prerequisites; routine complete local offline/Android work and upstream Standard-then-Full
+duplication are removed. Cheap changed-scope hygiene and mapped/focused feedback remain. Scope/tree
+state remains only where it protects the reviewed dirty-tree publication boundary; validation-result
+history does not. Full remains available explicitly for diagnostics and on-demand use. Profiling
+remains CP7 work. The measured reason is material: local Full historically took about 9–11 minutes,
+the latest observation was about 12 minutes, and prepare-pr historically repeated another broad
+local validation.
 
 The simplification must preserve exact prepare-pr scope/tree verification, required PR CI,
 exact-tree authentication, protected-main fail-safe fallback, final-context Release Build,
@@ -152,8 +183,8 @@ The controlled migration order is:
 3. Make PR CI authoritative for that contract — **IMPLEMENTED**.
 4. Teach protected main to reuse complete PR policy evidence — **IMPLEMENTED**.
 5. Live-prove the Android path — **COMPLETE (`ANDROID_FULL`, PR #61)**.
-6. Live-prove the non-Android path — **NEXT (`NON_ANDROID`)**.
-7. Only then simplify local and prepare-pr validation.
+6. Live-prove the non-Android path — **COMPLETE (`NON_ANDROID`, PR #62)**.
+7. Simplify local and prepare-pr validation — **IMPLEMENTED / FOCUSED VALIDATED (CP4B.3)**.
 8. Remove superseded state, catalog, tests, and documentation.
 9. Simplify Signing Diagnostic separately.
 
@@ -163,6 +194,70 @@ external queue latency, transient Maven dependency-resolution incident, Windows 
 Control/pre-commit incident, Android setup/cache overhead, 9–10 minute Release Build, upstream
 workflow-file publication permission mismatch, and missing sanitized `git push --porcelain`
 diagnostics as evidence rather than folding them into CP4B.2.
+
+## T0-1 CP4B.3 local / prepare-pr simplification
+
+Status: **IMPLEMENTED / FOCUSED VALIDATED; HOSTED ACCEPTANCE PENDING**
+
+The normal publication path is now:
+
+```text
+implementation
+  -> optional focused local feedback
+  -> prepare-pr complete-scope audit
+  -> changed-scope pre-commit + mapped/focused Fast feedback + git diff --check
+  -> exact stage and commit-tree verification
+  -> push/create or reuse PR
+  -> authoritative GitHub PR policy
+```
+
+The removed routine work had no distinct authority consumer after CP4B.2: prepare-pr no longer
+escalates high-risk/unknown scope to local Full, no longer runs the complete local offline suite or
+Android Full by default, and no longer runs upstream Standard followed by Full. Resolved upstream
+candidates still require meaningful focused JVM filters once, preserve their reviewed native
+parents/tree and Draft authority, and are forced through hosted `ANDROID_FULL`.
+
+`validate-local.ps1 -Level Full` remains unchanged as an explicit diagnostic/on-demand complete
+run. Fast now always performs changed-scope pre-commit and whitespace checking, runs only one
+unambiguous mapped offline suite or explicit focused JVM tests, and reports that authoritative PR CI
+owns broad coverage when local policy is high risk or multiple mappings would expand to `test_*.py`.
+Standard remains an optional broader developer
+diagnostic; it is not the normal publication gate.
+
+The resumable state remains because its scope manifest, mode/type/object/deletion identities,
+intended snapshot, staged tree, and commit identity protect an otherwise unreconstructable review
+boundary across explicit phases and Publish resume. Validation-result history was removed; the
+state records only the local-check level and phase. The schema is version 2 so stale v1 state fails
+closed. Per-run logs remain under `.logs/prepare-pr/<run>/`; the root `prepare-pr.log` was removed
+because it had no runtime consumer. The root `validation.log` remains because prepare-pr copies that
+completed validator snapshot into its stage diagnostics.
+
+Disposable repositories prove default Fast invocation, explicit-filter forwarding, no persisted
+validation results, unexpected local-check mutation refusing before staging, exact staged/commit
+tree equality, and commit-hook mutation refusing publication state. Existing focused contracts
+continue to cover remote divergence/no-force refusal, existing-PR reuse/no duplication, and native
+upstream Draft/merge identity. PowerShell parsing and focused validation-policy/resolver suites are
+part of this checkpoint's local acceptance. The final focused run passed 4 disposable prepare-pr
+tests, 21 validation-policy/integration tests, and 34 resolver tests. A real current-branch Fast run
+classified `tooling-only / high`, selected `non-android`, deliberately deferred the complete offline
+suite to PR CI, passed changed-scope pre-commit and whitespace checking, and completed in 2.7 seconds.
+
+PR #63 supplied two hosted CP4B.3 portability findings. Authoritative PR CI correctly exercised the
+new disposable prepare-pr fixtures and first caught ANSI formatting plus host line wrapping that
+made a stable tree-mismatch phrase non-contiguous. Its second run showed that PowerShell also emits
+literal `|` error-column markers between wrapped message segments. The production guard behaved
+correctly in both runs—the commit hook changed `HEAD^{tree}`, COMMIT failed, state remained
+`Staged`, and publication was refused. Coverage removes ANSI control sequences, folds presentation
+whitespace, and asserts the stable semantic components independently of visual error-column
+formatting; it separately asserts COMMIT failure, the mismatched tree, and unchanged state. No
+prepare-pr safety or publication behavior changed. A successful PR #63 rerun remains required
+before CP4B.3 hosted acceptance is complete.
+
+The first normal PR after merge must capture prepare-pr duration against the historical roughly
+5–6 minute validation-heavy path, pass authoritative PR policy, and show protected-main exact-tree
+reuse. No synthetic application or release change is required; this tooling/process branch is a
+natural `NON_ANDROID` candidate. Any evidence uncertainty must still exercise the complete
+protected-main fallback.
 
 ## T0-1 CP4A behavioral execution audit
 
@@ -317,9 +412,9 @@ path/test lists supplied by the enclosing stage.
 | Local Android | Full | Full default-debug validation | `.\gradlew :app:compileDefaultDebugKotlin :app:testDefaultDebugUnitTest :app:assembleDefaultDebug` | Full Debug compile/unit/APK graph | mutable checkout and local caches | Gradle result/log | operator only | prepare can immediately repeat; PR repeats clean-host synthetic merge | Useful on demand, not reusable today | **SIMPLIFY** |
 | Local whitespace | every level | Git whitespace check | `git diff --check` | Detect whitespace errors | mutable tracked diff | stage result/log | operator | prepare audit and child validation repeat it | Cheap, but repeated inside one prepare transaction | **SIMPLIFY** |
 | Prepare preflight/audit | guided `prepare-pr` | PREFLIGHT/AUDIT | Git status/ref/remote/fetch/log/diff/`ls-files --stage`/`hash-object` operations | Confirm complete branch-only + dirty scope and exact mode/type/blob/deletion state | `origin/main`, branch HEAD, worktree/index, configured remotes | `.git/wholphin-prepare-pr-state.json`; `.logs/prepare-pr/**` | later prepare phases | distinct from validation | Correct before mutation | **KEEP HERE** |
-| Prepare validate | after scope confirmation | VALIDATE | `.\scripts\validate-local.ps1 -Level <selected> -ChangedPath <path>... [-TestFilter <filter>]` | Enforce policy and detect autofix/drift before staging | confirmed publication path union + working snapshot hash | local validation logs; level/time in resumable state | Stage phase only | duplicates a just-completed operator Full; no prior-run lookup | Wrong when unchanged Full just ran | **REUSE PRIOR EVIDENCE** |
-| Prepare upstream validate | sync branch | Standard then Full | same command first with `-FocusedBeforeFull` and filters, then `-Level Full` | Meaningful semantic tests plus conservative complete gate | resolved native merge and derived/operator filters | two local results tied only to prepare snapshot | Stage phase | PR is then forced Full; Full local work repeats hosted | Safety policy is conservative but expensive | **SIMPLIFY** |
-| Prepare stage/commit | validated snapshot | STAGE/COMMIT | exact `git add`; `git write-tree`; `git commit`; `git rev-parse HEAD^{tree}` | Commit exactly reviewed content; preserve native merge commit | intended/staged snapshot, modes/types/blobs, expected merge parents/tree | commit SHA/tree, state/log | Publish | not duplicate | Correct mutation boundary | **KEEP HERE** |
+| Prepare local checks | after scope confirmation | LOCAL CHECKS | `.\scripts\validate-local.ps1 -Level Fast -ChangedPath <path>... [-TestFilter <filter>]` | Cheap hygiene/relevant feedback and autofix/drift refusal before staging | confirmed publication path union + working snapshot hash | per-run diagnostics; local-check level/phase in state | Stage phase only | authoritative coverage belongs to PR CI | CP4B.3 simplified | **KEEP THIN** |
+| Prepare upstream checks | resolved sync branch | focused Fast once | same command with meaningful derived filters | Useful semantic feedback before publication | reviewed native merge and derived filters | one local result; exact parents/tree remain separately authenticated | Stage and hosted PR Full | no local complete gate | CP4B.3 simplified | **KEEP THIN** |
+| Prepare stage/commit | checked snapshot | STAGE/COMMIT | exact `git add`; `git write-tree`; `git commit`; `git rev-parse HEAD^{tree}` | Commit exactly reviewed content; preserve native merge commit | intended/staged snapshot, modes/types/blobs, expected merge parents/tree | commit SHA/tree, state/log | Publish | not duplicate | Correct mutation boundary | **KEEP HERE** |
 | Prepare publish | committed clean branch | PUBLISH | `git push -u origin <branch>` or ordinary `git push`; `gh pr list --head <owner:branch> --base main --state open --json number,url`; `gh pr create ...` | Publish without force or duplicate PR | exact commit/tree, remote non-divergence, authenticated `gh` | remote branch + PR URL + log | GitHub CI/human | not duplicate | Correct after explicit authorization; stops before CI/merge | **KEEP HERE** |
 | PR classification | PR to main | Choose PR validation path | trusted-base copy of `mosaic_validation_policy.py --base <base SHA> --head "$GITHUB_SHA" --github-output "$GITHUB_OUTPUT"` | Prevent PR from weakening its own selector; force upstream branches Full | base SHA, synthetic merge checkout, base policy | mode/tests/offline pattern/release fields | later PR steps and summary | similar local decision, stronger identity/trust | Correct early stage | **KEEP HERE** |
 | PR hygiene | every PR | Check changed files | pre-commit action `--from-ref <base SHA> --to-ref <synthetic merge SHA>` | Authoritative committed-range hygiene | GitHub PR base + merge ref | required job status/log | branch rules/human | local pass is feedback, not authority | Correct hosted gate | **MUST REMAIN AUTHORITATIVE** |
@@ -364,8 +459,9 @@ never enters automatic Development because the release jobs require a protected-
 
 `mosaic_delivery_output.py` renders Development/Stable summaries and Release bodies; it carries no
 independent authority. `mosaic_output.ps1` is a local diagnostic/logging layer: one writer owns each
-per-stage log, then a post-run compatibility snapshot replaces root `validation.log` or
-`prepare-pr.log`. `run_offline_tests.py` buffers successful unittest output and removes hosted output
+per-stage validation log, then a post-run compatibility snapshot replaces root `validation.log`.
+Prepare-pr now keeps only per-run logs because its former root log had no runtime consumer.
+`run_offline_tests.py` buffers successful unittest output and removes hosted output
 variables so synthetic fixture summaries cannot escape into real Actions summaries.
 
 ### Primary APK lifecycle ledger: PR #46
@@ -702,9 +798,10 @@ of the graph. Debug execution cannot substitute for Release assembly.
 5. Keep Release/Sign/Publish and Stable/Hold boundary checks out of the duplicate-test cleanup.
 
 The narrow exact-tree reuse contract repair is complete and hosted validated. CP4B.2 defines
-complete policy evidence for both non-Android and Full committed PR paths, and `ANDROID_FULL` is now
-hosted validated. Only after `NON_ANDROID` is also hosted-proven may local/prepare duplication
-change.
+complete policy evidence for both non-Android and Full committed PR paths; PR #61 live-proved
+`ANDROID_FULL` and PR #62 live-proved `NON_ANDROID`. CP4B.3 has now removed routine broad local
+duplication while preserving every scope, tree, publication, and hosted fallback guarantee above;
+its first normal hosted lifecycle remains the acceptance gate.
 
 
 ---
@@ -944,7 +1041,7 @@ to rename `CI`, job IDs, workflow filenames, tags, artifacts, Environments, or c
 | P43 | Prepare-pr title | Conventional title inferred from branch | `prepare-pr.ps1:600-627` | Keep concise conventional title; allow explicit human title | Commit/PR title, tests | MEDIUM |
 | P44 | Generated PR body | Description/title; Confirmed paths; application/UI flags; Testing; review-sensitive; docs/screenshots/AI | `prepare-pr.ps1:665-719`, PR template | Default `What changed / Why / Validation / Next`; collapse paths/evidence | Template/tests/review process | MEDIUM |
 | P45 | Prepare-pr completion | PR URL, `Required CI / Full validation pending`, `Review/merge in GitHub` | `prepare-pr.ps1:769-784` | Add auto-merge armed/not armed and direct next action | GitHub capability/settings | MEDIUM |
-| P46 | Prepare-pr logs | `prepare-pr.log`, `.logs/prepare-pr/<run>` | `prepare-pr.ps1`, `.gitignore` | Keep machine-safe names; show one final location | Local compatibility | LOW |
+| P46 | Prepare-pr logs | `.logs/prepare-pr/<run>/prepare-pr.log` plus stage logs | `prepare-pr.ps1`, `.gitignore` | Keep one per-run diagnostic location | Non-authoritative diagnostics | LOW |
 | P47 | Local validation plan | `Wholphin validation`; requested level; relevance/risk/path | `validate-local.ps1:112-118` | `Validation plan`; plain reason and actual checks | Classifier values in log only | MEDIUM |
 | P48 | Local validation progress | `[N/T] stage [RUN/PASS/FAIL] duration → log` | `mosaic_output.ps1` | Keep concise lifecycle; sentence-case stages | Tests/operators | MEDIUM |
 | P49 | Local validation result/logs | final success/failure, `.logs/validation`, `validation.log` | output/validation scripts | Keep visible; technical excerpt and logs progressive | Compatibility log consumer | MEDIUM |
@@ -1180,9 +1277,9 @@ external action, and owner checkpoint.
 
 | ID | Source / current problem | Target and dependency/risk | Validation / external action | CP |
 |---|---|---|---|---|
-| P01 — CP4A MEASURED / CP4B PENDING | Operator Full can precede prepare-pr Full | Document/use one publication entry point; design authenticated snapshot evidence only if reuse is needed | Disposable drift/autofix/snapshot tests | CP4 |
-| P02 — CP4A MEASURED / CP4B PENDING | prepare-pr + PR Full duplicate local/hosted assurance | For ordinary high-risk/APK work, local focused/Standard then authoritative PR Full; retain fail-closed main fallback | Classifier/prepare-pr/CI fixtures and live PR/main reuse | CP4 |
-| P03 — CP4A MEASURED / CP4B PENDING | Upstream candidates require local Standard then Full plus PR Full | Remove duplicate local Full only after required upstream PR Full and exact merge evidence fully cover it | Native merge/filter/evidence tests; live natural candidate | CP4 |
+| P01 — CP4B.3 IMPLEMENTED / HOSTED PENDING | Operator Full could precede prepare-pr Full | Normal publication no longer requires operator or prepare-pr Full; explicit Full remains diagnostic/on-demand | Disposable drift/snapshot/tree fixtures; normal hosted PR timing | CP4 |
+| P02 — CP4B.3 IMPLEMENTED / HOSTED PENDING | prepare-pr + PR Full duplicated local/hosted assurance | Fast local feedback plus exact publication integrity, then authoritative PR policy; retain fail-closed main fallback | Classifier/prepare-pr fixtures and live PR/main reuse | CP4 |
+| P03 — CP4B.3 IMPLEMENTED / HOSTED PENDING | Upstream candidates required local Standard then Full plus PR Full | One meaningful focused local pass; preserve native merge identity and forced hosted Full | Native merge/filter fixtures; next natural resolved candidate | CP4 |
 | P04 — CP4A AUDITED / CP4B PENDING | prepare-pr stops after PR creation and manual auto-merge click | Authenticate same non-Draft head and arm native auto-merge; never arm upstream Draft | Mocked `gh`, branch/rules tests; enable GitHub auto-merge manually; hosted acceptance | CP4 |
 | P05 — CP4A AUDITED / CP4B PENDING | Signing Diagnostic requires repeated SHA | Zero-input authenticated protected-main source; keep Environment approval and no publication | Signing auth/refusal tests + manual hosted diagnostic | CP4 |
 

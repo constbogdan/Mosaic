@@ -559,6 +559,7 @@ class ResolveUpstreamTests(unittest.TestCase):
         self.assertEqual("-Command", command[-2])
         self.assertIn("prepare-pr.ps1", command[-1])
         self.assertIn("-TestFilter @('com.github.damontecres.wholphin.ui.detail.series.*')", command[-1])
+        self.assertNotIn("-Level", command[-1])
         self.assertIn("-PreserveMergeCommit", command[-1])
         self.assertIn(f"-ExpectedMergeFirstParent '{candidate.pr['head']['sha']}'", command[-1])
         self.assertIn(f"-ExpectedMergeSecondParent '{candidate.observation['upstream_sha']}'", command[-1])

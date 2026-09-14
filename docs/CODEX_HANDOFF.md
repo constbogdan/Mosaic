@@ -8,13 +8,13 @@
 
 `Baseline T0 — IN PROGRESS`
 
-`T0-1 CP4B.2 — IMPLEMENTED; ANDROID_FULL HOSTED VALIDATED; NON_ANDROID HOSTED ACCEPTANCE PENDING`
+`T0-1 CP4B.3 — IMPLEMENTED / FOCUSED VALIDATED; HOSTED ACCEPTANCE IN PROGRESS`
 
-`Next: live-prove NON_ANDROID exact-tree reuse`
+`Next: revalidate PR #63 after its hosted-only output portability correction, then complete CP4B.3 hosted acceptance`
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
-`CP4B.2 IMPLEMENTED; ANDROID_FULL HOSTED VALIDATED; NON_ANDROID HOSTED ACCEPTANCE PENDING`.
+`CP4B.2 COMPLETE / HOSTED VALIDATED`; `CP4B.3 IMPLEMENTED / FOCUSED VALIDATED / HOSTED ACCEPTANCE IN PROGRESS`.
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -60,6 +60,11 @@ HOSTED VALIDATED** with conservative fallback behavior intact.
 
 ### T0-1 CP4B.2 authoritative PR policy
 
+**COMPLETE / HOSTED VALIDATED**
+
+- `ANDROID_FULL` — **HOSTED VALIDATED**
+- `NON_ANDROID` — **HOSTED VALIDATED**
+
 CP4B.2 implements the simplest complete authoritative PR evidence contract without changing later
 Release, signing, publication, Stable, Hold, or upstream boundaries. Every PR runs
 changed-range hygiene and the complete offline tooling suite; Android/build/unknown scope also runs
@@ -77,7 +82,9 @@ fallback. In particular, missing, failed, cancelled, expired, ambiguous, foreign
 parent-mismatched, tree-mismatched, class-mismatched, and contract-mismatched evidence all fail
 closed to that path.
 
-PR #61 supplies the first live CP4B.2 class acceptance. Required PR run `34783794209`, attempt `1`,
+PR #61 supplies the first live CP4B.2 class acceptance. The authority-contract implementation was
+itself build/CI-sensitive and therefore correctly required `ANDROID_FULL`, while later Development
+eligibility independently found no APK release requirement. Required PR run `34783794209`, attempt `1`,
 successfully ran changed-range pre-commit, the complete offline suite, Android setup, and complete
 defaultDebug validation. Its unique `ANDROID_FULL` evidence artifact was ID `10325034747`, bound to
 head `8694bea0871435a2fce6c132c54458bccd965534`, synthetic merge
@@ -98,17 +105,73 @@ fine-grained test catalog while the complete hosted offline suite remains a chea
 (observed around 18–24 seconds for approximately 232 tests, not a guaranteed constant). Android
 remains a coarse relevance gate. Local logs are diagnostics, never authoritative attestations.
 
-`ANDROID_FULL` is hosted validated. This documentation-only checkpoint is the intended natural
-`NON_ANDROID` acceptance vehicle: it should run changed-range pre-commit and the complete offline
-suite, skip Android Full, and emit exact-tree `NON_ANDROID` evidence. After an exact-tree merge, main
-should authenticate that evidence, skip the four already-proven validation stages, check Development
-eligibility, and produce no APK. Only after that acceptance may local/prepare-pr validation be
-simplified; remove superseded state/tests/docs afterward and simplify Signing Diagnostic separately.
-Preserve exact scope/tree review, required PR CI, exact-tree authentication, main fallback,
-final-context Release Build, version allocation, signing and artifact boundaries, Publish
-freshness/idempotency, Stable/Hold authorization, upstream native topology/human authority, and
-native failed-job recovery. See the
+PR #62 from `chore/t0-1-cp4b2-checkpoint` naturally live-validated `NON_ANDROID`. Its documentation-only
+scope classified `docs-only / low`, selected `non-android`, and covered four paths. PR CI completed in
+about 45 seconds: changed-range pre-commit and the complete offline suite passed, Android application
+validation was not required, and exact `NON_ANDROID` policy evidence was emitted. After the normal
+two-parent merge, protected-main CI completed in about 26 seconds and reported `PR validation reused
+— this exact tree passed NON_ANDROID on PR #62.` The roughly 9-second validation job authenticated
+`pr-policy-v1`, PR run `34787725082`, attempt `1`, and identical tested/final-main tree
+`e8fa31e0b771b98e136bdd85ee6c9ffa68b069b6e`; it skipped pre-commit, the complete offline suite,
+Android setup, and Gradle. Development eligibility remained independent, took about 11 seconds, and
+Sign/Publish skipped.
+
+CP4B.2 is therefore complete and hosted validated for both evidence classes. Protected main is
+normally an authenticator of authoritative exact-tree PR evidence, not a second execution of the
+same validation; reuse remains conditional, and every uncertainty runs the complete conservative
+fallback. See the
 [authoritative ledger](T0_1_OPERATOR_UX_INVENTORY.md#t0-1-cp4b2-boundary-and-approved-direction).
+
+CP4B.3 is implemented and focused validated. The normal path is optional fast/relevant local
+feedback, prepare-pr scope/tree integrity plus cheap checks, authoritative PR validation, merge,
+protected-main exact-tree reuse, Development eligibility, and Release Build/Sign/Publish only when
+required. Prepare-pr defaults to Fast and no longer escalates high-risk/unknown scope into routine
+local Full, all offline tests, or Android Full. A single mapped offline suite remains useful local
+feedback; a multi-suite `test_*.py` expansion is deferred to authoritative PR CI. Resolved upstream candidates run one meaningful
+focused JVM pass rather than local Standard then Full; every upstream PR remains forced through
+hosted `ANDROID_FULL`. Explicit local Full remains available for diagnostics/on-demand use.
+
+The custom state was reduced rather than deleted wholesale. Its reviewed dirty-path scope,
+mode/type/object/deletion manifest, intended snapshot, staged tree, commit identity, and completed
+phase still protect the exact publication boundary and safe `-Phase Publish` resume; Git/GitHub
+cannot reconstruct that original working-tree intent. Validation-result history was removed and
+the state schema is now version 2, so older state refuses and requires a fresh Audit. Per-run logs
+remain under `.logs/prepare-pr/<run>/`. The unused repository-root `prepare-pr.log` was removed;
+root `validation.log` remains because prepare-pr consumes its completed diagnostic snapshot.
+
+Focused disposable-repository coverage proves default Fast and explicit filter forwarding,
+mutation refusal before staging, exact staged/commit trees, and commit-hook tree mismatch refusal.
+Existing fixtures retain remote divergence/no-force, PR reuse/no duplicate, and native upstream
+parent/tree/Draft safeguards. Hosted acceptance is still required: capture the first normal
+prepare-pr duration against the historical 5–6 minute validation-heavy path, observe authoritative
+PR policy, then verify protected main reuses the exact evidence. This branch should naturally be
+`NON_ANDROID`; do not manufacture an application change.
+
+Local checkpoint evidence is 4/4 disposable prepare-pr tests, 21/21 validation-policy/integration
+tests, and 34/34 resolver tests. PowerShell parsing passed. The final current-branch Fast run took
+2.7 seconds, classified `tooling-only / high`, selected `non-android`, deferred the multi-suite
+`test_*.py` expansion to authoritative PR CI, and passed changed-scope pre-commit plus
+`git diff --check`.
+
+PR #63 produced two useful hosted-only CP4B.3 findings before acceptance could complete. The
+authoritative complete offline suite ran the new disposable prepare-pr coverage on Linux and first
+found ANSI formatting plus line wrapping, then found literal PowerShell `|` error-column markers
+between wrapped message segments. The safety behavior itself was correct in both runs: the
+hook-mutated commit tree differed from the reviewed staged tree, COMMIT failed, resumable state
+remained `Staged`, and publication was refused. The fixture removes ANSI control presentation,
+folds whitespace, and asserts stable semantic components independently of visual column formatting;
+it separately proves COMMIT failure, the actual tree mismatch, and refused state. Production
+prepare-pr, validation authority, provenance, and release behavior are unchanged. CP4B.3 remains
+hosted-acceptance-in-progress until PR #63 passes and its normal hosted policy/main-reuse evidence
+is recorded.
+
+Do not confuse validation duplication with publication integrity. Preserve complete intended PR
+scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-
+and commit-tree verification, unexpected-mutation refusal, remote divergence/no-force protection,
+existing PR reuse, native upstream parents/tree and Draft/human authority, required authoritative PR
+CI, exact-tree reuse, and the complete protected-main fallback. Also preserve final-context Release
+Build, version allocation, signing/artifact boundaries, Publish freshness/idempotency, Stable/Hold
+authorization, and native failed-job recovery.
 
 ### T0-1 CP4A behavioral execution audit
 
@@ -319,7 +382,8 @@ episodes, or parent/tree drift. After the default-No `Ready to PUSH?` boundary, 
 is committed as a native two-parent merge: first parent is the exact remote blocked Draft head;
 second parent is the exact upstream tip. The Draft head has the recorded Mosaic baseline as its sole
 parent, which preserves baseline authentication while allowing a non-force fast-forward of the same
-Draft. `prepare-pr -PreserveMergeCommit` performs the established focused Standard-then-Full checks,
+Draft. `prepare-pr -PreserveMergeCommit` performs one meaningful focused Fast check before the
+authoritative hosted Full,
 verifies the exact parents/tree and remote Draft identity, creates no replacement commit, and refuses
 anything except one same-branch Draft at the resulting head. This is offline validated; natural
 hosted conflict acceptance remains checkpoint 4 and requires explicit authorization.
@@ -331,7 +395,7 @@ and downstream identities. No hosted state was changed. At inspection time its c
 commit ahead of and zero behind current `main`, so prepare-pr can safely update that same PR:
 the branch matches its upstream-sync pattern, an ordinary fast-forward push preserves human work,
 and exact-head PR lookup prevents a duplicate. It still requires meaningful focused JVM filters
-followed by Full and never marks the Draft Ready. If later `main` movement breaks the required
+locally, then forced hosted Full, and never marks the Draft Ready. If later `main` movement breaks the required
 ancestry, prepare-pr correctly refuses; reconcile deliberately rather than weakening that guard.
 
 **HISTORICAL PRE-CP5 IMPLEMENTATION RECORD.** Hosted Sync now loads

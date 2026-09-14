@@ -11,14 +11,16 @@ authoritative; the obsolete Issue/journal/finalizer lifecycle is removed.
 minimal emergency Hold Release followed by forward-fix and zero-input Stable Promotion.
 
 **Baseline T0 — IN PROGRESS. T0-1 CP4B.1 exact-tree reuse contract repair is COMPLETE / HOSTED
-VALIDATED. CP4B.2 — Authoritative PR Validation Model — is IMPLEMENTED; `ANDROID_FULL` is HOSTED
-VALIDATED and `NON_ANDROID` HOSTED ACCEPTANCE is PENDING. Both classes must be live-proven before
-simplifying any local validation path.** Baseline T0 is an
+VALIDATED. CP4B.2 — Authoritative PR Validation Model — is COMPLETE / HOSTED VALIDATED for both
+`ANDROID_FULL` and `NON_ANDROID`. CP4B.3 — Local / prepare-pr simplification — is IMPLEMENTED /
+FOCUSED VALIDATED with hosted acceptance pending.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 Checkpoint sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
-CP4B.2 IMPLEMENTED; ANDROID_FULL HOSTED VALIDATED; NON_ANDROID HOSTED ACCEPTANCE PENDING.**
+CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 IMPLEMENTED / FOCUSED VALIDATED.**
+
+CP4B.2 evidence classes: **`ANDROID_FULL` — HOSTED VALIDATED; `NON_ANDROID` — HOSTED VALIDATED.**
 
 1. **T0-1 — Cleanup & Operator Experience:** inventory every human-facing surface and machine
    contract before simplifying validation duplication, workflow/operator presentation, obsolete
@@ -96,14 +98,35 @@ PR policy artifact from run `34783794209`, attempt `1`, authenticated the final 
 skipped repository pre-commit, complete offline tooling, Android setup, and Gradle Full. Development
 eligibility remained independent, classified the scope non-release/tooling-only, and produced no
 APK. Full validation took about 11 seconds, Development eligibility about 12 seconds, and the full
-protected-main run about 28 seconds. `NON_ANDROID` remains the only CP4B.2 hosted acceptance gap.
+protected-main run about 28 seconds. At that point, `NON_ANDROID` remained the only CP4B.2 hosted
+acceptance gap.
+
+PR #62 naturally closed that gap with a four-file documentation-only change. Its approximately
+45-second PR CI passed changed-range pre-commit and the complete offline suite, correctly omitted
+Android validation, and emitted reusable `NON_ANDROID` evidence. After the normal two-parent merge,
+protected-main CI authenticated `pr-policy-v1` from PR run `34787725082`, attempt `1`, and identical
+tested/final tree `e8fa31e0b771b98e136bdd85ee6c9ffa68b069b6e`. It reported that the exact tree had
+passed `NON_ANDROID`, skipped pre-commit, offline tooling, Android setup, and Gradle, completed in
+about 26 seconds, and independently skipped Development Sign/Publish. Both CP4B.2 classes are now
+hosted validated.
 
 Migration order is fixed: complete PR evidence, authoritative PR CI, and main reuse are implemented;
-`ANDROID_FULL` is live-proven; live-prove `NON_ANDROID`; only then simplify local/prepare-pr validation; remove
-superseded state/tests/docs afterward; simplify Signing Diagnostic separately. Preserve exact-tree
+both evidence classes are live-proven; CP4B.3 removes routine broad local/prepare-pr duplication
+while retaining explicit Full and exact scope/tree/publication integrity; simplify Signing Diagnostic separately. Preserve exact-tree
 and required-CI trust, main fallback, final Release Build, version/sign/artifact/publication
 boundaries, Stable/Hold authorization, upstream native Git/human authority, and native failed-job
 recovery. Performance incidents and optimization remain CP7/T0-2 evidence, not CP4B.2 scope.
+
+CP4B.3 makes Fast local feedback the prepare-pr default. Normal preparation performs changed-scope
+hygiene, a narrow existing offline mapping and meaningful focused JVM filters when known, plus
+whitespace checking; it does not fall back to complete offline or Android Full on high-risk/unknown
+scope. Required PR CI owns authoritative `NON_ANDROID`/`ANDROID_FULL` coverage. Resolved upstream
+candidates keep one meaningful focused pass and forced hosted Full instead of local Standard then
+Full. Explicit `validate-local.ps1 -Level Full` remains supported for diagnosis/on-demand evidence.
+The scope/snapshot/staged-tree/commit identity state remains because Git alone cannot reconstruct
+the operator's reviewed dirty-tree intent; validation-result history and the unused root
+`prepare-pr.log` compatibility surface are removed. Hosted acceptance must measure the first normal
+prepare-pr run and prove authoritative PR policy followed by protected-main exact-tree reuse.
 
 Hosted CP2 evidence also establishes bounded later work: CP7 must separate runner queue, setup,
 cache/tool installation, test/build execution, Environment wait, and publication timing, and must

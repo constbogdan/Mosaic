@@ -3,8 +3,7 @@ param(
     [ValidateSet('Fast', 'Standard', 'Full')]
     [string]$Level = 'Fast',
     [string[]]$TestFilter = @(),
-    [string[]]$ChangedPath = @(),
-    [switch]$FocusedBeforeFull
+    [string[]]$ChangedPath = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -104,10 +103,17 @@ try {
     $plan = Get-ValidationPlan $python
     $effectiveMode = if ($Level -eq 'Full') {
         'full'
-    } elseif ($FocusedBeforeFull -and $TestFilter.Count) {
+    } elseif ($Level -eq 'Fast' -and $TestFilter.Count) {
         'targeted-android'
+    } elseif ($Level -eq 'Fast' -and $plan.validationMode -eq 'full') {
+        'non-android'
     } else {
         $plan.validationMode
+    }
+    $selectedTests = if ($Level -eq 'Fast' -and $TestFilter.Count) {
+        @($TestFilter)
+    } else {
+        @($plan.focusedTests)
     }
     Write-Host 'Wholphin validation'
     Write-Host "Requested level: $Level"
@@ -115,7 +121,8 @@ try {
     Write-Host "Validation risk: $($plan.validationRisk)"
     Write-Host "Selected path: $effectiveMode"
     if ($effectiveMode -eq 'full' -and $Level -ne 'Full') { Write-Host "$Level escalated to Full: $($plan.reason)" }
-    Write-MosaicRunLog $output "RequestedLevel=$Level; EffectiveMode=$effectiveMode; ReleaseRelevance=$($plan.releaseRelevance); ValidationRisk=$($plan.validationRisk); ChangedPaths=$(@($plan.paths).Count); Filters=$(@($plan.focusedTests) -join ',')"
+    if ($Level -eq 'Fast' -and $plan.validationMode -eq 'full') { Write-Host 'Fast provides local feedback only; authoritative PR CI will run the required Full policy.' }
+    Write-MosaicRunLog $output "RequestedLevel=$Level; EffectiveMode=$effectiveMode; ReleaseRelevance=$($plan.releaseRelevance); ValidationRisk=$($plan.validationRisk); ChangedPaths=$(@($plan.paths).Count); Filters=$($selectedTests -join ',')"
 
     $stages = [Collections.Generic.List[object]]::new()
     $scopedPaths = @($plan.paths | ForEach-Object { $_.path } | Where-Object { Test-Path -LiteralPath (Join-Path $repoRoot $_) })
@@ -127,7 +134,7 @@ try {
         if ($reviewedUntrackedPaths.Count) {
             $stages.Add([pscustomobject]@{ Name = 'Reviewed untracked pre-commit'; Log = 'pre-commit-untracked.log'; File = $preCommit.File; Args = @($preCommit.Prefix + @('run', '--files') + $reviewedUntrackedPaths); Display = "$($preCommit.Display) run --files <reviewed untracked paths>" })
         }
-    } elseif ($effectiveMode -eq 'non-android' -or $Level -eq 'Standard') {
+    } else {
         $preCommit = Find-PreCommit $python
         $preCommitArguments = @($preCommit.Prefix + @('run'))
         $preCommitDisplay = "$($preCommit.Display) run"
@@ -140,7 +147,12 @@ try {
         }
         $stages.Add([pscustomobject]@{ Name = 'Changed-scope pre-commit'; Log = 'pre-commit.log'; File = $preCommit.File; Args = $preCommitArguments; Display = $preCommitDisplay })
     }
-    if ($isFullPath -or $plan.offlineTestPattern) {
+    $deferCompleteOfflineToPr = $Level -eq 'Fast' -and $plan.offlineTestPattern -eq 'test_*.py'
+    if ($deferCompleteOfflineToPr) {
+        Write-Host 'Fast skipped the complete offline suite; authoritative PR CI will run it.'
+        Write-MosaicRunLog $output 'Complete offline tooling deferred to authoritative PR CI.'
+    }
+    if ($isFullPath -or ($plan.offlineTestPattern -and -not $deferCompleteOfflineToPr)) {
         $offlinePattern = if ($isFullPath) { 'test_*.py' } else { $plan.offlineTestPattern }
         $stages.Add([pscustomobject]@{ Name = 'Offline tooling tests'; Log = 'offline-tests.log'; File = $python; Args = @('-B', 'scripts/run_offline_tests.py', '--pattern', $offlinePattern); Display = "python -B scripts/run_offline_tests.py --pattern '$offlinePattern'" })
     }
@@ -149,7 +161,7 @@ try {
         $gradleArgs = @()
         if ($Level -eq 'Standard') { $gradleArgs += ':app:compileDefaultDebugKotlin' }
         $gradleArgs += ':app:testDefaultDebugUnitTest'
-        foreach ($filter in @($plan.focusedTests)) { $gradleArgs += @('--tests', $filter) }
+        foreach ($filter in $selectedTests) { $gradleArgs += @('--tests', $filter) }
         $name = if ($Level -eq 'Fast') { 'Focused JVM tests' } else { 'Kotlin compile + focused JVM tests' }
         $stages.Add([pscustomobject]@{ Name = $name; Log = 'focused-android.log'; File = $gradleWrapper; Args = $gradleArgs; Display = '.\gradlew ' + ($gradleArgs -join ' ') })
     } elseif ($effectiveMode -eq 'full') {

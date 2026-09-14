@@ -27,14 +27,14 @@ main
   -> implementation
   -> focused validation during development
   -> user explicitly authorizes publication
-  -> autonomous prepare-pr audit and classifier-selected validation
+  -> autonomous prepare-pr audit and cheap local feedback
   -> exact stage / commit / push / PR via gh
   -> required GitHub risk-tiered PR validation
   -> user reviews completed PR and decides merge / reject
   -> update local main
 ```
 
-Use the validation policy in [AGENTS.md](AGENTS.md#validation-workflow). Ordinary work uses classifier-selected Fast/Standard evidence, while unknown and sensitive scope escalates to Full. Manual upstream synchronization remains the explicit Standard-with-meaningful-filters then Full exception.
+Use the validation policy in [AGENTS.md](AGENTS.md#validation-workflow). Local commands provide developer feedback; required PR CI is authoritative. Resolved upstream work keeps one meaningful focused local JVM pass, while every upstream PR is forced through hosted Full.
 
 ## Manual upstream synchronization
 
@@ -51,12 +51,10 @@ update local main from origin/main
   -> merge upstream/main
   -> resolve conflicts deliberately, if any
   -> inspect high-risk auto-merges
-  -> Standard validation
-  -> Full validation
-  -> complete the merge commit if conflicts required manual resolution
+  -> complete the native merge commit after semantic review
   -> user explicitly authorizes publication
-  -> prepare-pr validates and publishes the sync PR through gh
-  -> required GitHub Full validation
+  -> prepare-pr runs focused Fast feedback and publishes the sync PR through gh
+  -> required authoritative GitHub Full validation
   -> user reviews and decides merge / reject
   -> update local main
 ```
@@ -76,17 +74,15 @@ If conflicts occur, the helper leaves the merge in progress, lists every unmerge
 ```text
 inspect and resolve conflicts
   -> git add resolved files
-  -> Standard validation
-  -> Full validation
   -> git commit
   -> user explicitly authorizes publication
-  -> prepare-pr with meaningful -TestFilter (Standard then Full)
-  -> required CI and human PR review / merge decision
+  -> prepare-pr with meaningful -TestFilter (focused Fast once)
+  -> required hosted Full and human PR review / merge decision
 ```
 
 Do not create or merge the sync pull request if validation fails. Diagnose and correct the integration on the sync branch.
 
-An in-progress merge must first be resolved, staged, validated, and completed with its local merge commit; prepare-pr refuses active Git operations even when all conflict markers are gone. That local integration step does not authorize push or PR creation. After the merge is complete, semantic review is finished, and the user explicitly authorizes publication, `scripts/prepare-pr.ps1` performs the mechanical publication preparation. It recognizes `chore/sync-upstream-*` and requires Standard followed by Full local validation before staging, commit, or publication. This support does not resolve conflicts, select `ours`/`theirs`, replace high-risk auto-merge review, or weaken any step above.
+An in-progress merge must first be resolved, staged, semantically reviewed, and completed with its local merge commit; prepare-pr refuses active Git operations even when all conflict markers are gone. That local integration step does not authorize push or PR creation. After the merge is complete and the user explicitly authorizes publication, `scripts/prepare-pr.ps1` performs the mechanical preparation. It recognizes `chore/sync-upstream-*`, requires meaningful focused JVM filters, runs that Fast feedback once, and preserves the reviewed native parents/tree. This support does not resolve conflicts, select `ours`/`theirs`, replace high-risk auto-merge review, or weaken authoritative hosted Full.
 
 ## Conflict-resolution policy
 
@@ -116,19 +112,18 @@ An automatic merge is only a textual result. If both sides changed related behav
 
 ## Validation
 
-The Standard/Full workstation sequence below applies to manual synchronization
-and local conflict recovery. Hosted conflict-free candidates instead receive
-lightweight structural checks followed by the existing required PR Full CI. Neither
-path removes semantic review or required runtime/device validation before merge.
+Manual synchronization and local conflict recovery retain meaningful focused feedback before
+publication. Hosted conflict-free candidates need no workstation validation. Every resulting
+upstream PR receives authoritative hosted Full. Neither path removes semantic review or required
+runtime/device validation before merge.
 
 Use `.\scripts\validate-local.ps1` and follow the handoff conventions in `docs/AGENTS.md`.
 
-- Run Standard validation after conflict resolution and semantic auto-merge review.
-- Run Full validation before creating or merging the upstream-sync pull request.
-- The manual sync Standard pass uses changed-scope pre-commit and meaningful focused tests; the following Full pass uses repository-wide pre-commit and the complete default-debug graph. Both stop if a hook fails or applies an autofix.
+- Supply the narrowest meaningful JVM filters for behavior changed or preserved by semantic resolution. Prepare-pr runs them once with changed-scope hygiene and refuses any autofix or unexpected mutation before staging/publication.
+- Do not run routine local Standard then Full merely to repeat the required PR gate. Explicit Full remains available for diagnosis or a separately justified comprehensive local check.
 - The resulting `chore/sync-upstream-*` pull request receives the same required fork-owned `CI / Full validation` job, with unknown/sensitive integration scope conservatively selecting its Full path.
-- A merge or push to `main` runs that deterministic CI validation again against the integrated commit.
-- If either fails, keep the work on the sync branch and investigate; do not advance the pull request.
+- Protected main authenticates exact PR evidence or runs its complete conservative fallback.
+- If local focused feedback or hosted Full fails, keep the work on the sync branch and investigate; do not advance the pull request.
 
 CI requires no Jellyfin, Seerr, Servarr, download-client, extension-repository, or signing credentials. It does not replace deliberate conflict resolution, high-risk auto-merge inspection, or Android TV visual/focus/runtime validation.
 
@@ -257,7 +252,7 @@ Ref drift stops the run for a fresh observation; main is never pushed or modifie
   `.upstream-sync/blocked-context.json`; it never contains markers or claims upstream
   ancestry. `resolve-upstream` authenticates that transport workspace and starts the exact native
   merge locally. Human/Codex resolution must deliberately produce the reviewed merge tree;
-  `prepare-pr` validates and preserves that existing merge commit and can only fast-forward the
+  `prepare-pr` runs focused local feedback, preserves that existing merge commit, and can only fast-forward the
   same Draft PR.
 - Reuse an exact open PR only when its head equals the deterministic candidate.
   An open Draft carrying the same episode marker is also reused when unrelated downstream

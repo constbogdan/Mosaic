@@ -169,18 +169,34 @@ class ValidationIntegrationContractTest(unittest.TestCase):
         self.assertIn("mosaic_validation_policy.py", core)
         self.assertIn("$effectiveMode = if ($Level -eq 'Full')", core)
         self.assertIn("$isFullPath = $effectiveMode -eq 'full'", core)
+        self.assertIn("Fast provides local feedback only", core)
+        self.assertIn("$selectedTests = if ($Level -eq 'Fast' -and $TestFilter.Count)", core)
+        self.assertIn("elseif ($Level -eq 'Fast' -and $plan.validationMode -eq 'full')", core)
+        self.assertIn("$offlinePattern = if ($isFullPath) { 'test_*.py' }", core)
+        self.assertIn("$deferCompleteOfflineToPr = $Level -eq 'Fast'", core)
+        self.assertIn("Fast skipped the complete offline suite", core)
         self.assertIn("Reviewed untracked pre-commit", core)
         self.assertIn("$plan.reviewedUntrackedPaths", core)
+        self.assertIn("@('run', '--all-files')", core)
+        self.assertIn("'test_*.py'", core)
+        self.assertIn("ValidateSet('Fast', 'Full')", prepare)
+        self.assertIn("[string]$Level = 'Fast'", prepare)
         self.assertIn("-ChangedPath @($State.publicationPaths)", prepare)
-        self.assertIn("-FocusedBeforeFull:$focusedBeforeFull", prepare)
-        self.assertIn("if ($policy.validationMode -eq 'full')", prepare)
-        self.assertNotIn("Validation selected automatically: Full because no focused", prepare)
-        self.assertIn("Upstream-sync preparation requires Standard validation", prepare)
+        self.assertIn("Invoke-LocalChecks", prepare)
+        self.assertNotIn("FocusedBeforeFull", validator + prepare)
+        self.assertNotIn("$levels = if ($isUpstreamSync)", prepare)
+        self.assertNotIn("if ($policy.validationMode -eq 'full')", prepare)
+        self.assertNotIn("validationResults", prepare)
+        self.assertIn("Upstream-sync preparation requires meaningful focused JVM test patterns", prepare)
+        self.assertIn("authoritative validation is running on GitHub.", prepare)
+        self.assertIn("Join-Path $runDirectory 'prepare-pr.log'", prepare)
+        self.assertNotIn("Join-Path $repoRoot 'prepare-pr.log'", prepare)
         for safety_boundary in (
             "Get-WorkingSnapshotHash",
             "Get-StagedSnapshotHash",
             "HEAD^{tree}",
             "publication would require a force push",
+            "Expected exactly one existing Draft PR for the preserved upstream merge",
         ):
             self.assertIn(safety_boundary, prepare)
         self.assertIn("'.vscode/*'", prepare_config)
