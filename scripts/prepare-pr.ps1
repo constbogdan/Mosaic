@@ -165,6 +165,162 @@ function Get-RepositorySlug([string]$Url) {
     return $null
 }
 
+function Invoke-Gh {
+    param(
+        [Parameter(Mandatory)]
+        [string]$CommandPath,
+        [Parameter(Mandatory)]
+        [string[]]$Arguments,
+        [switch]$AllowFailure
+    )
+    $stderrPath = [IO.Path]::GetTempFileName()
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $rawOutput = @(& $CommandPath @Arguments 2> $stderrPath)
+        $exitCode = $LASTEXITCODE
+        $errorOutput = if ((Get-Item -LiteralPath $stderrPath).Length) {
+            $captured = @(Get-Content -LiteralPath $stderrPath)
+            $nativeLines = @()
+            foreach ($line in $captured) {
+                if ($line -match '^At .+:\d+ char:\d+$') { break }
+                if ($line -match '^\s*\+ ' -or $line -match '^\s*\+ CategoryInfo' -or $line -match '^\s*\+ FullyQualifiedErrorId') { continue }
+                $nativeLines += ($line -replace '^gh(?:\.exe)?\s*:\s*', '')
+            }
+            @($nativeLines)
+        } else { @() }
+    } finally {
+        $ErrorActionPreference = $previousErrorAction
+        Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue
+    }
+    $output = @($rawOutput | ForEach-Object { $_.ToString() })
+    $diagnostics = @($output + $errorOutput)
+    Write-PrepareLog "GitHub CLI command: gh $($Arguments -join ' ') (exit $exitCode)"
+    if ($exitCode -ne 0) {
+        $details = ($diagnostics -join [Environment]::NewLine).Trim()
+        Write-PrepareLog "GitHub CLI command failed (exit $exitCode): gh $($Arguments -join ' ')"
+        if ($details) { Write-PrepareLog "GitHub CLI diagnostics: $details" }
+        if (-not $AllowFailure) {
+            throw "gh $($Arguments -join ' ') failed (exit $exitCode):`n$details"
+        }
+    }
+    return [pscustomobject]@{ Output = $diagnostics; ExitCode = $exitCode }
+}
+
+function ConvertFrom-GhJson([object]$Result, [string]$Description) {
+    $value = ($Result.Output -join "`n").Trim()
+    if (-not $value) { throw "GitHub CLI returned no $Description data." }
+    try {
+        return $value | ConvertFrom-Json
+    } catch {
+        throw "GitHub CLI returned invalid $Description JSON."
+    }
+}
+
+function Get-PullRequestHeadRepository([object]$PullRequest) {
+    if ($PullRequest.headRepository -and $PullRequest.headRepository.nameWithOwner) {
+        return $PullRequest.headRepository.nameWithOwner
+    }
+    if ($PullRequest.headRepositoryOwner -and $PullRequest.headRepositoryOwner.login -and $PullRequest.headRepository.name) {
+        return "$($PullRequest.headRepositoryOwner.login)/$($PullRequest.headRepository.name)"
+    }
+    return $null
+}
+
+function Get-AuthenticatedPullRequest(
+    [string]$GhPath,
+    [string]$Repository,
+    [object]$Summary,
+    [string]$ExpectedBranch,
+    [string]$ExpectedHead
+) {
+    $view = Invoke-Gh -CommandPath $GhPath -Arguments @(
+        'pr', 'view', [string]$Summary.number,
+        '--repo', $Repository,
+        '--json', 'number,url,state,isDraft,baseRefName,headRefName,headRefOid,headRepository,headRepositoryOwner,autoMergeRequest,mergedAt'
+    )
+    $pullRequest = ConvertFrom-GhJson $view 'pull-request'
+    if ($pullRequest.number -ne $Summary.number -or $pullRequest.url -ne $Summary.url) {
+        throw 'GitHub returned a different PR identity than the unique published candidate.'
+    }
+    $headRepository = Get-PullRequestHeadRepository $pullRequest
+    if (-not $headRepository -or $headRepository -ine $Repository) {
+        throw "PR head repository '$headRepository' does not match expected repository '$Repository'."
+    }
+    if ($pullRequest.baseRefName -cne $config.BaseBranch) {
+        throw "PR base '$($pullRequest.baseRefName)' does not match expected '$($config.BaseBranch)'."
+    }
+    if ($pullRequest.headRefName -cne $ExpectedBranch) {
+        throw "PR head branch '$($pullRequest.headRefName)' does not match expected '$ExpectedBranch'."
+    }
+    if ($pullRequest.headRefOid -cne $ExpectedHead) {
+        throw "PR head '$($pullRequest.headRefOid)' does not match reviewed published HEAD '$ExpectedHead'."
+    }
+    if ($pullRequest.state -cne 'OPEN' -or $pullRequest.mergedAt) {
+        throw "PR is not an open unmerged candidate (state=$($pullRequest.state))."
+    }
+    Write-PrepareLog "Authenticated PR #$($pullRequest.number). Repository=$Repository Base=$($pullRequest.baseRefName) Head=$($pullRequest.headRefName) HeadOid=$($pullRequest.headRefOid) Draft=$($pullRequest.isDraft)"
+    return $pullRequest
+}
+
+function Enable-NativeAutoMerge(
+    [string]$GhPath,
+    [string]$Repository,
+    [object]$Summary,
+    [string]$ExpectedBranch,
+    [string]$ExpectedHead
+) {
+    $pullRequest = Get-AuthenticatedPullRequest $GhPath $Repository $Summary $ExpectedBranch $ExpectedHead
+    if ($pullRequest.isDraft) { throw 'PR is Draft; native auto-merge was not enabled.' }
+
+    $method = [string]$config.AutoMergeMethod
+    if ($method -cne 'merge') { throw "Unsupported prepare-pr auto-merge method '$method'." }
+    $expectedMethod = $method.ToUpperInvariant()
+    if ($pullRequest.autoMergeRequest) {
+        if ($pullRequest.autoMergeRequest.mergeMethod -cne $expectedMethod) {
+            throw "PR auto-merge is already configured with unexpected method '$($pullRequest.autoMergeRequest.mergeMethod)'."
+        }
+        Write-Host 'Auto-merge: already enabled for the exact reviewed head.'
+        Write-PrepareLog "Native auto-merge already enabled. PR=$($pullRequest.number) Head=$ExpectedHead Method=$expectedMethod"
+        return 'already enabled'
+    }
+
+    $settingsResult = Invoke-Gh -CommandPath $GhPath -Arguments @('api', "repos/$Repository")
+    $settings = ConvertFrom-GhJson $settingsResult 'repository-settings'
+    if ($settings.full_name -ine $Repository) { throw 'GitHub returned settings for an unexpected repository.' }
+    if (-not $settings.allow_merge_commit) {
+        throw "Repository merge commits are disabled; '$method' cannot preserve the required exact-tree merge shape."
+    }
+    if (-not $settings.allow_auto_merge) {
+        throw "Repository setting 'Allow auto-merge' is disabled. Enable it manually, then resume with '.\scripts\prepare-pr.ps1 -Phase Publish'. The PR remains open and unmerged."
+    }
+
+    # Re-read immediately before mutation. --match-head-commit supplies the atomic head guard.
+    $pullRequest = Get-AuthenticatedPullRequest $GhPath $Repository $Summary $ExpectedBranch $ExpectedHead
+    if ($pullRequest.isDraft) { throw 'PR became Draft before auto-merge; no merge authority was granted.' }
+    if ($pullRequest.autoMergeRequest) {
+        if ($pullRequest.autoMergeRequest.mergeMethod -cne $expectedMethod) {
+            throw "PR auto-merge is already configured with unexpected method '$($pullRequest.autoMergeRequest.mergeMethod)'."
+        }
+        Write-Host 'Auto-merge: already enabled for the exact reviewed head.'
+        Write-PrepareLog "Native auto-merge became enabled before mutation. PR=$($pullRequest.number) Head=$ExpectedHead Method=$expectedMethod"
+        return 'already enabled'
+    }
+
+    $merge = Invoke-Gh -CommandPath $GhPath -Arguments @(
+        'pr', 'merge', [string]$pullRequest.number,
+        '--repo', $Repository,
+        '--auto', '--merge', '--match-head-commit', $ExpectedHead
+    ) -AllowFailure
+    if ($merge.ExitCode -ne 0) {
+        $details = ($merge.Output -join [Environment]::NewLine).Trim()
+        throw "GitHub could not enable native auto-merge for the exact reviewed head. The PR remains open; no direct merge or bypass was attempted.`n$details"
+    }
+    Write-Host 'Auto-merge: ENABLED'
+    Write-PrepareLog "Native auto-merge enabled. PR=$($pullRequest.number) Head=$ExpectedHead Method=$expectedMethod"
+    return 'enabled'
+}
+
 function Get-OperationStates {
     $names = @('MERGE_HEAD', 'rebase-merge', 'rebase-apply', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG')
     $active = @()
@@ -777,9 +933,9 @@ function Invoke-Publish([object]$Preflight, [object]$State) {
     Assert-CommittedOnlyState $Preflight $State
     $gh = Get-Command gh -ErrorAction SilentlyContinue
     if (-not $gh) { throw "GitHub CLI ('gh') is required before publication. Install it from https://cli.github.com/, run 'gh auth login', then resume with '.\scripts\prepare-pr.ps1 -Phase Publish'. No push occurred." }
-    $authOutput = @(& $gh.Source auth status 2>&1)
-    if ($LASTEXITCODE -ne 0) {
-        Write-PrepareLog "GitHub CLI authentication failed: $($authOutput -join [Environment]::NewLine)"
+    $authResult = Invoke-Gh -CommandPath $gh.Source -Arguments @('auth', 'status') -AllowFailure
+    if ($authResult.ExitCode -ne 0) {
+        Write-PrepareLog "GitHub CLI authentication failed: $($authResult.Output -join [Environment]::NewLine)"
         throw "GitHub CLI is not authenticated. Run 'gh auth login', then resume with '.\scripts\prepare-pr.ps1 -Phase Publish'. No push occurred."
     }
     $pullRequestBody = New-PullRequestBody $State
@@ -788,9 +944,9 @@ function Invoke-Publish([object]$Preflight, [object]$State) {
     $originUrl = Get-GitText @('remote', 'get-url', $config.OriginRemote)
     $slug = Get-RepositorySlug $originUrl
     if ($PreserveMergeCommit) {
-        $beforeOutput = @(& $gh.Source pr list --repo $slug --base $config.BaseBranch --head $branch --state open --json number,url,isDraft,headRefOid 2>&1)
-        if ($LASTEXITCODE -ne 0) { throw "GitHub CLI could not authenticate the existing Draft PR before push:`n$($beforeOutput -join [Environment]::NewLine)" }
-        $beforeJson = ($beforeOutput -join "`n").Trim()
+        $beforeResult = Invoke-Gh -CommandPath $gh.Source -Arguments @('pr', 'list', '--repo', $slug, '--base', $config.BaseBranch, '--head', $branch, '--state', 'open', '--json', 'number,url,isDraft,headRefOid') -AllowFailure
+        if ($beforeResult.ExitCode -ne 0) { throw "GitHub CLI could not authenticate the existing Draft PR before push:`n$($beforeResult.Output -join [Environment]::NewLine)" }
+        $beforeJson = ($beforeResult.Output -join "`n").Trim()
         $beforePullRequests = if ($beforeJson) { @($beforeJson | ConvertFrom-Json) } else { @() }
         if ($beforePullRequests.Count -ne 1) { throw 'Expected exactly one existing Draft PR before preserved merge publication.' }
         if (-not $beforePullRequests[0].isDraft) { throw 'The existing upstream PR is no longer Draft; no push occurred.' }
@@ -811,10 +967,11 @@ function Invoke-Publish([object]$Preflight, [object]$State) {
     }
 
     $prResult = $null
-    $existingOutput = @(& $gh.Source pr list --repo $slug --base $config.BaseBranch --head $branch --state open --json number,url,isDraft,headRefOid 2>&1)
-    if ($LASTEXITCODE -ne 0) { throw "GitHub CLI could not inspect existing PRs:`n$($existingOutput -join [Environment]::NewLine)" }
-    $existingJson = ($existingOutput -join "`n").Trim()
+    $existingResult = Invoke-Gh -CommandPath $gh.Source -Arguments @('pr', 'list', '--repo', $slug, '--base', $config.BaseBranch, '--head', $branch, '--state', 'open', '--json', 'number,url,isDraft,headRefOid') -AllowFailure
+    if ($existingResult.ExitCode -ne 0) { throw "GitHub CLI could not inspect existing PRs:`n$($existingResult.Output -join [Environment]::NewLine)" }
+    $existingJson = ($existingResult.Output -join "`n").Trim()
     $existingPullRequests = if ($existingJson) { @($existingJson | ConvertFrom-Json) } else { @() }
+    if ($existingPullRequests.Count -gt 1) { throw 'Multiple open PRs match the published branch; refusing ambiguous PR identity.' }
     $existing = @($existingPullRequests | ForEach-Object { "#$($_.number) $($_.url)" })
     if ($PreserveMergeCommit) {
         if ($existingPullRequests.Count -ne 1) { throw 'Expected exactly one existing Draft PR for the preserved upstream merge.' }
@@ -829,17 +986,29 @@ function Invoke-Publish([object]$Preflight, [object]$State) {
         $bodyFile = Join-Path ([IO.Path]::GetTempPath()) ("wholphin-pr-{0}.md" -f [guid]::NewGuid())
         try {
             $pullRequestBody | Set-Content -LiteralPath $bodyFile -Encoding UTF8
-            $created = @(& $gh.Source pr create --repo $slug --base $config.BaseBranch --head $branch --title $State.approvedTitle --body-file $bodyFile 2>&1)
-            if ($LASTEXITCODE -ne 0) { throw "GitHub CLI could not create the PR:`n$($created -join [Environment]::NewLine)" }
-            Write-Host "PR created: $($created -join '')"
+            $createResult = Invoke-Gh -CommandPath $gh.Source -Arguments @('pr', 'create', '--repo', $slug, '--base', $config.BaseBranch, '--head', $branch, '--title', $State.approvedTitle, '--body-file', $bodyFile) -AllowFailure
+            if ($createResult.ExitCode -ne 0) { throw "GitHub CLI could not create the PR:`n$($createResult.Output -join [Environment]::NewLine)" }
+            Write-Host "PR created: $($createResult.Output -join '')"
             $prResult = 'PR created'
-            Write-PrepareLog "PR created: $($created -join '')"
+            Write-PrepareLog "PR created: $($createResult.Output -join '')"
         } finally { Remove-Item -LiteralPath $bodyFile -Force -ErrorAction SilentlyContinue }
+        $createdListResult = Invoke-Gh -CommandPath $gh.Source -Arguments @('pr', 'list', '--repo', $slug, '--base', $config.BaseBranch, '--head', $branch, '--state', 'open', '--json', 'number,url,isDraft,headRefOid') -AllowFailure
+        if ($createdListResult.ExitCode -ne 0) { throw "GitHub CLI could not authenticate the newly created PR:`n$($createdListResult.Output -join [Environment]::NewLine)" }
+        $createdListJson = ($createdListResult.Output -join "`n").Trim()
+        $existingPullRequests = if ($createdListJson) { @($createdListJson | ConvertFrom-Json) } else { @() }
+        if ($existingPullRequests.Count -ne 1) { throw 'Expected exactly one open PR after creation; refusing ambiguous PR identity.' }
     }
     Write-Host 'Required CI / Full validation pending.'
-    Write-Host 'Review/merge in GitHub.'
-    Write-Host 'Done — authoritative validation is running on GitHub.'
-    Write-PrepareLog "Publication completed. Branch=$branch Result=$prResult"
+    if ($PreserveMergeCommit) {
+        Write-Host 'Auto-merge: EXCLUDED (upstream Draft requires human review).'
+        Write-Host 'Review and resolve Draft readiness in GitHub.'
+        $autoMergeResult = 'excluded upstream Draft'
+    } else {
+        $autoMergeResult = Enable-NativeAutoMerge $gh.Source $slug $existingPullRequests[0] $branch $State.commit
+        Write-Host 'GitHub will merge only after required protection succeeds.'
+    }
+    Write-Host 'Done - authoritative validation is running on GitHub.'
+    Write-PrepareLog "Publication completed. Branch=$branch Result=$prResult AutoMerge=$autoMergeResult"
 }
 
 try {

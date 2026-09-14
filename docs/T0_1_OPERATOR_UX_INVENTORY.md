@@ -1,7 +1,8 @@
 # Baseline T0-1 operator UX, workflow, and presentation inventory
 
-Status: **CP4B.3 COMPLETE / HOSTED VALIDATED**
-Next: **P04 — prepare-pr native auto-merge, after its repository-setting and safety prerequisites are explicitly approved**
+Status: **CP4B.3 COMPLETE / HOSTED VALIDATED; P04 IMPLEMENTED / HOSTED ACCEPTANCE PENDING**
+Committed-only publication follow-up: **HOSTED VALIDATED (PR #64)**
+Next: **P04 hosted acceptance after the repository auto-merge setting is read and, if disabled, explicitly enabled by the operator**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
@@ -185,7 +186,7 @@ The controlled migration order is:
 5. Live-prove the Android path — **COMPLETE (`ANDROID_FULL`, PR #61)**.
 6. Live-prove the non-Android path — **COMPLETE (`NON_ANDROID`, PR #62)**.
 7. Simplify local and prepare-pr validation — **COMPLETE / HOSTED VALIDATED (CP4B.3, PR #63)**.
-8. Arm native auto-merge from prepare-pr only after P04 safety and repository-setting prerequisites.
+8. Arm native auto-merge from prepare-pr — **IMPLEMENTED / HOSTED ACCEPTANCE PENDING (P04)**.
 9. Simplify Signing Diagnostic separately under P05.
 
 No safety mechanism is removed before its replacement is implemented and hosted-proven. Performance
@@ -837,17 +838,20 @@ had no PR scope. The follow-up now distinguishes clean/equal (nothing to publish
 validate/stage/commit path). The clean/ahead path binds the reviewed existing `HEAD` and tree, skips
 only uncommitted-content stages, never creates or amends a commit, and retains ancestry, remote
 divergence, no-force, PR reuse, and native-upstream safeguards. Disposable coverage is complete;
-hosted use of this new path remains pending rather than being folded into PR #63's earlier evidence.
+PR #64 subsequently hosted-validated this new path rather than folding it into PR #63's earlier
+evidence.
 
 PR #64 then exercised the committed-only fixtures in hosted authoritative CI. The positive clean
 publication, complete multi-commit scope, and existing-PR reuse cases passed. Three negative cases
-also refused correctlyâ€”clean `HEAD == origin/main`, divergent remote publication, and an upstream
-branch without preserved native-merge identityâ€”but their assertions encountered the already-known
+also refused correctly: clean `HEAD == origin/main`, divergent remote publication, and an upstream
+branch without preserved native-merge identity, but their assertions encountered the already-known
 PowerShell rendering behavior: hosted error-column formatting inserted standalone `|` markers at
 wrapped word boundaries. The fixture now has one central test-side presentation contract that
 removes ANSI CSI sequences, whitespace-delimited PowerShell column markers, line wrapping, and
 resulting repeated whitespace before semantic assertions. Production prepare-pr behavior remains
-unchanged; the centralized normalization correction still requires hosted confirmation.
+unchanged. The corrected PR then passed authoritative hosted validation and merged as
+`063ba3a26c7d93e5c90a6f0651ba11d273121b05`. The committed-only follow-up is therefore **HOSTED
+VALIDATED**; CP4B.3 remains closed.
 
 
 ---
@@ -1117,10 +1121,15 @@ Validation/result → What happens next**, followed by collapsed Confirmed Paths
 paths, provenance/authentication, and raw inventories. Never collapse the refusal, required operator
 action, validation result, or Draft/ready state.
 
-Prepare-pr currently creates/reuses the PR but neither enables nor arms auto-merge. It can invoke
-`gh pr merge --auto --merge` after exact PR/head authentication for ordinary non-Draft PRs, but only
-after repository auto-merge is enabled and the policy explicitly excludes upstream Drafts. That is
-a process checkpoint with mocked/offline tests and hosted acceptance, not a cosmetic edit.
+P04 makes prepare-pr authenticate the unique ordinary non-Draft PR after create/reuse, including the
+expected repository, base, same-repository head branch, exact reviewed head SHA, open state and
+current native auto-merge request. It checks the live repository setting and merge-commit support,
+rereads the PR immediately before mutation, and invokes `gh pr merge --auto --merge
+--match-head-commit <reviewed-head>`. Existing matching `MERGE` auto-merge is idempotent success.
+Drafts, upstream attention candidates, foreign/stale/mismatched states and ambiguity fail closed or,
+for the authenticated preserved upstream Draft path, are explicitly excluded without changing
+readiness. GitHub protection remains merge authority. Hosted acceptance and the live repository
+auto-merge setting remain external gates.
 
 ## Release and artifact presentation
 
@@ -1253,11 +1262,11 @@ a HIGH-risk process migration. It requires classifier tests, prepare-pr acceptan
 PR/main evidence-reuse tests, ruleset coordination where names change, and live exact-tree/fallback
 acceptance. Do not solve duplication by trusting `validation.log` or weakening main fallback.
 
-Auto-merge is technically feasible through authenticated `gh` after PR creation/reuse. The design
-must authenticate the same head, require non-Draft status, use normal merge (especially for native
-upstream ancestry), preserve required CI, refuse ambiguity, and report whether auto-merge was armed.
-It also requires the repository’s native auto-merge setting to be enabled manually. Human approval
-of publication would arm merge; protected rules/checks would still decide when merge occurs.
+P04 uses authenticated `gh` after PR creation/reuse. Publication authorization arms native
+merge-commit auto-merge only after exact PR/head authentication; `--match-head-commit` binds the
+request atomically. Required CI and branch protection decide whether and when GitHub merges. The
+repository's native auto-merge setting is never changed by prepare-pr and must be enabled manually
+if its live value is false. Upstream Drafts retain separate human readiness and merge authority.
 
 ## Performance inventory
 
@@ -1326,7 +1335,7 @@ external action, and owner checkpoint.
 | P01 — CP4B.3 COMPLETE / HOSTED VALIDATED | Operator Full could precede prepare-pr Full | Normal publication no longer requires operator or prepare-pr Full; explicit Full remains diagnostic/on-demand | Disposable drift/snapshot/tree fixtures plus PR #63 timing | CP4 |
 | P02 — CP4B.3 COMPLETE / HOSTED VALIDATED | prepare-pr + PR Full duplicated local/hosted assurance | Fast local feedback plus exact publication integrity, then authoritative PR policy; retain fail-closed main fallback | Classifier/prepare-pr fixtures and PR #63 PR/main reuse | CP4 |
 | P03 — CP4B.3 COMPLETE / HOSTED VALIDATED | Upstream candidates required local Standard then Full plus PR Full | One meaningful focused local pass; preserve native merge identity and forced hosted Full | Native merge/filter fixtures; forced hosted authority remains intact | CP4 |
-| P04 — CP4A AUDITED / CP4B PENDING | prepare-pr stops after PR creation and manual auto-merge click | Authenticate same non-Draft head and arm native auto-merge; never arm upstream Draft | Mocked `gh`, branch/rules tests; enable GitHub auto-merge manually; hosted acceptance | CP4 |
+| P04 — IMPLEMENTED / HOSTED ACCEPTANCE PENDING | prepare-pr stopped after PR creation and manual auto-merge click | Authenticate the exact open same-repository/base/head non-Draft PR; use native `--auto --merge --match-head-commit`; never arm upstream Draft | Focused mocked-`gh` fixtures pass; read/enable GitHub auto-merge manually if needed; natural tooling-only hosted acceptance remains | CP4 |
 | P05 — CP4A AUDITED / CP4B PENDING | Signing Diagnostic requires repeated SHA | Zero-input authenticated protected-main source; keep Environment approval and no publication | Signing auth/refusal tests + manual hosted diagnostic | CP4 |
 
 ### HIGH-RISK CONTRACT MIGRATION (6)

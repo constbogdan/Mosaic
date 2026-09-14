@@ -296,21 +296,24 @@ The protected `main` ruleset requires pull requests and the `CI / Full validatio
 ``` text
 user explicitly authorizes publication
         -> autonomous audit / cheap local checks / exact stage / commit / push / PR via gh
-        -> GitHub takes over: required risk-tiered PR validation and mergeability
-        -> user reviews completed PR and decides merge / reject
+        -> authenticate the exact ordinary non-Draft PR/head and arm native merge-commit auto-merge
+        -> GitHub takes over: required risk-tiered PR validation, protection and merge execution
         -> authenticate exact PR-tested tree on the merged main push
         -> reuse the complete PR policy only on equality; otherwise run the complete main fallback
 ```
+
+Upstream REVIEW/conflict candidates are an explicit exception: their Draft state is a safety gate,
+prepare-pr never arms auto-merge or changes readiness, and the user retains merge/reject authority.
 
 PR CI reports release relevance, validation risk, and the checks actually selected in the Actions summary. It is the authoritative integration contract: every PR proves changed-range hygiene and complete offline tooling, while `ANDROID_FULL` additionally proves production compilation, the complete default-debug JVM suite, and default-debug APK assembly. Protected main authenticates and reuses exact-tree evidence or executes the complete conservative fallback; manual CI continues to execute the complete repository-wide path. CI does not replace Android TV visual, focus, navigation, or integration validation when the changed behavior requires those checks.
 
 Codex does not decide independently that work should be published. Passing tests or completing implementation is not authority to stage for publication, commit, push, or create a PR. Publication begins only after an explicit user instruction such as “prepare the PR,” “publish this,” or an unambiguous equivalent.
 
-After that authorization, `scripts/prepare-pr.ps1` is the normal autonomous publication path. It audits the complete scope, runs cheap changed-scope hygiene and relevant local feedback, refuses any mutation, stages exactly, generates the title, commits, verifies tree identity, safely pushes, and uses authenticated `gh` to locate or create the PR without routine intermediate prompts. It does not run routine broad local Full or the complete local offline suite; GitHub PR CI is authoritative. Upstream-sync branches require meaningful focused patterns once before the forced hosted Full. The user then reviews the completed GitHub PR and decides whether to merge. Read `docs/PREPARE_PR.md` for stop conditions and advanced diagnostic phases.
+After that authorization, `scripts/prepare-pr.ps1` is the normal autonomous publication path. It audits the complete scope, runs cheap changed-scope hygiene and relevant local feedback, refuses any mutation, stages exactly, generates the title, commits, verifies tree identity, safely pushes, and uses authenticated `gh` to locate or create the PR without routine intermediate prompts. For an ordinary non-Draft PR it authenticates repository/base/head branch and exact head SHA, then requests native auto-merge with merge-commit mode and GitHub's expected-head guard. It never uses an administrative bypass or performs a direct merge. It does not run routine broad local Full or the complete local offline suite; GitHub PR CI is authoritative. Upstream-sync branches require meaningful focused patterns once before the forced hosted Full and retain Draft/human merge authority. Read `docs/PREPARE_PR.md` for stop conditions and advanced diagnostic phases.
 
 Prepare-pr never makes ownership assumptions about a dirty tree. Normal use automatically selects one coherent non-ignored change set in the dedicated task worktree. If unrelated work is mixed in, use an explicit advanced scope only after review or preserve the work in a separate worktree; any remaining out-of-scope dirty path is refused because it would validate a different tree from the intended commit. Never bypass the script with a broad `git add .` merely for convenience.
 
-The normal human boundaries are “ready to publish” before prepare-pr starts and “ready to merge” after the GitHub PR exists. Prepare-pr never force-pushes, merges, waits for CI, or deletes branches/worktrees. After publication, required `CI / Full validation` and manual merge remain the repository gates.
+The normal ordinary-PR human boundary is “ready to publish” before prepare-pr starts; it includes authorization to arm native auto-merge for that exact reviewed head. Prepare-pr never force-pushes, bypasses protection, merges directly, waits for CI, or deletes branches/worktrees. Required `CI / Full validation` and GitHub branch protection remain the merge gates. Upstream attention Drafts retain the separate “ready to merge” human boundary.
 
 Wholphin does not currently need a permanent staging/develop branch. Use PR CI and, once implemented, short-lived PR debug APKs for pre-main device testing; the target sequence and artifact status are in [the roadmap](Wholphin_ROADMAP.md#downstream-repository-maintenance-standardization).
 
@@ -318,7 +321,7 @@ Wholphin does not currently need a permanent staging/develop branch. Use PR CI a
 
 Use GitHub as the preferred control plane for unattended schedules, pull-request state, required checks, review, merge, artifacts, security alerts, and notifications. Keep local scripts deterministic, thin, repository-specific, and useful before publication; do not recreate durable hosted workflow state locally.
 
-Preserve both normal human decision boundaries: explicit publication authorization, then completed-PR review and merge/reject. An agent may complete mechanical local preparation and, when the task explicitly authorizes external publication, push and open a pull request from an isolated task worktree. Objective checks belong in deterministic tooling; AI review and agent analysis are advisory unless a later policy explicitly establishes a narrower guarded role.
+Preserve explicit publication authorization before external mutation. For ordinary non-Draft PRs, that decision may arm native auto-merge for the exact authenticated head while GitHub protection remains authoritative. Preserve separate completed-PR review and merge/reject authority for upstream attention Drafts. An agent may complete mechanical local preparation and, when the task explicitly authorizes external publication, push, open or reuse the PR, and request eligible native auto-merge from an isolated task worktree. Objective checks belong in deterministic tooling; AI review and agent analysis are advisory unless a later policy explicitly establishes a narrower guarded role.
 
 Standardize maintained downstream repositories by safety contract rather than by branch name or identical scripts. The invariant is one appropriate protected integration branch; neither `main`, PowerShell, Gradle, identical CI, nor identical release mechanics are mandatory. Each repository chooses its own integration branch, validation graph, package manager, artifacts, upstream identity, and release implementation while preserving PR-only integration, local/CI parity, semantic upstream conflict handling, minimal permissions, and guarded publishers.
 
