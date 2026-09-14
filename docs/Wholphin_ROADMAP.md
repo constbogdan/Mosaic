@@ -14,14 +14,15 @@ minimal emergency Hold Release followed by forward-fix and zero-input Stable Pro
 VALIDATED. CP4B.2 — Authoritative PR Validation Model — is COMPLETE / HOSTED VALIDATED for both
 `ANDROID_FULL` and `NON_ANDROID`. CP4B.3 — Local / prepare-pr simplification — is COMPLETE / HOSTED
 VALIDATED. P04 — prepare-pr native auto-merge — is COMPLETE / HOSTED VALIDATED. Validation-plan
-visibility and prepare-pr terminal UX are COMPLETE / HOSTED VALIDATED.** Baseline T0 is an
+visibility and prepare-pr terminal UX are COMPLETE / HOSTED VALIDATED. The Operator UX batch is
+IMPLEMENTED / HOSTED ACCEPTANCE PENDING.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 Checkpoint sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE /
 HOSTED VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX
-COMPLETE / HOSTED VALIDATED.**
+COMPLETE / HOSTED VALIDATED; Operator UX batch IMPLEMENTED / HOSTED ACCEPTANCE PENDING.**
 
 CP4B.2 evidence classes: **`ANDROID_FULL` — HOSTED VALIDATED; `NON_ANDROID` — HOSTED VALIDATED.**
 
@@ -178,13 +179,19 @@ escape-sequence-free forensic logs. During acceptance, an older-base branch corr
 resolved it without weakening ancestry protection. Required CI passed, native auto-merge merged PR
 #70, and protected main preserved exact-tree evidence reuse.
 
-The next bounded T0-1 work is an **Operator UX batch** combining presentation-only ordinary
-prepare-pr PR-body/scope improvements with upstream candidate/Draft links, REVIEW-first attention,
-less duplicate Observe/Publish outcome text, and useful downstream/upstream comparison navigation.
-It retains `resolve-upstream.ps1` as the semantic-resolution entry point and may improve bounded
-publication-failure wording only without lifecycle, permission, validation, or publication changes.
-`Upstream check · Scheduled` and `Upstream check · Manual` already provide adequate run intent;
-GitHub supplies the run number/date, so no run-title work remains.
+The **Operator UX batch is implemented with hosted acceptance pending**. Publish owns the one final
+candidate outcome and exposes the exact downstream PR prominently; Observe retains a compact
+authenticated handoff. REVIEW attention precedes bulk history, distinguishes semantic policy from
+Git textual conflicts, and offers exact current/downstream and incoming/upstream blob navigation.
+Candidate and ordinary prepare-pr bodies now lead with the decisions, scope and validation/release
+implications while retaining exhaustive paths and provenance in collapsed detail. The resolver,
+lifecycle, permissions, evidence, native ancestry, validation, P04 auto-merge and release authority
+are unchanged. `Upstream check · Scheduled` and `Upstream check · Manual` remain satisfactory.
+
+This batch closes the bounded ordinary PR-body and upstream candidate-summary presentation items
+after natural hosted rendering is accepted. T0-1 still retains CP5's optional coordinated machine
+contract renames, broader PR/Release presentation such as Compare Changes/version display, measured
+performance work, and the final consistency sweep.
 
 Hosted CP2 evidence also establishes bounded later work: CP7 must separate runner queue, setup,
 cache/tool installation, test/build execution, Environment wait, and publication timing, and must

@@ -141,7 +141,8 @@ class HostedSyncTests(unittest.TestCase):
         self.assertEqual(o["changed_paths"], ["upstream.txt"])
         self.assertEqual(o["classification_range_count"], 1)
         body = sync.description(o)
-        for text in (up, self.anchor, "Human review", "upstream.txt", "1 additional file integrates cleanly"):
+        for text in (up, self.anchor, "Human review", "upstream.txt",
+                     "1 FOLLOW path is included by the native candidate"):
             self.assertIn(text, body)
         evidence = sync.technical_evidence(o)
         self.assertIn('"candidate_parents"', evidence)
@@ -361,6 +362,10 @@ class HostedSyncTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "existing_pr")
         sync.publish(retry, self.github, result, result["upstream_sha"], result["downstream_sha"])
         self.assertFalse(retry.pushes or self.github.created)
+        summary = sync.upstream_summary(result, publication=True)
+        self.assertIn("### Candidate ready", summary)
+        self.assertIn("PR #123  [open](https://github.com/constbogdan/Wholphin/pull/123)", summary)
+        self.assertIn("no duplicate was created", summary)
 
     def test_draft_pr_appearing_during_publish_remains_blocked_and_open(self):
         self.upstream(".github/workflows/ci.yml", "review\n")
@@ -507,7 +512,10 @@ class HostedSyncTests(unittest.TestCase):
         for change in removed.values():
             self.assertEqual("DOWNSTREAM-OWNED", change["ownership"])
             self.assertIsNone(change["downstream_blob"])
-        summary = sync.upstream_summary(observation)
+        observe_summary = sync.upstream_summary(observation)
+        self.assertTrue(observe_summary.startswith("## Upstream observation recorded"))
+        self.assertNotIn("observed but excluded", observe_summary.splitlines()[0])
+        summary = sync.upstream_summary(observation, publication=True)
         self.assertTrue(summary.startswith("## 2 upstream changes · observed but excluded"))
         self.assertIn("Mosaic state was preserved", summary)
         self.assertIn("DOWNSTREAM-OWNED: 2 — observed but excluded", summary)
@@ -568,6 +576,10 @@ class HostedSyncTests(unittest.TestCase):
                   if change["path"] == ".github/workflows/ci.yml")
         self.assertEqual("REVIEW", ci["ownership"])
         self.assertIn("semantic review", ci["reason"])
+        body = sync.description(review)
+        self.assertIn("Git produced a textually clean candidate", body)
+        self.assertIn("Semantic REVIEW:", body)
+        self.assertNotIn("Git textual conflict:", body)
 
     def test_later_owned_change_produces_new_observed_state(self):
         first = self.upstream(".github/workflows/main.yml", "one\n")
@@ -721,18 +733,33 @@ class HostedSyncTests(unittest.TestCase):
         body = sync.description(observation)
         self.assertIn("PR 1946", body)
         self.assertIn("<code>ddddddd</code>", body)
-        self.assertIn("<code>SeriesViewModel.kt</code>", body)
+        self.assertIn("<code>app/src/SeriesViewModel.kt</code>", body)
         self.assertNotIn("github.com/damontecres", body)
         self.assertNotIn("damontecres/Wholphin#", body)
-        self.assertIn("1 additional file integrates cleanly.", body)
+        self.assertIn("1 FOLLOW path is included by the native candidate.", body)
         self.assertNotIn(clean_path, body)
         self.assertNotIn("existing_pr_url: not available", body)
         self.assertIn("Latest observation:", body)
         self.assertIn(clean_path, json.dumps(observation))
+        headings = ["## What requires attention?", "## Why?",
+                    "## What integrates automatically?",
+                    "## What is intentionally preserved downstream?",
+                    "## What should the operator do next?",
+                    "<summary>Technical provenance and upstream history</summary>"]
+        self.assertEqual(headings, sorted(headings, key=body.index))
+        self.assertIn(".\\scripts\\resolve-upstream.ps1", body)
 
-        summary = sync.upstream_summary(observation)
+        observe_summary = sync.upstream_summary(observation)
+        self.assertTrue(observe_summary.startswith("## Upstream observation recorded"))
+        summary = sync.upstream_summary(observation, publication=True)
         self.assertTrue(summary.startswith("## 2 upstream changes · review required"))
-        self.assertIn("1 path requires review", summary)
+        self.assertIn("1 path requires semantic review", summary)
+        self.assertIn("PR #31  [open](https://github.com/constbogdan/Wholphin/pull/31)", summary)
+        self.assertLess(summary.index("### Review required"), summary.index("1 incoming"))
+        self.assertIn("Semantic REVIEW:", summary)
+        self.assertIn("Git textual conflict:", summary)
+        self.assertIn("[Current Mosaic](https://github.com/constbogdan/Wholphin/blob/", summary)
+        self.assertIn("[Incoming upstream](https://github.com/damontecres/Wholphin/blob/", summary)
         self.assertIn("<summary>Operator navigation</summary>", summary)
         self.assertIn("<summary>Technical details</summary>", summary)
         self.assertIn("[PR 1946](https://github.com/damontecres/Wholphin/pull/1946)", summary)
@@ -788,10 +815,17 @@ class HostedSyncTests(unittest.TestCase):
         summary = sync.upstream_summary({"outcome": "review_required",
             "ownership_counts": {"FOLLOW": 0, "REVIEW": 1, "DOWNSTREAM-OWNED": 0},
             "automation_changes": [{"ownership": "REVIEW", "path": "`\n## injected",
-                                     "reason": "<review>@team"}]})
+                                     "reason": "<review>@team"}]}, publication=True)
         self.assertNotIn("\n## injected", summary)
         self.assertNotIn("<review>", summary)
         self.assertIn("&lt;review&gt;&#64;team", summary)
+        hostile_link = sync.upstream_summary({"outcome": "existing_draft_pr",
+            "pr_number": "31", "pr_url": "https://evil.invalid/pull/31",
+            "review_paths": ["safe.yml"], "conflict_paths": [],
+            "automation_changes": [{"ownership": "REVIEW", "path": "safe.yml",
+                                     "reason": "review"}]}, publication=True)
+        self.assertNotIn("[open](https://evil.invalid", hostile_link)
+        self.assertNotIn("PR #31  [open]", hostile_link)
 
     def test_non_hosted_cli_cannot_mutate(self):
         output = self.root / "out.json"
@@ -854,6 +888,7 @@ class HostedSyncTests(unittest.TestCase):
                    "GITHUB_OUTPUT": str(self.root / "outputs")}
         def conflict(git, gh, observation):
             observation.update(upstream_sha="a" * 40, downstream_sha="b" * 40,
+                               branch=sync.branch_name("a" * 40, "b" * 40),
                                conflict_paths=["source.kt"], textual_conflicts=True)
             raise sync.OperationError("permission_denied: fixture publication failed.")
         with patch.dict(os.environ, runtime), patch("sys.argv", ["hosted_upstream", "--publish", "--output", str(output)]), patch.object(sync, "inspect", side_effect=conflict):
@@ -863,6 +898,13 @@ class HostedSyncTests(unittest.TestCase):
         self.assertEqual(result["conflict_paths"], ["source.kt"])
         self.assertNotIn("blocked_issue_url", result)
         self.assertIn("outcome=publication_error", (self.root / "outputs").read_text())
+        summary = (self.root / "summary.md").read_text()
+        self.assertIn("## Upstream publication failed", summary)
+        self.assertIn("No candidate PR was confirmed", summary)
+        self.assertIn("Candidate branch  [inspect](https://github.com/constbogdan/Wholphin/tree/",
+                      summary)
+        self.assertIn("inspect the outcome artifact and branch before rerunning", summary)
+        self.assertIn("permission_denied: fixture publication failed", summary)
 
     def test_upstream_contained_after_accepted_merge_no_new_pr(self):
         self.upstream()

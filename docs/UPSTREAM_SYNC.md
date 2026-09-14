@@ -138,10 +138,13 @@ This is historical evidence for the process, not a prediction of future conflict
 ## Hosted upstream synchronization v2
 
 The Actions workflow displays **Upstream Synchronization**. Its run title distinguishes a
-`Manual` or `Scheduled` check without embedding a future wall-clock time. Summaries lead with a
-plain-language result and action: no changes, attention-free candidate, review required, or
-downstream-owned changes `observed but excluded`. Rich navigation and exact machine evidence stay
-available in collapsible sections and retained JSON; I06 identities and behavior are unchanged.
+`Manual` or `Scheduled` check without embedding a future wall-clock time. For a candidate-producing
+run, Observe records a compact authenticated handoff and Publish owns the single final operator
+outcome. A no-delta or observation failure remains final in Observe because Publish does not run.
+The final outcome leads with review attention or candidate readiness and a canonical direct link to
+the exact downstream PR; bulk upstream history follows in a collapsible navigation section. Exact
+machine evidence remains in the summaries and retained JSON; I06 identities and behavior are
+unchanged.
 
 Hosted observation loads a versioned policy from trusted downstream `main`:
 
@@ -160,6 +163,16 @@ Unknown `.github/**` paths and ownership-crossing renames are REVIEW. `no_delta`
 DOWNSTREAM-OWNED-only observations retain complete machine evidence without creating a candidate.
 A clean FOLLOW candidate creates/reuses a normal PR. REVIEW or textual conflict creates/reuses a
 Draft PR until semantic/manual work is resolved. No journal Issue duplicates the PR lifecycle.
+
+REVIEW presentation deliberately distinguishes a Git textual conflict from a textually clean merge
+that still requires semantic review under downstream ownership policy. The final Actions summary
+puts those decision paths first and gives each one exact `Current Mosaic` and `Incoming upstream`
+blob links derived from the authenticated downstream/upstream SHAs. This provides truthful review
+navigation even when a preserved path is absent from the candidate's Files changed tab; it does not
+fabricate a candidate diff. Candidate PR bodies remain quiet toward upstream and order attention,
+reason, automatic FOLLOW integration, preserved downstream state, next action, then collapsed
+technical provenance/history. The next action continues to be `resolve-upstream.ps1`; its generated
+authenticated Codex handoff is not duplicated into the PR.
 
 An unresolved candidate is identified by trusted policy version plus the paths requiring
 attention, their ownership/status and downstream blob identities, and their textual-conflict
