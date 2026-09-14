@@ -830,6 +830,15 @@ while preserving every scope, tree, publication, and hosted fallback guarantee a
 live-validated the simplified local/prepare-pr-to-authoritative-PR lifecycle and protected-main
 exact-tree reuse.
 
+The subsequent CP4B.3 documentation checkpoint exposed one bounded publication gap: prepare-pr
+treated an intentionally clean branch containing only commits ahead of `origin/main` as though it
+had no PR scope. The follow-up now distinguishes clean/equal (nothing to publish), clean/ahead
+(review and publish the complete committed branch scope), and any dirty scope (the normal
+validate/stage/commit path). The clean/ahead path binds the reviewed existing `HEAD` and tree, skips
+only uncommitted-content stages, never creates or amends a commit, and retains ancestry, remote
+divergence, no-force, PR reuse, and native-upstream safeguards. Disposable coverage is complete;
+hosted use of this new path remains pending rather than being folded into PR #63's earlier evidence.
+
 
 ---
 

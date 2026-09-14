@@ -448,13 +448,29 @@ function Show-Audit([string[]]$Scope, [object[]]$Entries, [object]$Preflight) {
 
 function Resolve-AndSaveScope([object]$Preflight) {
     $entries = @(Get-ChangedEntries)
-    $scope = @(Resolve-Scope $entries)
+    $committedOnly = -not $entries.Count
+    if ($committedOnly) {
+        if (-not @($Preflight.BranchCommits).Count -or -not @($Preflight.CommittedPaths).Count) {
+            throw 'No modified, deleted, staged, untracked, or branch-only committed paths were found.'
+        }
+        if ($Files.Count -or $Exclude.Count) {
+            throw 'Committed-only publication always uses the complete branch diff; -Files and -Exclude are not applicable.'
+        }
+        if ($Preflight.Branch -like $config.UpstreamSyncBranchPattern -and -not $PreserveMergeCommit) {
+            throw 'A committed-only upstream-sync branch requires the existing preserved native-merge identity arguments.'
+        }
+        Write-Section 'AUDIT CHANGES'
+        Write-Host 'Working tree and index are clean; reviewing committed branch content only.'
+        $scope = @()
+    } else {
+        $scope = @(Resolve-Scope $entries)
+    }
     Assert-NoOutOfScope $scope $entries
     $risks = @(Show-Audit $scope $entries $Preflight)
-    return Save-ConfirmedScope $Preflight $scope $risks
+    return Save-ConfirmedScope $Preflight $scope $risks -CommittedOnly:$committedOnly
 }
 
-function Save-ConfirmedScope([object]$Preflight, [string[]]$Scope, [string[]]$Risks) {
+function Save-ConfirmedScope([object]$Preflight, [string[]]$Scope, [string[]]$Risks, [switch]$CommittedOnly) {
     $snapshotHash = Get-WorkingSnapshotHash $Scope
     $state = @{
         version = 2
@@ -473,16 +489,56 @@ function Save-ConfirmedScope([object]$Preflight, [string[]]$Scope, [string[]]$Ri
         stagedSnapshotHash = $null
         approvedTitle = $null
         completedPhase = 'ScopeConfirmed'
+        committedOnly = [bool]$CommittedOnly
+    }
+    if ($CommittedOnly -and $Preflight.Branch -notlike $config.UpstreamSyncBranchPattern) {
+        $tree = Get-GitText @('rev-parse', 'HEAD^{tree}')
+        $approvedTitle = New-CommitTitle $Preflight $state
+        if (-not $approvedTitle -or $approvedTitle -notmatch '^(feat|fix|chore|ci|docs|test|refactor)(\([^)]+\))?: .+') {
+            throw 'Committed-only publication requires a supported Conventional Commit PR title; supply -Title if the branch name cannot provide one.'
+        }
+        $state.stagedTree = $tree
+        $state.approvedTitle = $approvedTitle
+        $state.commit = $Preflight.Head
+        $state.completedPhase = 'Committed'
     }
     Save-State $state
-    Write-Host "Scope confirmed. Intended snapshot: $snapshotHash"
-    Write-PrepareLog "Scope confirmed. IntendedSnapshot=$snapshotHash"
+    if ($CommittedOnly) {
+        Write-Host "Committed-only scope confirmed. HEAD: $($Preflight.Head); tree: $(Get-GitText @('rev-parse', 'HEAD^{tree}'))"
+        Write-PrepareLog "Committed-only scope confirmed. Commit=$($Preflight.Head) Tree=$(Get-GitText @('rev-parse', 'HEAD^{tree}'))"
+    } else {
+        Write-Host "Scope confirmed. Intended snapshot: $snapshotHash"
+        Write-PrepareLog "Scope confirmed. IntendedSnapshot=$snapshotHash"
+    }
     @($state.publicationPaths) | ForEach-Object { Write-PrepareLog "Confirmed publication path: $_" }
     return [pscustomobject]$state
 }
 
+function Assert-CommittedOnlyState([object]$Preflight, [object]$State) {
+    if (-not $State.committedOnly) { return }
+    if (@($State.scope).Count -or -not @($State.committedPaths).Count -or -not @($State.publicationPaths).Count) {
+        throw 'Committed-only state has incomplete scope evidence. Run Audit again.'
+    }
+    if (@(Get-ChangedEntries).Count) { throw 'Committed-only publication requires a clean working tree and index.' }
+    $expectedPaths = @($Preflight.CommittedPaths | Sort-Object -Unique)
+    $recordedPaths = @($State.publicationPaths | Sort-Object -Unique)
+    if (Compare-Object $expectedPaths $recordedPaths) {
+        throw 'Committed-only branch scope changed after review. Run Audit again.'
+    }
+    if ($State.commit -ne $Preflight.Head) { throw 'Committed-only reviewed HEAD changed after Audit.' }
+    $tree = Get-GitText @('rev-parse', 'HEAD^{tree}')
+    if ($State.stagedTree -ne $tree) { throw 'Committed-only reviewed tree no longer matches HEAD.' }
+}
+
 function Invoke-LocalChecks([object]$Preflight, [object]$State, [string]$RequestedLevel) {
     Write-Section 'LOCAL CHECKS'
+    if ($State.committedOnly -and $State.completedPhase -eq 'Committed') {
+        Assert-CommittedOnlyState $Preflight $State
+        Write-Host 'Skipped: clean committed-only branch; authoritative validation belongs to PR CI.'
+        Write-PrepareLog 'Local checks skipped for authenticated committed-only scope.'
+        Complete-PrepareStage -Status 'SKIP'
+        return $State
+    }
     $scope = @($State.scope)
     $entries = @(Get-ChangedEntries)
     Assert-NoOutOfScope $scope $entries
@@ -545,6 +601,13 @@ function Invoke-LocalChecks([object]$Preflight, [object]$State, [string]$Request
 
 function Invoke-Stage([object]$Preflight, [object]$State) {
     Write-Section 'STAGE CONFIRMED SCOPE'
+    if ($State.committedOnly -and $State.completedPhase -eq 'Committed') {
+        Assert-CommittedOnlyState $Preflight $State
+        Write-Host 'Skipped: committed-only scope has no working-tree content to stage.'
+        Write-PrepareLog 'Staging skipped for authenticated committed-only scope.'
+        Complete-PrepareStage -Status 'SKIP'
+        return $State
+    }
     if ($State.completedPhase -ne 'Checked') { throw 'Current state has not passed local checks.' }
     $scope = @($State.scope)
     Assert-NoOutOfScope $scope @(Get-ChangedEntries)
@@ -595,6 +658,13 @@ function New-CommitTitle([object]$Preflight, [object]$State) {
 
 function Invoke-Commit([object]$Preflight, [object]$State) {
     Write-Section 'COMMIT'
+    if ($State.committedOnly -and $State.completedPhase -eq 'Committed') {
+        Assert-CommittedOnlyState $Preflight $State
+        Write-Host "Skipped: publishing existing commit $($State.commit); no commit or amend performed."
+        Write-PrepareLog "Commit skipped for authenticated committed-only scope. Commit=$($State.commit) Tree=$($State.stagedTree)"
+        Complete-PrepareStage -Status 'SKIP'
+        return $State
+    }
     if ($State.completedPhase -ne 'Staged') { throw 'Current state is not at the reviewed staged phase.' }
     if ((Get-GitText @('write-tree')) -ne $State.stagedTree) { throw 'The staged snapshot changed after review.' }
     $scope = @($State.scope)
@@ -653,6 +723,11 @@ function New-PullRequestBody([object]$State) {
     $applicationChanged = @($State.publicationPaths | Where-Object { $_ -like 'app/*' }).Count -gt 0
     $screenshots = if ($uiChanged) { 'Not supplied by prepare-pr; add screenshots or explain why they are not applicable before merge.' } else { 'Not applicable; no UI path was detected.' }
     $scopeText = (@($State.publicationPaths) | ForEach-Object { "- ``$($_)``" }) -join "`n"
+    $localChecksText = if ($State.committedOnly -and -not $State.localCheckLevel) {
+        'Not rerun for the already-committed clean scope; authoritative PR validation is pending.'
+    } else {
+        "$($State.localCheckLevel) feedback passed for the committed snapshot."
+    }
     return @"
 ## Description
 
@@ -671,7 +746,7 @@ Not recorded by prepare-pr. Add references or state that none apply.
 
 ### Testing
 
-- Local checks: $($State.localCheckLevel) feedback passed for the committed snapshot.
+- Local checks: $localChecksText
 - Required `CI / Full validation`: pending.
 - Android TV/manual runtime validation: not recorded by prepare-pr; update if applicable.
 
@@ -695,9 +770,11 @@ Not recorded automatically. Disclose applicable assistance and human verificatio
 
 function Invoke-Publish([object]$Preflight, [object]$State) {
     Write-Section 'PUBLISH'
-    if ($State.completedPhase -ne 'Committed') { throw 'A reviewed commit created by prepare-pr is required before publication.' }
+    if ($State.completedPhase -ne 'Committed') { throw 'A reviewed committed tree is required before publication.' }
     if ((Get-GitText @('rev-parse', 'HEAD')) -ne $State.commit) { throw 'HEAD changed after the approved commit.' }
     if (Get-GitText @('status', '--porcelain=v1', '--untracked-files=all')) { throw 'The working tree must be clean before publication.' }
+    if ((Get-GitText @('rev-parse', 'HEAD^{tree}')) -ne $State.stagedTree) { throw 'HEAD tree changed after review; publication is refused.' }
+    Assert-CommittedOnlyState $Preflight $State
     $gh = Get-Command gh -ErrorAction SilentlyContinue
     if (-not $gh) { throw "GitHub CLI ('gh') is required before publication. Install it from https://cli.github.com/, run 'gh auth login', then resume with '.\scripts\prepare-pr.ps1 -Phase Publish'. No push occurred." }
     $authOutput = @(& $gh.Source auth status 2>&1)
@@ -782,11 +859,7 @@ try {
 
     switch ($Phase) {
         'Audit' {
-            $entries = @(Get-ChangedEntries)
-            $scope = @(Resolve-Scope $entries)
-            Assert-NoOutOfScope $scope $entries
-            $risks = @(Show-Audit $scope $entries $preflight)
-            Save-ConfirmedScope $preflight $scope $risks | Out-Null
+            Resolve-AndSaveScope $preflight | Out-Null
         }
         'Validate' {
             $state = if ($Files.Count) { Resolve-AndSaveScope $preflight } else { Load-State $preflight }

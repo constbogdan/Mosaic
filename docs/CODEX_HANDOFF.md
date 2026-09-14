@@ -188,6 +188,17 @@ native auto-merge while preserving required checks and excluding upstream Drafts
 explicit repository auto-merge setting decision and separate hosted acceptance; CP4B.3 does not
 authorize either action.
 
+One CP4B.3 follow-up was found while publishing its already-committed documentation checkpoint.
+Prepare-pr previously rejected an empty working tree even when `origin/main..HEAD` contained real
+commits and paths. It now treats that state as committed-only publication: audit records the complete
+branch diff plus exact existing `HEAD`/tree; local checks, staging, and commit creation are skipped;
+publication reauthenticates the clean tree and retains ancestry, remote-divergence, no-force, safe
+first-push, and existing-PR reuse checks. Clean/equal still refuses, and any dirty path selects the
+normal reviewed staging/commit flow. Clean upstream-native branches do not receive the shortcut
+unless the preserved-merge identity contract is supplied, and they retain focused validation plus
+parent/tree/Draft authentication. Twelve disposable prepare-pr fixtures pass; hosted acceptance of
+this committed-only path is still pending. P04 remains separate and unstarted.
+
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-
 and commit-tree verification, unexpected-mutation refusal, remote divergence/no-force protection,
