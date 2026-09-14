@@ -148,11 +148,18 @@ $global:LASTEXITCODE = 0
         self.git("commit", "--quiet", "-m", message)
         return self.git("rev-parse", "HEAD").stdout.strip()
 
-    def fake_publish_env(self, remote_sha="", pr_mode="create"):
-        tool_dir = self.root / ".logs" / "fake-publish" / "tools"
+    def fake_publish_env(
+        self,
+        remote_sha="",
+        pr_mode="create",
+        scenario="default",
+        list_head_before="",
+    ):
+        fixture_root = self.root / ".logs" / f"fake-publish-{scenario}"
+        tool_dir = fixture_root / "tools"
         tool_dir.mkdir(parents=True, exist_ok=True)
-        git_trace = self.root / ".logs" / "fake-publish" / "git.jsonl"
-        gh_trace = self.root / ".logs" / "fake-publish" / "gh.jsonl"
+        git_trace = fixture_root / "git.jsonl"
+        gh_trace = fixture_root / "gh.jsonl"
         git_proxy = tool_dir / "git_proxy.py"
         gh_proxy = tool_dir / "gh_proxy.py"
         git_proxy.write_text(
@@ -188,21 +195,109 @@ raise SystemExit(subprocess.run([os.environ[\"REAL_GIT\"], *delegated]).returnco
         gh_proxy.write_text(
             """import json
 import os
+from pathlib import Path
 import sys
 
 args = sys.argv[1:]
 with open(os.environ[\"FAKE_GH_TRACE\"], \"a\", encoding=\"utf-8\") as stream:
     stream.write(json.dumps(args) + \"\\n\")
+state_dir = Path(os.environ[\"FAKE_GH_STATE\"])
+created = state_dir / \"created\"
+armed = state_dir / \"armed\"
+list_count_path = state_dir / \"list-count\"
+view_count_path = state_dir / \"view-count\"
+mode = os.environ.get(\"FAKE_PR_MODE\", \"create\")
+
+
+def bump(path):
+    value = int(path.read_text() if path.exists() else \"0\") + 1
+    path.write_text(str(value))
+    return value
+
+
+def summary(number=63):
+    list_count = bump(list_count_path)
+    head = os.environ[\"FAKE_HEAD\"]
+    before = os.environ.get(\"FAKE_LIST_HEAD_BEFORE\", \"\")
+    if before and list_count == 1:
+        head = before
+    return {
+        \"number\": number,
+        \"url\": f\"https://example.invalid/pr/{number}\",
+        \"isDraft\": mode in {\"draft\", \"upstream_draft\"},
+        \"headRefOid\": head,
+    }
+
+
+def view():
+    view_count = bump(view_count_path)
+    head = os.environ[\"FAKE_HEAD\"]
+    if mode == \"wrong_head_sha\":
+        head = \"f\" * 40
+    if mode == \"head_drift\" and view_count > 1:
+        head = \"e\" * 40
+    state = \"OPEN\"
+    merged_at = None
+    if mode == \"closed\":
+        state = \"CLOSED\"
+    if mode == \"merged\":
+        state = \"MERGED\"
+        merged_at = \"2026-09-14T00:00:00Z\"
+    head_repository = \"constbogdan/Wholphin\"
+    if mode == \"wrong_repo\":
+        head_repository = \"someone/Wholphin\"
+    return {
+        \"number\": 63,
+        \"url\": \"https://example.invalid/pr/63\",
+        \"state\": state,
+        \"isDraft\": mode in {\"draft\", \"upstream_draft\"},
+        \"baseRefName\": \"develop\" if mode == \"wrong_base\" else \"main\",
+        \"headRefName\": \"other-branch\" if mode == \"wrong_head_branch\" else os.environ[\"FAKE_BRANCH\"],
+        \"headRefOid\": head,
+        \"headRepository\": {\"nameWithOwner\": head_repository},
+        \"headRepositoryOwner\": {\"login\": head_repository.split(\"/\", 1)[0]},
+        \"autoMergeRequest\": (
+            {\"mergeMethod\": \"SQUASH\" if mode == \"wrong_auto_method\" else \"MERGE\"}
+            if mode in {\"already_enabled\", \"wrong_auto_method\"} or armed.exists()
+            else None
+        ),
+        \"mergedAt\": merged_at,
+    }
+
+
 if args[:2] == [\"auth\", \"status\"]:
     raise SystemExit(0)
 if args[:2] == [\"pr\", \"list\"]:
-    if os.environ.get(\"FAKE_PR_MODE\") == \"existing\":
-        print(json.dumps([{\"number\": 63, \"url\": \"https://example.invalid/pr/63\", \"isDraft\": False, \"headRefOid\": os.environ[\"FAKE_HEAD\"]}]))
-    else:
+    if mode == \"create\" and not created.exists():
         print(\"[]\")
+    elif mode == \"ambiguous\":
+        print(json.dumps([summary(), summary(64)]))
+    else:
+        print(json.dumps([summary()]))
     raise SystemExit(0)
 if args[:2] == [\"pr\", \"create\"]:
+    created.touch()
     print(\"https://example.invalid/pr/63\")
+    raise SystemExit(0)
+if args[:2] == [\"pr\", \"view\"]:
+    print(json.dumps(view()))
+    raise SystemExit(0)
+if args and args[0] == \"api\":
+    print(json.dumps({
+        \"full_name\": \"constbogdan/Wholphin\",
+        \"allow_auto_merge\": mode != \"settings_disabled\",
+        \"allow_merge_commit\": mode != \"merge_disabled\",
+        \"allow_squash_merge\": True,
+        \"allow_rebase_merge\": True,
+    }))
+    raise SystemExit(0)
+if args[:2] == [\"pr\", \"merge\"]:
+    if mode in {\"merge_failure\", \"head_drift_at_mutation\"}:
+        message = \"head commit does not match\" if mode == \"head_drift_at_mutation\" else \"auto-merge unavailable\"
+        print(message, file=sys.stderr)
+        raise SystemExit(1)
+    armed.touch()
+    print(\"auto-merge enabled\")
     raise SystemExit(0)
 print(\"unexpected fake gh command\", file=sys.stderr)
 raise SystemExit(2)
@@ -228,16 +323,51 @@ raise SystemExit(2)
             "REAL_GIT": shutil.which("git"),
             "FAKE_GIT_TRACE": str(git_trace),
             "FAKE_GH_TRACE": str(gh_trace),
+            "FAKE_GH_STATE": str(fixture_root),
             "FAKE_REMOTE_SHA": remote_sha,
             "FAKE_PR_MODE": pr_mode,
             "FAKE_HEAD": self.git("rev-parse", "HEAD").stdout.strip(),
+            "FAKE_BRANCH": self.git("branch", "--show-current").stdout.strip(),
+            "FAKE_LIST_HEAD_BEFORE": list_head_before,
         }
 
-    def fake_trace(self, name):
-        path = self.root / ".logs" / "fake-publish" / f"{name}.jsonl"
+    def fake_trace(self, name, scenario="default"):
+        path = self.root / ".logs" / f"fake-publish-{scenario}" / f"{name}.jsonl"
         if not path.exists():
             return []
         return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+    def auto_merge_commands(self, scenario="default"):
+        return [
+            args
+            for args in self.fake_trace("gh", scenario)
+            if args[:2] == ["pr", "merge"]
+        ]
+
+    def create_native_upstream_merge(self):
+        first = self.commit_current_worktree("fix: downstream baseline")
+        base = self.git("rev-parse", "origin/main").stdout.strip()
+        base_tree = self.git("rev-parse", "origin/main^{tree}").stdout.strip()
+        upstream = subprocess.run(
+            [shutil.which("git"), "commit-tree", base_tree, "-p", base],
+            cwd=self.root,
+            input="upstream fixture\n",
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        resolved_tree = self.git("rev-parse", "HEAD^{tree}").stdout.strip()
+        merge = subprocess.run(
+            [shutil.which("git"), "commit-tree", resolved_tree, "-p", first, "-p", upstream],
+            cwd=self.root,
+            input="merge: resolved upstream fixture\n",
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        self.git("update-ref", "HEAD", merge)
+        self.git("branch", "-m", "chore/sync-upstream-fixture")
+        return first, upstream, merge, resolved_tree
 
     def test_default_local_checks_are_fast_and_preserve_explicit_filter(self):
         self.prepare("Audit")
@@ -270,10 +400,20 @@ raise SystemExit(2)
         result = self.prepare("Publish", env=self.fake_publish_env(), check=False)
         self.assertEqual(0, result.returncode, normalized_native_output(result))
         self.assertIn("PR created", result.stdout)
+        self.assertIn("Auto-merge: ENABLED", result.stdout)
         self.assertEqual(reviewed_head, self.git("rev-parse", "HEAD").stdout.strip())
         pushes = [args for args in self.fake_trace("git") if args and args[0] == "push"]
         self.assertEqual([["push", "-u", "origin", "chore/cp4b3-fixture"]], pushes)
         self.assertNotIn("--force", result.stdout + result.stderr)
+        merge_commands = self.auto_merge_commands()
+        self.assertEqual(1, len(merge_commands))
+        self.assertIn("--auto", merge_commands[0])
+        self.assertIn("--merge", merge_commands[0])
+        self.assertNotIn("--admin", merge_commands[0])
+        self.assertEqual(
+            reviewed_head,
+            merge_commands[0][merge_commands[0].index("--match-head-commit") + 1],
+        )
 
     def test_committed_only_multiple_commits_retain_complete_scope(self):
         self.commit_current_worktree("docs: first committed change")
@@ -307,6 +447,10 @@ raise SystemExit(2)
         self.prepare("Commit", "-Title", "docs: add candidate work")
         self.assertNotEqual(first, self.git("rev-parse", "HEAD").stdout.strip())
         self.assertEqual("Committed", self.state()["completedPhase"])
+        reviewed_head = self.git("rev-parse", "HEAD").stdout.strip()
+        result = self.prepare("Publish", env=self.fake_publish_env())
+        self.assertIn("Auto-merge: ENABLED", result.stdout)
+        self.assertEqual(reviewed_head, self.git("rev-parse", "HEAD").stdout.strip())
 
     def test_committed_only_remote_divergence_refuses_without_push(self):
         self.commit_current_worktree()
@@ -340,9 +484,185 @@ raise SystemExit(2)
         )
         self.assertEqual(0, result.returncode, normalized_native_output(result))
         self.assertIn("PR: #63 https://example.invalid/pr/63", result.stdout)
+        self.assertIn("Auto-merge: ENABLED", result.stdout)
         gh_commands = self.fake_trace("gh")
         self.assertTrue(any(args[:2] == ["pr", "list"] for args in gh_commands))
         self.assertFalse(any(args[:2] == ["pr", "create"] for args in gh_commands))
+        self.assertEqual(1, len(self.auto_merge_commands()))
+
+    def test_new_pr_is_authenticated_before_head_bound_native_auto_merge(self):
+        reviewed_head = self.commit_current_worktree()
+        self.prepare("Audit")
+        result = self.prepare("Publish", env=self.fake_publish_env())
+        self.assertEqual(0, result.returncode, normalized_native_output(result))
+        commands = self.fake_trace("gh")
+        create_index = next(i for i, args in enumerate(commands) if args[:2] == ["pr", "create"])
+        view_indexes = [i for i, args in enumerate(commands) if args[:2] == ["pr", "view"]]
+        merge_index = next(i for i, args in enumerate(commands) if args[:2] == ["pr", "merge"])
+        self.assertEqual(2, len(view_indexes))
+        self.assertLess(create_index, view_indexes[0])
+        self.assertLess(view_indexes[1], merge_index)
+        merge = commands[merge_index]
+        self.assertEqual(
+            reviewed_head,
+            merge[merge.index("--match-head-commit") + 1],
+        )
+        self.assertIn("--auto", merge)
+        self.assertIn("--merge", merge)
+        self.assertNotIn("--admin", merge)
+
+    def test_already_enabled_exact_auto_merge_is_idempotent(self):
+        reviewed_head = self.commit_current_worktree()
+        self.prepare("Audit")
+        result = self.prepare(
+            "Publish",
+            env=self.fake_publish_env(
+                remote_sha=reviewed_head,
+                pr_mode="already_enabled",
+            ),
+        )
+        self.assertIn("already enabled for the exact reviewed head", result.stdout)
+        self.assertEqual([], self.auto_merge_commands())
+        self.assertFalse(any(args and args[0] == "api" for args in self.fake_trace("gh")))
+
+    def test_draft_pr_is_never_armed(self):
+        reviewed_head = self.commit_current_worktree()
+        self.prepare("Audit")
+        result = self.prepare(
+            "Publish",
+            env=self.fake_publish_env(
+                remote_sha=reviewed_head,
+                pr_mode="draft",
+            ),
+            check=False,
+        )
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("PR is Draft", normalized_native_output(result))
+        self.assertEqual([], self.auto_merge_commands())
+
+    def test_upstream_resolution_draft_remains_human_controlled(self):
+        first, upstream, _, tree = self.create_native_upstream_merge()
+        identity = (
+            "-PreserveMergeCommit",
+            "-ExpectedMergeFirstParent",
+            first,
+            "-ExpectedMergeSecondParent",
+            upstream,
+            "-ExpectedMergeTree",
+            tree,
+        )
+        env = self.fake_publish_env(
+            remote_sha=first,
+            pr_mode="upstream_draft",
+            list_head_before=first,
+        )
+        result = self.prepare(
+            "Guided",
+            *identity,
+            "-TestFilter",
+            "*UpstreamFixtureTest*",
+            env=env,
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, normalized_native_output(result))
+        self.assertIn("Auto-merge: EXCLUDED", result.stdout)
+        self.assertEqual([], self.auto_merge_commands())
+        self.assertFalse(any(args and args[0] == "api" for args in self.fake_trace("gh")))
+
+    def test_wrong_repository_base_or_head_identity_refuses(self):
+        reviewed_head = self.commit_current_worktree()
+        self.prepare("Audit")
+        cases = {
+            "wrong_repo": "does not match expected repository",
+            "wrong_base": "does not match expected 'main'",
+            "wrong_head_branch": "does not match expected 'chore/cp4b3-fixture'",
+            "wrong_head_sha": "does not match reviewed published HEAD",
+        }
+        for mode, expected in cases.items():
+            with self.subTest(mode=mode):
+                result = self.prepare(
+                    "Publish",
+                    env=self.fake_publish_env(
+                        remote_sha=reviewed_head,
+                        pr_mode=mode,
+                        scenario=mode,
+                    ),
+                    check=False,
+                )
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn(expected, normalized_native_output(result))
+                self.assertEqual([], self.auto_merge_commands(mode))
+
+    def test_closed_merged_or_ambiguous_pr_refuses(self):
+        reviewed_head = self.commit_current_worktree()
+        self.prepare("Audit")
+        for mode in ("closed", "merged", "ambiguous"):
+            with self.subTest(mode=mode):
+                result = self.prepare(
+                    "Publish",
+                    env=self.fake_publish_env(
+                        remote_sha=reviewed_head,
+                        pr_mode=mode,
+                        scenario=mode,
+                    ),
+                    check=False,
+                )
+                self.assertNotEqual(0, result.returncode)
+                diagnostic = normalized_native_output(result)
+                self.assertTrue(
+                    "open unmerged candidate" in diagnostic
+                    or "ambiguous PR identity" in diagnostic
+                )
+                self.assertEqual([], self.auto_merge_commands(mode))
+
+    def test_head_drift_before_or_at_mutation_refuses(self):
+        reviewed_head = self.commit_current_worktree()
+        self.prepare("Audit")
+        for mode in ("head_drift", "head_drift_at_mutation"):
+            with self.subTest(mode=mode):
+                result = self.prepare(
+                    "Publish",
+                    env=self.fake_publish_env(
+                        remote_sha=reviewed_head,
+                        pr_mode=mode,
+                        scenario=mode,
+                    ),
+                    check=False,
+                )
+                self.assertNotEqual(0, result.returncode)
+                diagnostic = normalized_native_output(result)
+                self.assertTrue(
+                    "does not match reviewed published HEAD" in diagnostic
+                    or "could not enable native auto-merge" in diagnostic
+                )
+
+    def test_disabled_repository_setting_and_merge_failure_are_actionable(self):
+        reviewed_head = self.commit_current_worktree()
+        self.prepare("Audit")
+        cases = {
+            "settings_disabled": "Allow auto-merge' is disabled",
+            "merge_disabled": "merge commits are disabled",
+            "merge_failure": "could not enable native auto-merge",
+            "wrong_auto_method": "unexpected method 'SQUASH'",
+        }
+        for mode, expected in cases.items():
+            with self.subTest(mode=mode):
+                result = self.prepare(
+                    "Publish",
+                    env=self.fake_publish_env(
+                        remote_sha=reviewed_head,
+                        pr_mode=mode,
+                        scenario=mode,
+                    ),
+                    check=False,
+                )
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn(expected, normalized_native_output(result))
+                commands = self.auto_merge_commands(mode)
+                if mode == "merge_failure":
+                    self.assertEqual(1, len(commands))
+                else:
+                    self.assertEqual([], commands)
 
     def test_committed_only_upstream_branch_requires_preserved_merge_identity(self):
         self.commit_current_worktree()

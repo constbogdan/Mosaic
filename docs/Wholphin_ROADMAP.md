@@ -13,12 +13,13 @@ minimal emergency Hold Release followed by forward-fix and zero-input Stable Pro
 **Baseline T0 — IN PROGRESS. T0-1 CP4B.1 exact-tree reuse contract repair is COMPLETE / HOSTED
 VALIDATED. CP4B.2 — Authoritative PR Validation Model — is COMPLETE / HOSTED VALIDATED for both
 `ANDROID_FULL` and `NON_ANDROID`. CP4B.3 — Local / prepare-pr simplification — is COMPLETE / HOSTED
-VALIDATED.** Baseline T0 is an
+VALIDATED. P04 — prepare-pr native auto-merge — is IMPLEMENTED / HOSTED ACCEPTANCE PENDING.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 Checkpoint sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
-CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED.**
+CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 IMPLEMENTED /
+HOSTED ACCEPTANCE PENDING.**
 
 CP4B.2 evidence classes: **`ANDROID_FULL` — HOSTED VALIDATED; `NON_ANDROID` — HOSTED VALIDATED.**
 
@@ -64,7 +65,7 @@ technical detail to logs/artifacts by default, and explain minutes-long work bef
 Backlog: eliminate duplicate Full validation across local validation, prepare-pr, PR CI and main;
 establish one authoritative Full execution per path; assess PR Full for every
 `releaseRequired=true` APK change while preserving exact-tree reuse; profile offline tests and
-Development Build; arm native auto-merge from prepare-pr; collapse Confirmed Paths; improve PR and
+Development Build; hosted-validate native auto-merge from prepare-pr; collapse Confirmed Paths; improve PR and
 post-merge summaries/links; simplify the Signing Diagnostic SHA input, stale compatibility and the
 retired `mosaic-release-signing` Environment after operator confirmation. CP2 removed the obsolete
 inherited Development Build and Create release surfaces; Baseline T0 deliberately does not own
@@ -144,10 +145,14 @@ correctly. One test-side normalization contract now removes the observed ANSI, w
 column-marker, and whitespace presentation before semantic assertions. The corrected PR passed
 authoritative hosted validation and merged as `063ba3a26c7d93e5c90a6f0651ba11d273121b05`.
 
-The next bounded CP4 item is P04, prepare-pr native auto-merge. It must authenticate the same
-non-Draft PR head, preserve required CI and normal merge behavior, exclude upstream Drafts, and
-requires explicit repository auto-merge enablement before hosted acceptance. Do not infer that
-repository-setting authority from CP4B.3 completion.
+P04 is implemented with native GitHub state rather than a custom scheduler. Prepare-pr authenticates
+the unique ordinary non-Draft PR's repository, base, branch and exact reviewed head, rereads it before
+mutation, and requests merge-commit auto-merge with GitHub's expected-head guard. Existing matching
+auto-merge is idempotent. Draft/upstream attention, stale, foreign, ambiguous and incompatible states
+remain excluded or fail closed; GitHub protection and required CI remain merge authority. The live
+repository `Allow auto-merge` setting still requires verification and explicit operator enablement if
+disabled. Hosted acceptance must use a natural non-release/tooling PR; do not manufacture an upstream
+conflict to prove Draft exclusion.
 
 Hosted CP2 evidence also establishes bounded later work: CP7 must separate runner queue, setup,
 cache/tool installation, test/build execution, Environment wait, and publication timing, and must

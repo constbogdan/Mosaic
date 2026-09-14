@@ -1,6 +1,6 @@
 # Safe pull-request preparation
 
-`scripts/prepare-pr.ps1` is Wholphin's publication command. Codex and repository tooling must not invoke it merely because work appears complete. Running it, or explicitly instructing Codex to run it, is the user's **READY TO PUBLISH** decision. The next normal human decision is **READY TO MERGE** after the pull request and required checks are available in GitHub.
+`scripts/prepare-pr.ps1` is Wholphin's publication command. Codex and repository tooling must not invoke it merely because work appears complete. Running it, or explicitly instructing Codex to run it, is the user's **READY TO PUBLISH** decision. For an ordinary non-Draft PR, that authorization also asks GitHub to merge the exact published head automatically after repository protection succeeds. Upstream attention Drafts retain a separate human **READY TO MERGE** decision.
 
 **CURRENT:** Autonomous PR handoff v2 is integrated on `main` through [PR #9](https://github.com/constbogdan/Wholphin/pull/9). Validation and dogfooding evidence is preserved in [the handoff](CODEX_HANDOFF.md).
 
@@ -12,7 +12,7 @@ From a purpose-specific branch rooted in current `origin/main`:
 .\scripts\prepare-pr.ps1
 ```
 
-After that one publication authorization, the script performs preflight, audits the complete eventual PR scope, runs cheap local feedback, verifies snapshot stability, stages only the exact scope, verifies the staged tree, generates a Conventional Commit title, commits, verifies the committed tree, safely pushes, and delegates existing-PR lookup or PR creation to authenticated GitHub CLI. Authoritative integration validation runs on the PR in GitHub. The script does not ask routine scope, local-check, stage, title, commit, push, or PR questions when policy provides one safe answer.
+After that one publication authorization, the script performs preflight, audits the complete eventual PR scope, runs cheap local feedback, verifies snapshot stability, stages only the exact scope, verifies the staged tree, generates a Conventional Commit title, commits, verifies the committed tree, safely pushes, and delegates existing-PR lookup or PR creation to authenticated GitHub CLI. It then authenticates the exact ordinary PR and published head and asks GitHub to enable native merge-commit auto-merge. Authoritative integration validation and merge timing remain owned by GitHub. The script does not ask routine scope, local-check, stage, title, commit, push, PR, or merge questions when policy provides one safe answer.
 
 A clean branch that is already ahead of `origin/main` is also valid publication input. Prepare-pr
 audits every branch-only commit and changed path as the complete PR scope, records the exact existing
@@ -81,7 +81,28 @@ The first push uses `git push -u origin <branch>`; subsequent pushes use ordinar
 
 Authenticated `gh` is required. The script checks `gh auth status` before pushing, reuses an existing open PR, or creates one with a factual generated title/body. Missing or unauthenticated `gh` stops before push with setup guidance; after setup, resume the already verified local commit with `.\scripts\prepare-pr.ps1 -Phase Publish`. There is no parallel PowerShell GitHub API or manual compare-URL fallback.
 
-After publication, required CI remains pending and merge remains manual. Prepare-pr does not wait, poll, merge, bypass checks, rewrite a failed PR, or delete branches/worktrees.
+For an ordinary PR, prepare-pr requires one unambiguous open non-Draft PR and authenticates its repository, base branch, head repository/branch, exact reviewed head SHA, and current auto-merge state. It confirms that repository auto-merge and merge commits are enabled, rereads the PR immediately before mutation, and invokes:
+
+``` powershell
+gh pr merge <number> --repo constbogdan/Wholphin --auto --merge --match-head-commit <reviewed-head>
+```
+
+The expected-head guard binds authority to the reviewed commit. A changed, foreign, stale, Draft,
+closed, merged, wrong-base, wrong-branch, or ambiguous PR is refused. Existing matching auto-merge is
+idempotent success only when its method is `MERGE`. The command never uses `--admin`, never requests
+an immediate bypass merge, and never changes repository settings. If `Allow auto-merge` is disabled,
+the PR remains open and the operator must explicitly enable that repository setting before rerunning
+`-Phase Publish`.
+
+Merge-commit mode preserves the normal two-parent final-main shape used by exact-tree PR evidence.
+GitHub still waits for branch protection and `CI / Full validation`; if the base moves or final tree
+cannot be authenticated, protected main retains its complete fail-safe validation fallback.
+
+Preserved upstream REVIEW/conflict publication is deliberately excluded. Prepare-pr reauthenticates
+and updates the same Draft but neither enables auto-merge nor changes Draft readiness. Human semantic
+review and merge/reject authority remain mandatory for that path.
+
+Prepare-pr does not wait or poll, bypass checks, rewrite a failed PR, or delete branches/worktrees.
 
 ## After merge
 
@@ -100,6 +121,6 @@ Other downstream repositories should reuse this UX and safety contract, not Whol
 
 ## Current boundary
 
-Prepare-pr owns repository/worktree safety, complete-scope audit, cheap local feedback, exact staging, actionable Git diagnostics, Git index/tree identity, safe ordinary push, and PR handoff through `gh`. Authoritative validation, durable PR status, review, merge, notifications, and post-publication recovery belong to GitHub.
+Prepare-pr owns repository/worktree safety, complete-scope audit, cheap local feedback, exact staging, actionable Git diagnostics, Git index/tree identity, safe ordinary push, exact PR/head authentication, and the native auto-merge request through `gh`. Authoritative validation, durable PR status, protection enforcement, merge execution, notifications, and post-publication recovery belong to GitHub. Upstream Draft review and merge/reject remain human-owned.
 
 Keep this adapter thin and autonomous after authorization, using `gh` as the standard GitHub interface. Hosted clean upstream candidates do not call prepare-pr; resolved Draft candidates use it only for the focused semantic check and exact native-merge publication boundary. The normal flow is implementation, optional focused local feedback, prepare-pr, then authoritative GitHub PR validation. Full remains an explicit diagnostic/on-demand command.

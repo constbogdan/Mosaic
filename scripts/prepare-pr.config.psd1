@@ -7,6 +7,7 @@
     ValidationScript = 'scripts/validate-local.ps1'
     PullRequestTemplate = '.github/pull_request_template.md'
     UpstreamSyncBranchPattern = 'chore/sync-upstream-*'
+    AutoMergeMethod = 'merge'
 
     HighRiskPatterns = @(
         '.gitignore'

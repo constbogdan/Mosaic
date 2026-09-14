@@ -12,7 +12,9 @@
 
 `CP4B.3 committed-only publication follow-up — HOSTED VALIDATED (PR #64)`
 
-`Next: P04 — prepare-pr native auto-merge, after its repository-setting and safety prerequisites are explicitly approved`
+`P04 — IMPLEMENTED / HOSTED ACCEPTANCE PENDING`
+
+`Next: verify/enable repository auto-merge if needed, then live-prove P04 on a natural tooling-only PR`
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
@@ -213,6 +215,46 @@ presentation can vary. No production prepare-pr, validation/provenance, workflow
 behavior changed. The corrected PR passed authoritative hosted validation and merged as
 `063ba3a26c7d93e5c90a6f0651ba11d273121b05`; the committed-only follow-up is **HOSTED VALIDATED**
 and does not reopen CP4B.3.
+
+### T0-1 P04 native auto-merge
+
+P04 removes the routine manual merge click without moving merge authority into prepare-pr. After
+safe push and unique PR create/reuse, prepare-pr authenticates the expected repository, `main` base,
+same-repository head branch, exact reviewed head SHA, open/non-Draft state and current native
+auto-merge request. It checks live repository support, rereads the PR immediately before mutation,
+and uses `gh pr merge <number> --repo constbogdan/Wholphin --auto --merge
+--match-head-commit <reviewed-head>`. There is no `--admin`, direct merge API, readiness transition,
+poller or custom merge state. Existing exact `MERGE` auto-merge is idempotent success; a different
+method refuses.
+
+The `--merge` method retains the ordinary two-parent main commit shape required by exact-tree PR
+evidence. GitHub branch protection and required `CI / Full validation` remain authoritative. If the
+base moves or the final tree differs, protected main still rejects reuse and runs the complete
+conservative fallback. Release Build, signing, publication, Stable, Hold and upstream ownership
+boundaries are unchanged.
+
+Any foreign repository/head, wrong base or branch, head drift, Draft, closed/merged state,
+ambiguity, disabled repository auto-merge, disabled merge commits or CLI failure stops without a
+merge bypass. Preserved upstream REVIEW/conflict Drafts are explicitly excluded after their existing
+head/merge-identity checks; prepare-pr neither arms auto-merge nor changes readiness.
+
+The repository's previous authenticated rules evidence establishes required PR integration,
+`CI / Full validation`, blocked deletion/non-fast-forward updates and zero required approvals.
+Recent merged history proves merge commits remain supported. During P04 proposal generation the
+saved `gh` credential was invalid and public API execution was unavailable, so the live
+`allow_auto_merge` value and optional squash/rebase settings were not inferred. Prepare-pr reads the
+live repository flags and reports an actionable open-PR refusal when `Allow auto-merge` is disabled;
+only the operator may change that setting.
+
+Disposable fixtures cover new and existing PRs, idempotent already-enabled state, exact
+repository/base/branch/head authentication, Draft and preserved upstream Draft exclusion, closed,
+merged and ambiguous candidates, pre-mutation and atomic expected-head drift, disabled settings,
+merge-method incompatibility, CLI failure, committed-only and mixed-work publication, no force or
+administrative bypass, and merge-commit selection. Hosted acceptance remains: one natural
+non-release/tooling PR arms auto-merge while CI is pending, required CI succeeds, GitHub creates the
+normal merge commit, protected main authenticates exact `NON_ANDROID` evidence, and Development
+correctly skips. Draft exclusion requires fixtures/existing evidence rather than a manufactured
+conflict.
 
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-
