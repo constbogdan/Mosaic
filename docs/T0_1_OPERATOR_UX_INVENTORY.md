@@ -2,15 +2,15 @@
 
 Status: **CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED VALIDATED;
 Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX COMPLETE / HOSTED
-VALIDATED; Operator UX batch IMPLEMENTED / HOSTED ACCEPTANCE PENDING**
+VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED**
 Committed-only publication follow-up: **HOSTED VALIDATED (PR #64)**
-Next: **Operator UX batch hosted acceptance**
+Next: **Release / Diagnostic UX batch**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED
 VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX COMPLETE /
-HOSTED VALIDATED; Operator UX batch IMPLEMENTED / HOSTED ACCEPTANCE PENDING.**
+HOSTED VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED.**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
 baseline; historical names in acceptance records are evidence, not active UX. CP2 removed only
@@ -108,7 +108,7 @@ current `origin/main` resolved the stale base; ancestry protection was not weake
 
 ## T0-1 operator UX batch
 
-Status: **IMPLEMENTED / HOSTED ACCEPTANCE PENDING**
+Status: **COMPLETE / HOSTED VALIDATED (ordinary PR #72; upstream review candidate PR #58)**
 
 The final upstream outcome now belongs to Publish whenever publication is required. Observe emits a
 compact authenticated handoff instead of repeating the same candidate/review headline; no-delta and
@@ -124,17 +124,41 @@ Codex prompt remains resolver-owned. Ordinary prepare-pr bodies now present a co
 release relevance and risk, keep review-sensitive paths prominent, collapse the exhaustive confirmed
 path list, and retain validation and Development-release implications.
 
-Publication failure presentation now says whether a PR was confirmed and links the authenticated
-candidate PR or deterministic branch when available, while retaining the refusal and complete
-outcome artifact. This batch changes no lifecycle, ownership, evidence, ancestry, permission,
-validation, P04 auto-merge, or release authority contract. `Upstream check · Scheduled` and
-`Upstream check · Manual` remain unchanged.
+PR #72 live-validated the ordinary generated body: `What changed` led with a concise
+`Scope: 9 files · tooling-only · high risk` summary; application/UI implications, review-sensitive
+paths, validation, release consequence and expected hosted path were immediately visible; the
+complete confirmed-path inventory and unrelated boilerplate were secondary/collapsed. Hosted CI
+selected `NON_ANDROID`, ran changed-range pre-commit plus the complete offline tooling suite, and
+omitted Android application validation. Native auto-merge waited for required CI. Protected main
+then authenticated exact `NON_ANDROID` evidence from PR #72, reused the exact-tree policy in about
+10 seconds, independently reported `No build required`, and skipped Development Build/Sign/Publish.
 
-Hosted acceptance should confirm one natural candidate/reuse run renders a single Publish-owned
-outcome with its exact PR link and that an attention candidate renders REVIEW first with working
-exact blob navigation. Until then the batch is not complete. This closes the bounded ordinary PR
-body and upstream candidate-summary presentation backlog; broader CP5 machine-name migration,
-remaining release presentation, performance work and the final consistency sweep remain separate.
+A natural manual upstream check against existing review candidate PR #58 live-validated the other
+half. Observe displayed only `Upstream observation recorded` and the authenticated handoff to
+Publish. Publish owned the single final `29 upstream changes · review candidate already open`
+outcome, put `Review required` and the exact PR #58 link before bulk history, reused the candidate
+without duplication, and showed `.github/workflows/pr.yml` first. It truthfully reported `current
+Mosaic absent`, linked the exact incoming upstream blob, distinguished Git textual conflict from
+trusted-policy semantic REVIEW, and directed the operator to `resolve-upstream.ps1`, the Draft PR
+number, and its generated authenticated handoff. Secondary counts remained visible: 1 requiring
+attention, 26 FOLLOW, and 2 preserved downstream.
+
+Publication failure presentation says whether a PR was confirmed and links the authenticated
+candidate PR or deterministic branch when available, while retaining the refusal and complete
+outcome artifact. This batch changed no lifecycle, ownership, evidence, ancestry, permission,
+validation, P04 auto-merge, or release authority contract. `Upstream check · Scheduled` and
+`Upstream check · Manual` remain final: GitHub already supplies run number/time metadata.
+
+Closed inventory items: P34/S04 upstream outcome ownership and REVIEW-first summary, P37 upstream
+candidate PR-body presentation, and P44 ordinary generated PR-body presentation. P32/L02 run naming
+requires no further change. The operational sanitized-push-detail item S07 remains separate.
+
+The next grouped work is **Release / Diagnostic UX**: challenge the continued Signing Diagnostic
+manual SHA, improve Development/Stable and Compare Changes navigation, demote immutable
+`downstream-build-N` archives, refine human-facing release titles/descriptions without changing
+updater/tag/asset identity, and remove redundant human-facing provenance only where durable machine
+evidence already provides it. CP5 machine-contract renames are not implicit in that batch; their
+value must be decided explicitly afterward. CP7 performance and CP8 consistency remain subsequent.
 
 ## T0-1 CP4B.1 exact-tree reuse contract repair
 
@@ -1197,17 +1221,17 @@ to rename `CI`, job IDs, workflow filenames, tags, artifacts, Environments, or c
 | P31 | Signing result | `Mosaic signing diagnostic verified`, artifact/source/retention | signing workflow line 133 | `Signing verified`; action/no-publication statement visible; details collapsed | Tests/docs | MEDIUM |
 | P32 | Upstream workflow/run | `Upstream — Synchronization`; `Observe upstream · event` | upstream workflow lines 1-2 | `Upstream Synchronization`; `Upstream check · Scheduled/Manual` | Tests/docs | MEDIUM |
 | P33 | Upstream jobs/steps | `Observe upstream integration`; read-only attempt; retain; publish/recheck | upstream workflow | `Observe`; `Publish candidate`; concise authentication verbs | Credential/condition structure | MEDIUM |
-| P34 | Upstream outcomes | `No upstream delta`; `Ready candidate`; `Review required · Draft candidate`; etc. | `hosted_upstream.py:333-369` | Plain first-line counts/result/action; keep machine outcome in details | Tests and operational semantics | MEDIUM |
+| P34 — COMPLETE / HOSTED VALIDATED (PR #58) | Upstream outcomes | `No upstream delta`; `Ready candidate`; `Review required · Draft candidate`; etc. | `hosted_upstream.py:333-369` | One Publish-owned final outcome; REVIEW/action/PR first; machine outcome retained in details | Tests and operational semantics | MEDIUM |
 | P35 | Ownership classes | `FOLLOW`, `REVIEW`, `DOWNSTREAM-OWNED` | ownership policy/hosted summary | Keep machine tokens in evidence; explain as “integrate”, “review”, “preserve Mosaic” | Policy/classification | HIGH |
 | P36 | Upstream PR titles | `chore: synchronize official upstream`; `chore: review upstream changes to …` | `hosted_upstream.py:323-330` | `Sync official upstream`; `Review upstream changes: area` | Tests/dedup uses branch/evidence, not title | MEDIUM |
-| P37 | Upstream PR body | incoming/attention counts, filenames, run link, `<details>` evidence | `hosted_upstream.py:271-321,747-762` | `What changed / Why review / Validation / Next`; retain details collapsed | Episode marker/evidence embedded | HIGH |
+| P37 — COMPLETE / HOSTED VALIDATED (PR #58) | Upstream PR body | incoming/attention counts, filenames, run link, `<details>` evidence | `hosted_upstream.py:271-321,747-762` | Attention / reason / automatic integration / preserved downstream / next action; provenance retained collapsed | Episode marker/evidence embedded | HIGH |
 | P38 | Upstream artifacts | `upstream-observation-A`; `upstream-outcome-A` | upstream workflow | Keep machine names; show operator result in summary | Resolver retrieval/auth | HIGH |
 | P39 | Resolver CLI | candidate list, dependency states, publication plan, `Ready to PUSH?` | `resolve_upstream.py:604-843` | Sentence case; lead with action and next step; technical identities in prompt/log | Tests/operator contract | MEDIUM |
 | P40 | Resolver prompt | Incoming, attention, CI, constraints, exact evidence | `resolve_upstream.py:692-809` | Keep bounded handoff; collapse/reference machine evidence where safe | Semantic safety contract | HIGH |
 | P41 | Prepare-pr phases | uppercase `AUDIT/VALIDATE/STAGE/COMMIT/PUBLISH`, `[RUN/PASS/FAIL]` | `prepare-pr.ps1` | Title case lifecycle with one-line intent/result | Tests/log parsers | MEDIUM |
 | P42 | Prepare-pr scope | `TOTAL COMPLETE PR SCOPE`; tracked/untracked/raw stats | `prepare-pr.ps1:387-479` | `PR scope: N files`; details collapsed/logged | Snapshot confirmation | HIGH |
 | P43 | Prepare-pr title | Conventional title inferred from branch | `prepare-pr.ps1:600-627` | Keep concise conventional title; allow explicit human title | Commit/PR title, tests | MEDIUM |
-| P44 | Generated PR body | Description/title; Confirmed paths; application/UI flags; Testing; review-sensitive; docs/screenshots/AI | `prepare-pr.ps1:665-719`, PR template | Default `What changed / Why / Validation / Next`; collapse paths/evidence | Template/tests/review process | MEDIUM |
+| P44 — COMPLETE / HOSTED VALIDATED (PR #72) | Generated PR body | Description/title; Confirmed paths; application/UI flags; Testing; review-sensitive; docs/screenshots/AI | `prepare-pr.ps1:665-719`, PR template | Compact `What changed` scope/classification; risk and implications visible; exhaustive paths collapsed | Template/tests/review process | MEDIUM |
 | P45 | Prepare-pr completion | PR URL, `Required CI / Full validation pending`, `Review/merge in GitHub` | `prepare-pr.ps1:769-784` | Add auto-merge armed/not armed and direct next action | GitHub capability/settings | MEDIUM |
 | P46 | Prepare-pr logs | `.logs/prepare-pr/<run>/prepare-pr.log` plus stage logs | `prepare-pr.ps1`, `.gitignore` | Keep one per-run diagnostic location | Non-authoritative diagnostics | LOW |
 | P47 | Local validation plan | `Wholphin validation`; requested level; relevance/risk/path | `validate-local.ps1:112-118` | `Validation plan`; plain reason and actual checks | Classifier values in log only | MEDIUM |
@@ -1279,14 +1303,15 @@ VALIDATED**.
 Three bounded follow-ups are now closed: PR #67 added the narrow tooling-support classification
 while retaining unknown-path fail-closed behavior; PR #68 made the existing PR Validation plan
 visible early without changing its authority contract; and PR #70 live-validated the concise
-prepare-pr terminal UX specified above. The implemented Operator UX batch retains manual Upstream
-check #39 evidence: `Upstream check · Scheduled` / `Upstream check · Manual` plus GitHub's run
-number are adequate. Candidate reuse creates no duplicate; Publish now owns the final summary and
+prepare-pr terminal UX specified above. The completed Operator UX batch retains the established
+run-name conclusion: `Upstream check · Scheduled` / `Upstream check · Manual` plus GitHub's run
+number are adequate. Natural acceptance against PR #58 proved candidate reuse creates no duplicate;
+Publish owns the final summary and
 prominently links the candidate PR/Draft, while REVIEW attention precedes bulk incoming history.
 REVIEW paths deliberately preserved/excluded downstream may be absent from Files changed, so the
 summary provides exact current-Mosaic and incoming-upstream blob navigation rather than pretending
 they are candidate diffs. `resolve-upstream.ps1` remains the semantic entry point and sole generator
-of the authenticated Codex handoff. Natural hosted rendering remains pending.
+of the authenticated Codex handoff.
 
 ## Release and artifact presentation
 
@@ -1480,7 +1505,7 @@ external action, and owner checkpoint.
 | S01 — COMPLETE / HOSTED VALIDATED (PR #68) | `ci.yml` PR policy summary was late and classifier-centric | Early live path signal from existing policy outputs plus detailed final summary | Conservative `ANDROID_FULL` signal appeared early; required CI, auto-merge, and exact-tree main reuse succeeded | CP3/CP4 |
 | S02 — CP3 COMPLETE / HOSTED VALIDATED | PR APK/main reuse summaries expose all identities equally | Main result/link visible; SHA/tree/run/artifact in `<details>` | Exact evidence assertions pass; hosted exact-tree reuse observed, with fallback retained by fixtures | CP3 |
 | S03 — CP3 COMPLETE / HOSTED VALIDATED | `mosaic_development_release.record_eligibility` emits full paths/default | One build/no-build sentence; paths and policy evidence collapsed | Release classifier/output tests pass; hosted non-APK presentation observed and APK paths remain live-proven elsewhere | CP3 |
-| S04 — CP3 COMPLETE / HOSTED VALIDATED | `hosted_upstream.upstream_summary` exposes policy tables and full JSON | Counts/attention/action first; lists/navigation/details collapsed; artifact remains complete | Hostile-input/quiet-surface fixtures and natural hosted Upstream runs observed | CP3 |
+| S04 — COMPLETE / HOSTED VALIDATED (PR #58) | `hosted_upstream.upstream_summary` duplicated the high-level candidate outcome and buried the downstream PR | Observe owns evidence handoff; Publish owns one final REVIEW-first outcome and exact candidate link; artifact remains complete | Hostile-input/quiet-surface fixtures plus natural existing-candidate run | CP3/CP6 |
 | S05 — COMPLETE / HOSTED VALIDATED (PR #70) | prepare-pr terminal success output was noisier than its operator decision path | Six concise stages, scope/classification once, RUN-only clickable log links, PR link, CI/path state, detailed failure diagnostics and forensic logs | PR #70 exercised the accepted presentation; disposable prepare-pr/output fixtures retain terminal-link fallback and snapshot safety | CP6 |
 | S06 — CP3 PRESENTATION IMPLEMENTED / CP8 SWEEP REMAINS | failure summaries name `$GITHUB_JOB` but not always action/remedy | Plain refusal/failure, mutation status, retry/forward-fix action visible | Current Stable/Hold/Signing/CI failures now state action; final cross-surface sweep remains CP8 | CP3/CP8 |
 | S07 — RECLASSIFIED AS OPERATIONAL | Upstream publication hides the actionable `git push --porcelain` rejection because stdout/stderr are captured but discarded | Bounded sanitized failure detail: operation, remote/refspec, exit, destination existence, rejection category/excerpt from both streams; never credentials | Requires subprocess/error-contract tests, not cosmetic summary editing | CP6 or T0-2 security |

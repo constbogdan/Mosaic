@@ -103,6 +103,13 @@ the current classification requires a Development APK. Protected main still rech
 eligibility independently. This is presentation only: the complete publication scope and all tree,
 staging, mutation, PR-head and no-force checks are unchanged.
 
+PR #72 live-validated this body with `Scope: 9 files · tooling-only · high risk`. Application/UI
+implications and review-sensitive paths were visible, confirmed paths were collapsed, and the
+expected `NON_ANDROID` path plus release consequence were explicit. Required CI ran changed-range
+pre-commit and the complete offline tooling suite without Android validation; native auto-merge
+waited for it. Protected main authenticated the exact PR evidence, reused it in about 10 seconds,
+then independently reported `No build required` and skipped Development Build/Sign/Publish.
+
 For an ordinary PR, prepare-pr requires one unambiguous open non-Draft PR and authenticates its repository, base branch, head repository/branch, exact reviewed head SHA, and current auto-merge state. It confirms that repository auto-merge and merge commits are enabled, rereads the PR immediately before mutation, and invokes:
 
 ``` powershell
