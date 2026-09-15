@@ -241,6 +241,17 @@ class DeliveryOutputTests(unittest.TestCase):
         self.assertIn('name: Set up Android SDK', setup)
         self.assertIn('name: Resolve current Stable release', hold)
 
+    def test_shared_android_setup_requests_only_required_supported_packages(self):
+        setup = (ROOT / '.github/actions/setup/action.yml').read_text(encoding='utf-8')
+        match = re.search(r'^\s*packages:\s*"([^"]+)"\s*$', setup, re.MULTILINE)
+        self.assertIsNotNone(match)
+        self.assertEqual(
+            'platform-tools build-tools;${{ env.BUILD_TOOLS_VERSION }} '
+            'ndk;${{ env.NDK_VERSION }}',
+            match[1],
+        )
+        self.assertNotIn('tools', match[1].split())
+
     def test_lifecycle_run_names_use_best_trigger_time_human_identity(self):
         ci = (ROOT / '.github/workflows/ci.yml').read_text(encoding='utf-8')
         ci_run_name = ci.split('\non:\n', 1)[0]
