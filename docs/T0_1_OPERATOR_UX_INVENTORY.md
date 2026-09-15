@@ -5,14 +5,16 @@ Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX C
 VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED**
 Committed-only publication follow-up: **HOSTED VALIDATED (PR #64)**
 Release / Diagnostic UX batch: **COMPLETE / HOSTED VALIDATED (PR #74)**
-Next: **V01 + CP5 decision phase (audit/decision only)**
+V01: **KEEP / COMPLETE**
+CP5: **COMPLETE / NO MIGRATION JUSTIFIED**
+Next: **CP7 — Performance**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED
 VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX COMPLETE /
 HOSTED VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED; Release / Diagnostic UX batch
-COMPLETE / HOSTED VALIDATED.**
+COMPLETE / HOSTED VALIDATED; V01 KEEP / COMPLETE; CP5 COMPLETE / NO MIGRATION JUSTIFIED.**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
 baseline; historical names in acceptance records are evidence, not active UX. CP2 removed only
@@ -248,14 +250,65 @@ Preserved contracts: numeric Release API `name` (`v1.0.N`), `develop`, `downstre
 workflow/job/step names, evidence/manifest schemas, artifact names/IDs/digests/retention, signing,
 Development/Stable/Hold/validation authority, and exact-tree reuse.
 
-### Next bounded phase: V01 + CP5 decision
+### V01 + CP5 contract decision
 
-V01 stays **OPEN / DECISION PENDING**. Audit whether a Development version-format change still
-adds meaningful operator value after channel-first presentation, and whether remaining CP5
-workflow/job/step/artifact renames justify migrating established machine contracts. Preserving
-existing identities and closing an item as **KEEP** is a valid preferred outcome when migration
-does not earn its cost. This is not an implementation mandate. Sequence: **V01 + CP5 decision →
-CP7 performance → CP8 final consistency**. None of these later phases began in this checkpoint.
+Status: **V01 — KEEP / COMPLETE; CP5 — COMPLETE / NO MIGRATION JUSTIFIED**
+
+KEEP is the result of the completed contract-and-consumer audit, not deferred implementation. The
+low-risk presentation work resolved the operator problems without requiring migration of established
+machine identities.
+
+V01 keeps the aligned numeric identity:
+
+- Android `versionCode`: protected-main first-parent distance from the epoch;
+- Android `versionName`: `1.0.N`;
+- Development Release name: `v1.0.N`;
+- rolling Development tag: `develop`;
+- immutable Development tag: `downstream-build-N`;
+- Stable Release name: `v1.0.N`;
+- Stable tag: `mosaic-v1.0.N`;
+- manifest version: `1.0.N`.
+
+Channel-first Development and Stable presentation now supplies the human distinction that motivated
+V01. A Development-specific APK/version identity was rejected because it would migrate updater,
+Release, APK, manifest, history, and recovery contracts. Stable promotes exact Development APK
+bytes, so replacing that identity for Stable would require rebuilding and resigning rather than
+exact-byte promotion. Changing only the GitHub Release presentation would instead disagree with the
+authenticated APK `versionName`.
+
+The CP5 decisions are:
+
+- **H01 — KEEP / COMPLETE:** keep `CI / Full validation`. It is an established ruleset, evidence,
+  reuse, and provenance identity. Early `Validation path · ...` presentation removes the ambiguity
+  without migrating the required check.
+- **H02 — KEEP / COMPLETE:** keep `Build Development Release`, `Sign Development`, and `Publish
+  Development`; their channel-qualified names are clearer than generic alternatives.
+- **H03 — KEEP / COMPLETE:** keep authenticated artifact names because producer/consumer, native
+  rerun, and provenance checks use them as selectors. Operator presentation appropriately hides
+  their detail.
+- **H04 — KEEP / COMPLETE:** keep `v1.0.N`, `develop`, `downstream-build-N`, `mosaic-v1.0.N`,
+  `Wholphin-release.apk`, and `mosaic-release.json`. Channel-first presentation solved the UX issue
+  without an updater or provenance migration.
+- **H05 — KEEP / COMPLETE:** keep the explicit downstream-owned absence of inherited `main.yml` and
+  `release.yml`; it prevents upstream synchronization from resurrecting competing publication
+  authorities and is not cosmetic debt.
+- **H06 — KEEP least privilege / COMPLETE for T0-1:** do not broaden Upstream Sync workflow-file
+  publication authority for convenience. Workflow-file candidates may require manual handling. Any
+  broader permission and threat-model decision belongs to T0-2.
+
+The audit also confirmed the hidden contracts that future work must not casually reopen: live main
+protection requires exact `Full validation`; exact-tree reuse authenticates workflow and evidence
+identities; Development and Stable authenticate successful Full validation; resolver selection uses
+the established validation identity; numeric APK/version identity is enforced across build, signing,
+manifest, Development, Stable, and Hold; Stable exact-byte promotion constrains channel-specific
+versioning; updater discovery parses the GitHub Release name; rolling, immutable-provenance, and
+Stable tags have distinct roles; and several artifact names are authenticated selectors rather than
+presentation text.
+
+The next implementation phase is **CP7 — Performance**, driven by measured offline fixture/test,
+Android/JDK/SDK/NDK setup, Gradle/cache restoration, Full validation, Release Build, runner queue,
+and Environment-wait costs. CP8 final consistency follows CP7. Neither phase began in this decision
+closure.
 
 ## T0-1 CP4B.1 exact-tree reuse contract repair
 
@@ -1617,16 +1670,16 @@ external action, and owner checkpoint.
 | P04 — COMPLETE / HOSTED VALIDATED | prepare-pr stopped after PR creation and manual auto-merge click | Authenticate the exact open same-repository/base/head non-Draft PR; use native `--auto --merge --match-head-commit`; never arm upstream Draft | PR #65 proved failed CI blocks head A, corrected head B reuses the PR and auto-merges only after required CI, and main reuses exact evidence | CP4 |
 | P05 — COMPLETE / HOSTED VALIDATED (PR #74) | Signing Diagnostic required repeated SHA | Zero-input authenticated protected-main source; keep Environment approval and no publication | Integration accepted; diagnostic visual observation awaits next natural dispatch | Release / Diagnostic UX |
 
-### HIGH-RISK CONTRACT MIGRATION (6)
+### HIGH-RISK CONTRACT DECISIONS (6)
 
 | ID | Source / current problem | Target and dependency/risk | Validation / external action | CP |
 |---|---|---|---|---|
-| H01 | `Full validation` is desired as `Prepare` but is ruleset/reuse/provenance input | Coordinated rename across workflow, ruleset, API consumers, tests/docs with no interval lacking required protection | Old/new check migration tests and hosted PR/main acceptance; manual ruleset update | CP5 |
-| H02 | Development job names are verbose and test-bound | `Build`, `Sign`, `Publish` only after proving names are not external API/provenance selectors; job IDs unchanged | Release/security tests + hosted APK delivery/rerun | CP5 |
-| H03 | Artifact names are ugly but authenticated | Do not rename by default; improve surrounding display. Any change needs dual-reader/migration proof | Complete artifact/provenance/Stable/Hold tests | CP5 or reject |
-| H04 | Release names/tags/installer filenames mix human/machine identity | Keep updater contracts; isolate human title changes from machine identity | Updater/version/manifest/device update acceptance | CP5/CP6 |
-| H05 | Ownership path state for removed inherited workflows | Explicit downstream-owned absence so upstream sync cannot resurrect publishers | I06 classification/native candidate fixtures + natural observation | CP2/CP5 |
-| H06 | I06 can construct a genuine `.github/workflows/**` candidate while its least-privilege App token lacks Workflows write | Decide explicitly between manual handling (preferred absent a concrete need) and isolated repo-scoped Workflows write; never silently broaden authority | Permission/threat-model audit plus authorized hosted acceptance only if automation is chosen | CP5 or T0-2 security |
+| H01 — KEEP / COMPLETE | `CI / Full validation` is a live ruleset/evidence/provenance contract | Keep it; early validation-path presentation solves operator ambiguity without migration | Completed consumer/ruleset audit | CP5 complete |
+| H02 — KEEP / COMPLETE | Development-qualified job names provide useful channel context | Keep `Build Development Release`, `Sign Development`, and `Publish Development` | Completed workflow/consumer audit | CP5 complete |
+| H03 — KEEP / COMPLETE | Artifact names are authenticated producer/consumer selectors | Keep exact artifact identities; demote them only in human presentation | Completed artifact/provenance/rerun audit | CP5 complete |
+| H04 — KEEP / COMPLETE | Release/tag/asset identities are updater and provenance contracts | Keep `v1.0.N`, `develop`, `downstream-build-N`, `mosaic-v1.0.N`, `Wholphin-release.apk`, and `mosaic-release.json` | Completed updater/version/manifest audit | CP5 complete |
+| H05 — KEEP / COMPLETE | Removed inherited workflows must remain downstream-owned absences | Keep the ownership rule so upstream sync cannot recreate competing publishers | Completed ownership/native-candidate audit | CP5 complete |
+| H06 — KEEP least privilege / COMPLETE for T0-1 | Workflow-file candidates exceed current Upstream Sync publication authority | Keep least privilege and manual handling; reconsider only through a T0-2 permission/threat-model decision | Completed permission-boundary audit | CP5 complete; T0-2 if revisited |
 
 ### PERFORMANCE (6)
 
@@ -1643,7 +1696,7 @@ external action, and owner checkpoint.
 
 | ID | Source / current problem | Target and dependency/risk | Validation / external action | CP |
 |---|---|---|---|---|
-| V01 — OPEN / DECISION PENDING | Development title lacks distance from Stable | Reassess value after channel-first presentation; KEEP existing identities is valid | Compatibility/value audit before any implementation | V01 + CP5 decision |
+| V01 — KEEP / COMPLETE | Development title previously lacked distance from Stable | Channel-first presentation distinguishes channels while preserving one authenticated numeric APK/Release/manifest identity and exact-byte Stable promotion | Completed compatibility/value/consumer audit | V01 complete |
 | V02 — COMPLETE / HOSTED VALIDATED (PR #74) | Stable/Development bodies lacked prominent comparison | Immutable authenticated source range for Development and prior-Stable tag range for Stable | Integration accepted; visual observation awaits natural publication | Release / Diagnostic UX |
 | V03 — COMPLETE / HOSTED VALIDATED (PR #74) | Immutable archive looked like another human release | Permanent provenance record points to rolling Development | Integration accepted; visual observation awaits natural publication | Release / Diagnostic UX |
 | V04 — COMPLETE / HOSTED VALIDATED (PR #74) | Artifact identities dominated summaries | Human version/channel first; exact artifact in technical details | Integration accepted; visual observation awaits natural publication/Hold | Release / Diagnostic UX |
@@ -1659,7 +1712,7 @@ external action, and owner checkpoint.
 | D05 | A clean hosted runner transiently failed to resolve two existing Android debug variants while local cache and an unchanged rerun succeeded | Reproducibility/dependency-resolution assurance, not CP2 presentation work; do not alter dependencies after one transient failure | Compare clean/warm resolution, repository availability and dependency metadata only if recurrence supplies evidence |
 
 Ledger totals: **REMOVE 3; LOW-RISK PRESENTATION 4; SUMMARY/COLLAPSE 7; PROCESS
-SIMPLIFICATION 5; HIGH-RISK CONTRACT MIGRATION 6; PERFORMANCE 6; RELEASE PRESENTATION 4;
+SIMPLIFICATION 5; HIGH-RISK CONTRACT DECISIONS 6; PERFORMANCE 6; RELEASE PRESENTATION 4;
 DEFER TO T0-2 5** — **40 finite items**.
 
 ## Recommended T0-1 checkpoint sequence
@@ -1675,20 +1728,22 @@ DEFER TO T0-2 5** — **40 finite items**.
 4. **CP4 — Process simplification:** eliminate redundant validation paths, simplify Signing
    Diagnostic input, and arm native auto-merge. This depends on CP3’s clear explanations and
    requires GitHub auto-merge enablement plus hosted exact-tree/fallback acceptance.
-5. **CP5 — High-risk contracts:** only if still valuable, coordinate `Full validation → Prepare`
-   and Development job presentation with ruleset and every authenticated consumer. Manual GitHub
-   ruleset change and hosted old/new transition acceptance are mandatory.
-6. **CP6 — PR and Release presentation:** restructure PR default view, add Compare Changes, and
-   implement human Development versioning only after updater/version/provenance proof. Device and
-   live release acceptance required for version/title changes.
-7. **CP7 — Performance:** profile first, then optimize offline fixtures, Android validation and
-   Release Build independently. Depends on CP4 so obsolete duplicate work is not optimized.
+5. **CP5 — High-risk contract decision (complete / no migration justified):** the consumer audit
+   retained H01-H06. The existing identities protect ruleset, evidence, provenance, updater,
+   ownership, or least-privilege contracts; completed presentation work removed the UX rationale for
+   migrating them.
+6. **CP6 — PR and Release presentation (complete through the hosted-validated Operator and Release /
+   Diagnostic UX batches):** channel-first presentation, Compare Changes, archive demotion, and
+   concise provenance solved the identified UX problems without changing machine identity.
+7. **CP7 — Performance (next):** profile first, then optimize offline fixtures, Android validation
+   and Release Build independently. Separate queue/Environment wait from actual execution and setup.
 8. **CP8 — Final consistency sweep:** compare every surviving Actions/PR/Release/CLI surface to this
    registry, reconcile docs, and prove no machine contract was cosmetically renamed.
 
-Cosmetic CP3 is deliberately separated from CP5 machine-contract migration. CP2 should not wait for
-cosmetic work because dead workflows distort the inventory operators see. CP7 follows CP4 because
-removing duplication is higher leverage than accelerating duplicate work.
+Cosmetic CP3 was deliberately separated from the CP5 contract decision. The completed CP5 audit
+found no justified migration. CP2 did not wait for cosmetic work because dead workflows distorted
+the inventory operators saw. CP7 follows the completed simplification and decision work because
+removing duplication was higher leverage than accelerating duplicate work.
 
 ## Future “Learn more” integration
 

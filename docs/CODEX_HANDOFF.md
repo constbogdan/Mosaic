@@ -22,14 +22,19 @@
 
 `Release / Diagnostic UX batch — COMPLETE / HOSTED VALIDATED (PR #74)`
 
-`Next: V01 + CP5 decision phase (audit/decision only)`
+`V01 — KEEP / COMPLETE`
+
+`CP5 — COMPLETE / NO MIGRATION JUSTIFIED`
+
+`Next: CP7 — Performance`
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
 `CP4B.2 COMPLETE / HOSTED VALIDATED`; `CP4B.3 COMPLETE / HOSTED VALIDATED`; `P04 COMPLETE / HOSTED
 VALIDATED`; `Validation-plan visibility COMPLETE / HOSTED VALIDATED`; `prepare-pr terminal UX
 COMPLETE / HOSTED VALIDATED`; `Operator UX batch COMPLETE / HOSTED VALIDATED`; `Release /
-Diagnostic UX batch COMPLETE / HOSTED VALIDATED`.
+Diagnostic UX batch COMPLETE / HOSTED VALIDATED`; `V01 KEEP / COMPLETE`; `CP5 COMPLETE / NO
+MIGRATION JUSTIFIED`.
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -328,8 +333,8 @@ No upstream lifecycle, ownership, quiet-surface, ancestry, evidence, permission,
 auto-merge, or Development/Stable authority contract changed. At that checkpoint, the next work was **Release /
 Diagnostic UX**: reassess Signing Diagnostic's manual SHA and improve channel, Compare Changes,
 archive emphasis, release wording and redundant human-facing provenance without changing machine
-identity. CP5 machine-contract renames remain a separate explicit value decision; CP7 and CP8
-follow.
+identity. CP5 machine-contract renames remained a separate explicit value decision at that
+checkpoint; the completed audit below has since closed them as KEEP. CP7 and CP8 follow.
 
 The **Release / Diagnostic UX batch is COMPLETE / HOSTED VALIDATED (PR #74)**. Signing Diagnostic is
 now zero-input and derives the exact current protected-main `github.sha`; the existing protected-ref
@@ -369,10 +374,29 @@ checks, and Fast validation. Do not confuse this setup failure with Release/Diag
 
 No artificial diagnostic, Development, Stable, or Hold operation was dispatched for presentation.
 Those visual surfaces await their next natural operation; integration closure does not claim live
-release mutation. Existing published bodies stay immutable on retry. Next is **V01 + CP5 decision**:
-challenge version-format value and remaining machine-name migrations after channel-first cleanup;
-**KEEP** existing identities is valid. Only afterward come CP7 performance and CP8 consistency.
-This checkpoint authorizes none of those implementations.
+release mutation. Existing published bodies stay immutable on retry.
+
+The completed contract-and-consumer audit closes **V01 — KEEP / COMPLETE** and **CP5 — COMPLETE /
+NO MIGRATION JUSTIFIED**. KEEP is the audited result, not deferred implementation. Channel-first
+presentation solves the Development/Stable distinction while preserving the aligned `1.0.N`
+APK/manifest/Release identity, `develop`, `downstream-build-N`, `mosaic-v1.0.N`, and exact-byte Stable
+promotion. A Development-only version identity would migrate updater/history/recovery contracts and
+force Stable rebuild/resigning; changing only the Release name would disagree with authenticated APK
+`versionName`.
+
+H01-H06 are complete KEEP decisions: retain `CI / Full validation`; Development-qualified
+Build/Sign/Publish names; authenticated artifact names; current release/tag/asset identities;
+downstream-owned absence of inherited publishers; and least-privilege Upstream Sync workflow-file
+handling. The audit confirmed live consumers across main protection, exact-tree evidence/reuse,
+Development/Stable Full authentication, resolver selection, numeric build/sign/manifest/Stable/Hold
+checks, updater Release-name parsing, distinct rolling/immutable/Stable tag roles, and artifact
+selectors. Workflow-file candidates may continue to require manual handling; any broader authority
+belongs to T0-2.
+
+The next implementation phase is **CP7 — Performance**, based on measured offline tests, Android and
+JDK/SDK/NDK setup, Gradle/cache restoration, Full validation, Release Build, runner queue, and
+Environment-wait costs. **CP8 — Final consistency** follows. Neither begins in this documentation
+checkpoint.
 
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-
