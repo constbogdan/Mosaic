@@ -4,15 +4,15 @@ Status: **CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED VALIDATED;
 Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX COMPLETE / HOSTED
 VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED**
 Committed-only publication follow-up: **HOSTED VALIDATED (PR #64)**
-Release / Diagnostic UX batch: **IMPLEMENTED / OFFLINE VALIDATED; HOSTED ACCEPTANCE PENDING**
-Next after acceptance: **CP5 value decision**
+Release / Diagnostic UX batch: **COMPLETE / HOSTED VALIDATED (PR #74)**
+Next: **V01 + CP5 decision phase (audit/decision only)**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED
 VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX COMPLETE /
 HOSTED VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED; Release / Diagnostic UX batch
-IMPLEMENTED / OFFLINE VALIDATED.**
+COMPLETE / HOSTED VALIDATED.**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
 baseline; historical names in acceptance records are evidence, not active UX. CP2 removed only
@@ -155,7 +155,7 @@ Closed inventory items: P34/S04 upstream outcome ownership and REVIEW-first summ
 candidate PR-body presentation, and P44 ordinary generated PR-body presentation. P32/L02 run naming
 requires no further change. The operational sanitized-push-detail item S07 remains separate.
 
-The next grouped work is **Release / Diagnostic UX**: challenge the continued Signing Diagnostic
+At the Operator UX checkpoint, the next grouped work was **Release / Diagnostic UX**: challenge the continued Signing Diagnostic
 manual SHA, improve Development/Stable and Compare Changes navigation, demote immutable
 `downstream-build-N` archives, refine human-facing release titles/descriptions without changing
 updater/tag/asset identity, and remove redundant human-facing provenance only where durable machine
@@ -164,7 +164,7 @@ value must be decided explicitly afterward. CP7 performance and CP8 consistency 
 
 ## T0-1 Release / Diagnostic UX batch
 
-Status: **IMPLEMENTED / OFFLINE VALIDATED; HOSTED ACCEPTANCE PENDING**
+Status: **COMPLETE / HOSTED VALIDATED (PR #74)**
 
 Signing Diagnostic remains a distinct no-publication check of the real build, `release-sign`
 Environment, credentials, certificate, package and payload boundary. Its required `expected_sha`
@@ -193,11 +193,69 @@ the tag, APK, manifest and provenance remain preserved. Hold success states whet
 became current or none remains and directs a forward fix when necessary. Hold authentication,
 recheck, mutation, idempotency and Environment authority are unchanged.
 
-This closes P05 (Signing Diagnostic repeated SHA), V02 (reliable Compare Changes), V03 (immutable
-archive emphasis), and V04 (channel/result prominence) at implementation level. V01's proposed
-human Development version format remains unimplemented because the current numeric Release `name`
-is updater-consumed; any further title/identity change belongs to the later explicit CP5 value
-decision. CP5 names, CP7 performance and CP8 consistency were not started.
+P05 (zero-input Signing Diagnostic), V02 (authenticated Compare Changes), V03 (immutable archive
+demotion), and V04 (Development/Stable channel-first presentation) are **COMPLETE / HOSTED
+VALIDATED** at the implementation/integration boundary. Signing Diagnostic retains protected-main
+guards, `release-sign` approval, exact artifact ID/digest and source/tree/run/attempt binding,
+signer/package/payload verification, and no Release publication authority.
+
+Development leads with `Development vX`, the latest automatically published validated build, and
+an authenticated Stable-to-Development comparison when available. Stable leads with `Stable vX`, an
+explicitly promoted trusted build for normal consumption, and an authenticated previous-to-new
+Stable comparison when available. Immutable `downstream-build-N` objects remain provenance/history
+records, not equivalent update channels. Comparison links are navigation only: malformed, mutable,
+hostile, unauthenticated, or identical identities produce no link. Hold explains the exact Stable
+being held, cessation of `/releases/latest` advertising, preservation of historical tag/assets and
+provenance, and the authenticated remaining Stable or need for a forward fix. Safety/idempotency
+is unchanged; existing Release bodies are never rewritten merely to backfill presentation.
+
+### PR #74 hosted acceptance and Android setup correction
+
+The first hosted head passed changed-range pre-commit and 272 offline tests but failed shared
+Android setup before Full began: current `sdkmanager` could not resolve the obsolete standalone
+`tools` SDK package. This was inherited CI environment/toolchain drift, not a Release/Diagnostic
+behavior failure. PR #74 removed only `tools` from `.github/actions/setup/action.yml`, retained
+`platform-tools`, Build Tools `36.0.0`, and NDK `29.0.14206865`, and added an exact regression
+contract rejecting standalone `tools`. No build command depended on `$ANDROID_HOME/tools`.
+Local correction evidence: 65 focused release/setup/signing/policy/reuse tests passed; the complete
+offline suite ran 273 tests with one existing Windows skip; YAML/pre-commit, Python syntax,
+whitespace checks, and Fast validation passed.
+
+Corrected [PR run 34930521117](https://github.com/constbogdan/Wholphin/actions/runs/34930521117),
+attempt 1, tested head `9cb877692a84f16f98344b2aea1504a68a2c60df`. Its tooling-only/high scope
+correctly selected `ANDROID_FULL`, with `releaseRequired=false`. Changed-range pre-commit,
+complete offline tooling, Android setup, actual Full `defaultDebug` validation, and evidence
+record/upload all succeeded. Required `CI / Full validation` became green; native auto-merge merged
+the corrected exact head in [PR #74](https://github.com/constbogdan/Wholphin/pull/74), producing
+`0a8308c8aad622e58dc18f8b799b7b3d106a8002`.
+
+[Protected-main run 34931217453](https://github.com/constbogdan/Wholphin/actions/runs/34931217453),
+attempt 1, authenticated `pr-policy-v1` / `ANDROID_FULL` artifact ID `10382165466`, archive digest
+`sha256:7bffd66fddd3da1c9627c82a137112ab6bfa773b8fa16607c9c417a606f58209`, tested synthetic merge
+`2895b28eb7270da1f36970f0c56ecf875cab1ae2`, and exact tested/final tree
+`a797be1cba170be879c3317b24f5620cee7b2757`. Main skipped pre-commit, offline tooling, Android setup,
+and Gradle Full. Development eligibility executed independently, reported `skipped_non_apk` and
+`releaseRequired=false`, and skipped Release assembly, Sign, and Publish. This is CI/integration
+acceptance, not a manufactured release-state mutation.
+
+No artificial Signing Diagnostic, Development publication, Stable promotion, or Hold was dispatched
+to close this batch. Their changed visual surfaces are implemented/offline validated and await
+observation during the next natural corresponding operation; that is not an open implementation
+item or a reason to manufacture mutation.
+
+Preserved contracts: numeric Release API `name` (`v1.0.N`), `develop`, `downstream-build-N`,
+`mosaic-v1.0.N`, `Wholphin-release.apk`, `mosaic-release.json`, updater endpoints/version parsing,
+workflow/job/step names, evidence/manifest schemas, artifact names/IDs/digests/retention, signing,
+Development/Stable/Hold/validation authority, and exact-tree reuse.
+
+### Next bounded phase: V01 + CP5 decision
+
+V01 stays **OPEN / DECISION PENDING**. Audit whether a Development version-format change still
+adds meaningful operator value after channel-first presentation, and whether remaining CP5
+workflow/job/step/artifact renames justify migrating established machine contracts. Preserving
+existing identities and closing an item as **KEEP** is a valid preferred outcome when migration
+does not earn its cost. This is not an implementation mandate. Sequence: **V01 + CP5 decision →
+CP7 performance → CP8 final consistency**. None of these later phases began in this checkpoint.
 
 ## T0-1 CP4B.1 exact-tree reuse contract repair
 
@@ -1557,7 +1615,7 @@ external action, and owner checkpoint.
 | P02 — CP4B.3 COMPLETE / HOSTED VALIDATED | prepare-pr + PR Full duplicated local/hosted assurance | Fast local feedback plus exact publication integrity, then authoritative PR policy; retain fail-closed main fallback | Classifier/prepare-pr fixtures and PR #63 PR/main reuse | CP4 |
 | P03 — CP4B.3 COMPLETE / HOSTED VALIDATED | Upstream candidates required local Standard then Full plus PR Full | One meaningful focused local pass; preserve native merge identity and forced hosted Full | Native merge/filter fixtures; forced hosted authority remains intact | CP4 |
 | P04 — COMPLETE / HOSTED VALIDATED | prepare-pr stopped after PR creation and manual auto-merge click | Authenticate the exact open same-repository/base/head non-Draft PR; use native `--auto --merge --match-head-commit`; never arm upstream Draft | PR #65 proved failed CI blocks head A, corrected head B reuses the PR and auto-merges only after required CI, and main reuses exact evidence | CP4 |
-| P05 — IMPLEMENTED / OFFLINE VALIDATED; HOSTED PENDING | Signing Diagnostic requires repeated SHA | Zero-input authenticated protected-main source; keep Environment approval and no publication | Signing auth/refusal tests pass; zero-input hosted diagnostic pending | Release / Diagnostic UX |
+| P05 — COMPLETE / HOSTED VALIDATED (PR #74) | Signing Diagnostic required repeated SHA | Zero-input authenticated protected-main source; keep Environment approval and no publication | Integration accepted; diagnostic visual observation awaits next natural dispatch | Release / Diagnostic UX |
 
 ### HIGH-RISK CONTRACT MIGRATION (6)
 
@@ -1585,10 +1643,10 @@ external action, and owner checkpoint.
 
 | ID | Source / current problem | Target and dependency/risk | Validation / external action | CP |
 |---|---|---|---|---|
-| V01 | Development primary title lacks distance from Stable | After compatibility audit, `vStable-distance-gSHA — Development`; machine `downstream-build-N` unchanged | VersionCode/updater/provenance tests + device acceptance | CP6 |
-| V02 — IMPLEMENTED / OFFLINE VALIDATED; HOSTED PENDING | Stable/Development bodies lack prominent comparison | Immutable authenticated source range for Development and prior-Stable tag range for Stable | Source/ref validation and presentation tests pass; natural publication pending | Release / Diagnostic UX |
-| V03 — IMPLEMENTED / OFFLINE VALIDATED; HOSTED PENDING | Immutable archive looks like another human release | Body identifies permanent provenance record and points to rolling Development | Release body/updater contract tests pass; natural publication pending | Release / Diagnostic UX |
-| V04 — IMPLEMENTED / OFFLINE VALIDATED; HOSTED PENDING | Artifact identities dominate summaries | Human version/channel first; exact artifact in technical details | Artifact authentication unchanged; summary tests pass; natural publication pending | Release / Diagnostic UX |
+| V01 — OPEN / DECISION PENDING | Development title lacks distance from Stable | Reassess value after channel-first presentation; KEEP existing identities is valid | Compatibility/value audit before any implementation | V01 + CP5 decision |
+| V02 — COMPLETE / HOSTED VALIDATED (PR #74) | Stable/Development bodies lacked prominent comparison | Immutable authenticated source range for Development and prior-Stable tag range for Stable | Integration accepted; visual observation awaits natural publication | Release / Diagnostic UX |
+| V03 — COMPLETE / HOSTED VALIDATED (PR #74) | Immutable archive looked like another human release | Permanent provenance record points to rolling Development | Integration accepted; visual observation awaits natural publication | Release / Diagnostic UX |
+| V04 — COMPLETE / HOSTED VALIDATED (PR #74) | Artifact identities dominated summaries | Human version/channel first; exact artifact in technical details | Integration accepted; visual observation awaits natural publication/Hold | Release / Diagnostic UX |
 
 ### DEFER TO T0-2 (5)
 
