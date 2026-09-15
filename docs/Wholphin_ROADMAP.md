@@ -15,14 +15,16 @@ VALIDATED. CP4B.2 — Authoritative PR Validation Model — is COMPLETE / HOSTED
 `ANDROID_FULL` and `NON_ANDROID`. CP4B.3 — Local / prepare-pr simplification — is COMPLETE / HOSTED
 VALIDATED. P04 — prepare-pr native auto-merge — is COMPLETE / HOSTED VALIDATED. Validation-plan
 visibility and prepare-pr terminal UX are COMPLETE / HOSTED VALIDATED. The Operator UX batch is
-COMPLETE / HOSTED VALIDATED.** Baseline T0 is an
+COMPLETE / HOSTED VALIDATED. Release / Diagnostic UX is IMPLEMENTED / OFFLINE VALIDATED with hosted
+acceptance pending.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 Checkpoint sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE /
 HOSTED VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX
-COMPLETE / HOSTED VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED.**
+COMPLETE / HOSTED VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED; Release / Diagnostic UX
+IMPLEMENTED / OFFLINE VALIDATED.**
 
 CP4B.2 evidence classes: **`ANDROID_FULL` — HOSTED VALIDATED; `NON_ANDROID` — HOSTED VALIDATED.**
 
@@ -201,6 +203,20 @@ SHA and improve Development/Stable, Compare Changes, immutable archive emphasis,
 redundant human-facing provenance without changing updater/tag/asset identities. CP5's optional
 machine-contract renames remain a later explicit value decision; CP7 performance and CP8 final
 consistency follow.
+
+The **Release / Diagnostic UX batch is now implemented and offline validated**. Signing Diagnostic
+uses zero operator inputs and remains bound to the exact protected-main dispatch SHA and
+`release-sign` approval. New Development and Stable bodies explain their channel roles, expose only
+validated immutable comparisons, and keep provenance secondary. Immutable `downstream-build-N`
+pages now identify themselves as permanent build/provenance records rather than update channels.
+Stable approval and Hold summaries state the pending authorization and resulting updater-visible
+state without changing any mutation rule. Current numeric Release names, tags, assets, updater
+endpoints, workflow/job names, Environments, evidence and permissions remain exact.
+
+Natural hosted acceptance is pending; no release mutation should be manufactured only to validate
+presentation. After acceptance, make the explicit CP5 decision on whether any remaining high-risk
+machine-contract rename is worth its migration cost. CP7 performance and CP8 final consistency
+remain later phases.
 
 Hosted CP2 evidence also establishes bounded later work: CP7 must separate runner queue, setup,
 cache/tool installation, test/build execution, Environment wait, and publication timing, and must

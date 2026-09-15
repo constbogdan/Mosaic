@@ -138,12 +138,15 @@ class ExerciseTests(unittest.TestCase):
         build, sign = workflow.split('\n  sign:\n')
         action = (Path(__file__).resolve().parent.parent / '.github/actions/mosaic-sign-apk/action.yml').read_text()
         self.assertIn('workflow_dispatch:', build)
+        self.assertNotIn('inputs:', workflow)
+        self.assertNotIn('expected_sha', workflow)
         for forbidden in ('pull_request:', 'push:', 'schedule:', 'contents: write', 'gh release', 'git push', 'SYNC_BOT', 'GITHUB_TOKEN }}'):
             self.assertNotIn(forbidden, workflow)
         self.assertIn('contents: read', workflow)
-        guard = "github.ref == 'refs/heads/main' && github.ref_protected && inputs.expected_sha == github.sha"
+        guard = "github.ref == 'refs/heads/main' && github.ref_protected"
         self.assertIn(guard, build)
         self.assertIn(guard, sign)
+        self.assertIn('MOSAIC_EXERCISE_SHA: ${{ github.sha }}', build)
         self.assertNotIn('secrets.', build)
         self.assertNotIn('environment:', build)
         self.assertIn('needs: build', sign)

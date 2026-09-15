@@ -59,7 +59,7 @@ jobs:
           VERSION: ${{ steps.get.outputs.version }}
           APK_URL: ${{ steps.get.outputs.apk_url }}
         run: |
-          printf '## Ready to hold: [%s](%s)\n\nWaiting for approval — authorization is required before changing the current Stable release.\n\nNothing has been changed by this run.\n' "$VERSION" "$APK_URL" >> "$GITHUB_STEP_SUMMARY"
+          printf '## Stable %s ready to hold\n\n[Download the currently advertised APK](%s)\n\nApproval will stop advertising this release through <code>/releases/latest</code>. Its tag, APK, manifest, and provenance will remain preserved.\n\nWaiting for <code>release-hold</code> approval. Nothing has been changed by this run.\n' "$VERSION" "$APK_URL" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         id: evidence
         with:
@@ -115,9 +115,9 @@ jobs:
           CURRENT_URL: ${{ steps.hold.outputs.current_url }}
         run: |
           if [[ "$CURRENT" == 'none' ]]; then
-            printf '## Held: [%s](%s)\n\nThis release is no longer advertised as Stable.\n\nCurrent Stable: none available.\n' "$HELD" "$HELD_URL" >> "$GITHUB_STEP_SUMMARY"
+            printf '## Stable held: [%s](%s)\n\nClients are no longer offered this release through the Stable channel. Its tag, APK, manifest, and provenance remain preserved.\n\nCurrent Stable: none available. Prepare and promote a forward fix.\n' "$HELD" "$HELD_URL" >> "$GITHUB_STEP_SUMMARY"
           else
-            printf '## Held: [%s](%s)\n\nThis release is no longer advertised as Stable.\n\nCurrent Stable: [%s](%s)\n' "$HELD" "$HELD_URL" "$CURRENT" "$CURRENT_URL" >> "$GITHUB_STEP_SUMMARY"
+            printf '## Stable held: [%s](%s)\n\nClients are no longer offered this release through the Stable channel. Its tag, APK, manifest, and provenance remain preserved.\n\nCurrent Stable: [%s](%s)\n' "$HELD" "$HELD_URL" "$CURRENT" "$CURRENT_URL" >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Summarize failed hold
         if: failure()

@@ -127,9 +127,9 @@ implemented manual publisher, whose delivery was live validated through recovery
 ## Implemented manual hosted exercise
 
 Workflow: [.github/workflows/mosaic-signing-exercise.yml](../.github/workflows/mosaic-signing-exercise.yml).
-It accepts only workflow_dispatch in constbogdan/Wholphin on protected main, with
-`expected_sha` exactly matching the dispatch SHA. No caller-supplied ref/artifact/run
-can select a different build. This checkpoint supersedes future-only signing-job
+It accepts only zero-input `workflow_dispatch` in constbogdan/Wholphin on protected main. The
+workflow derives its exact source from the protected-main dispatch `github.sha`; no caller-supplied
+SHA/ref/artifact/run can select a different build. This checkpoint supersedes future-only signing-job
 statements in the original architecture below.
 
 The build job runs offline acceptance, pre-commit, the existing Full Debug validation
@@ -175,17 +175,14 @@ exercise APKs to a release. Durable no-replacement enforcement remains required 
 publication. Rerun the entire workflow, not only failed signing jobs: provenance binds
 the run attempt and deliberately rejects artifacts from an earlier attempt.
 
-For any future exercise, separately authorize a specific main SHA and run:
+For any future exercise, select protected `main` and run:
 
 ```powershell
-$exerciseSha = gh api repos/constbogdan/Wholphin/commits/main --jq .sha
-$exerciseSha
-# Review and authorize this exact SHA before dispatching:
-gh workflow run mosaic-signing-exercise.yml --repo constbogdan/Wholphin --ref main -f "expected_sha=$exerciseSha"
+gh workflow run mosaic-signing-exercise.yml --repo constbogdan/Wholphin --ref main
 ```
 
-If main moves between lookup and dispatch, the gate rejects the mismatch. Reassess the
-new SHA before trying again. Apply any configured Environment approval; do not bypass
+The run binds the source selected by GitHub for that protected-main dispatch. Review the source/run
+shown by the workflow, then apply any configured `release-sign` Environment approval; do not bypass
 it. No tags, GitHub Releases, updater changes or Contents write are part of this run.
 
 ## Public custody checkpoint (2026-09-09)

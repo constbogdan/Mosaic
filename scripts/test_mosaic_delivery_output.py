@@ -44,18 +44,42 @@ class DeliveryOutputTests(unittest.TestCase):
 
     def test_release_bodies_distinguish_channels_without_changing_identity(self):
         before = copy.deepcopy(self.m)
-        bodies = [development.release_fields(self.m, False)['body'],
-                  development.release_fields(self.m, False, archive=True)['body'],
-                  stable.fields(self.m, False)['body']]
+        baseline = 'b' * 40
+        bodies = [development.release_fields(self.m, False, compare_from=baseline)['body'],
+                  development.release_fields(self.m, False, archive=True, compare_from=baseline)['body'],
+                  stable.fields(self.m, False, 'mosaic-v1.0.4')['body']]
         for body in bodies:
             for value in (self.m['versionName'], self.m['immutableIdentity'], self.m['sourceSha'],
                           self.m['signedApkSha256'], 'mosaic-release.json', 'Wholphin-release.apk'):
                 self.assertIn(value, body)
             self.assertIn('/commit/' + self.m['sourceSha'], body)
-        self.assertIn('rolling Development', bodies[0])
-        self.assertIn('Immutable archive', bodies[1])
-        self.assertIn('Promoted unchanged', bodies[2])
+            self.assertIn('<summary>Technical provenance</summary>', body)
+            self.assertIn('Compare changes', body)
+        self.assertIn('# Development v1.0.5', bodies[0])
+        self.assertIn('Latest automatically published validated build.', bodies[0])
+        self.assertIn('# Immutable Development build v1.0.5', bodies[1])
+        self.assertIn('not a separate update channel', bodies[1])
+        self.assertIn('# Stable v1.0.5', bodies[2])
+        self.assertIn('Explicitly promoted trusted build for normal consumption.', bodies[2])
+        self.assertIn('/compare/' + baseline + '...' + self.m['sourceSha'], bodies[0])
+        self.assertIn('/compare/mosaic-v1.0.4...mosaic-v1.0.5', bodies[2])
         self.assertEqual(before, self.m)
+
+    def test_compare_links_accept_only_immutable_authenticated_identities(self):
+        self.assertEqual(
+            output.REPOSITORY_URL + '/compare/' + 'a' * 40 + '...' + 'b' * 40,
+            output.compare_link('a' * 40, 'b' * 40),
+        )
+        self.assertEqual(
+            output.REPOSITORY_URL + '/compare/mosaic-v1.0.4...mosaic-v1.0.5',
+            output.compare_link('mosaic-v1.0.4', 'mosaic-v1.0.5'),
+        )
+        for hostile in ('develop', 'main', 'mosaic-v1.0.0', 'x](https://example.invalid)', 'a' * 39):
+            with self.subTest(hostile=hostile):
+                self.assertIsNone(output.compare_link(hostile, self.m['sourceSha']))
+                body = development.release_fields(self.m, False, compare_from=hostile)['body']
+                self.assertNotIn('Compare changes', body)
+                self.assertNotIn('/compare/', body)
 
     def test_existing_published_bodies_are_not_backfilled_on_retry(self):
         api = fixtures.FakeGitHub()
@@ -64,22 +88,50 @@ class DeliveryOutputTests(unittest.TestCase):
             release['body'] = 'Historical body retained'
         before = copy.deepcopy((api.refs, api.tags, api.releases, api.uploads))
         api.calls.clear()
-        development.publish(api, self.m, self.apk)
+        development.publish(api, self.m, self.apk, compare_from='b' * 40)
         self.assertEqual(before, (api.refs, api.tags, api.releases, api.uploads))
         self.assertFalse(any(method in ('POST', 'PATCH', 'DELETE') for method, _, _ in api.calls))
 
+    def test_development_publication_uses_authenticated_baseline_only_for_navigation(self):
+        api = fixtures.FakeGitHub()
+        previous = dict(self.m, versionCode=4, versionName='1.0.4', immutableIdentity='downstream-build-4',
+                        sourceSha='4' * 40)
+        annotation = api.call('POST', 'git/tags', dict(tag='mosaic-v1.0.4', message=development.canonical(previous).decode(),
+                                                      object=previous['sourceSha'], type='commit'))
+        api.call('POST', 'git/refs', dict(ref='refs/tags/mosaic-v1.0.4', sha=annotation['sha']))
+        api.call('POST', 'releases', dict(tag_name='mosaic-v1.0.4', name='v1.0.4', draft=False,
+                                         prerelease=False, make_latest='true', body='fixture'))
+        self.assertEqual('mosaic-v1.0.4', development.publish(api, self.m, self.apk))
+        self.assertEqual({'mosaic-v1.0.4', 'downstream-build-5', 'develop'},
+                         {item['tag_name'] for item in api.releases.values()})
+        for item in (release for release in api.releases.values() if release['prerelease']):
+            self.assertEqual('v1.0.5', item['name'])
+            self.assertIn('/compare/mosaic-v1.0.4...' + self.m['sourceSha'], item['body'])
+
+    def test_development_omits_untrusted_stable_comparison_without_blocking_publication(self):
+        api = fixtures.FakeGitHub()
+        api.call('POST', 'releases', dict(tag_name='mosaic-v1.0.4', name='v1.0.4', draft=False,
+                                         prerelease=False, make_latest='true', body='fixture'))
+        self.assertIsNone(development.publish(api, self.m, self.apk))
+        rolling = next(item for item in api.releases.values() if item['tag_name'] == 'develop')
+        self.assertNotIn('Compare changes', rolling['body'])
+
     def test_publication_summaries_preserve_original_identity(self):
         env = {}
-        for operation, heading in [('publish', 'Published: v1.0.5 to Development'),
-                                   ('promote', 'Released: v1.0.5')]:
-            text = output.publication_summary(self.m, operation, env)
+        for operation, heading, baseline in [('publish', 'Development v1.0.5 published', 'b' * 40),
+                                             ('promote', 'Stable v1.0.5 released', 'mosaic-v1.0.4')]:
+            text = output.publication_summary(self.m, operation, env, compare_from=baseline)
             self.assertTrue(text.startswith('## ' + heading))
             for value in (self.m['sourceSha'], self.m['signedApkSha256'], self.m['immutableIdentity']):
                 self.assertIn(value, text)
             self.assertIn('Original build run: ' + self.m['buildRunId'], text)
             self.assertIn('<summary>Technical details</summary>', text)
-            self.assertLess(text.index('No further action is required'), text.index('<details>'))
-        promoted = output.publication_summary(self.m, 'promote', env)
+            self.assertIn('Compare changes', text)
+            self.assertLess(text.index('Compare changes'), text.index('<details>'))
+        published = output.publication_summary(self.m, 'publish', env, compare_from='b' * 40)
+        self.assertIn('Latest automatically published validated build.', published)
+        promoted = output.publication_summary(self.m, 'promote', env, compare_from='mosaic-v1.0.4')
+        self.assertIn('Explicitly promoted trusted build for normal consumption.', promoted)
         self.assertIn('Exact Development bytes reused', promoted)
         self.assertIn('/releases/tag/mosaic-v1.0.5', promoted)
 
@@ -188,6 +240,17 @@ class DeliveryOutputTests(unittest.TestCase):
         self.assertIn('name: Set up JDK', setup)
         self.assertIn('name: Set up Android SDK', setup)
         self.assertIn('name: Resolve current Stable release', hold)
+
+    def test_shared_android_setup_requests_only_required_supported_packages(self):
+        setup = (ROOT / '.github/actions/setup/action.yml').read_text(encoding='utf-8')
+        match = re.search(r'^\s*packages:\s*"([^"]+)"\s*$', setup, re.MULTILINE)
+        self.assertIsNotNone(match)
+        self.assertEqual(
+            'platform-tools build-tools;${{ env.BUILD_TOOLS_VERSION }} '
+            'ndk;${{ env.NDK_VERSION }}',
+            match[1],
+        )
+        self.assertNotIn('tools', match[1].split())
 
     def test_lifecycle_run_names_use_best_trigger_time_human_identity(self):
         ci = (ROOT / '.github/workflows/ci.yml').read_text(encoding='utf-8')

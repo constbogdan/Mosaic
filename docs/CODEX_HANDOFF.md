@@ -20,13 +20,16 @@
 
 `Operator UX batch — COMPLETE / HOSTED VALIDATED (ordinary PR #72; upstream PR #58)`
 
-`Next: Release / Diagnostic UX batch`
+`Release / Diagnostic UX batch — IMPLEMENTED / OFFLINE VALIDATED; HOSTED ACCEPTANCE PENDING`
+
+`Next after acceptance: CP5 value decision`
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
 `CP4B.2 COMPLETE / HOSTED VALIDATED`; `CP4B.3 COMPLETE / HOSTED VALIDATED`; `P04 COMPLETE / HOSTED
 VALIDATED`; `Validation-plan visibility COMPLETE / HOSTED VALIDATED`; `prepare-pr terminal UX
-COMPLETE / HOSTED VALIDATED`; `Operator UX batch COMPLETE / HOSTED VALIDATED`.
+COMPLETE / HOSTED VALIDATED`; `Operator UX batch COMPLETE / HOSTED VALIDATED`; `Release /
+Diagnostic UX batch IMPLEMENTED / OFFLINE VALIDATED`.
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -327,6 +330,27 @@ Diagnostic UX**: reassess Signing Diagnostic's manual SHA and improve channel, C
 archive emphasis, release wording and redundant human-facing provenance without changing machine
 identity. CP5 machine-contract renames remain a separate explicit value decision; CP7 and CP8
 follow.
+
+The **Release / Diagnostic UX batch is implemented and offline validated**. Signing Diagnostic is
+now zero-input and derives the exact current protected-main `github.sha`; the existing protected-ref
+guard, `release-sign` Environment, exact same-run artifact ID/digest, source/tree/run/attempt,
+certificate, package and payload checks remain unchanged, and the workflow still has no publisher.
+
+New Development releases explain that they are the latest automatically published validated build;
+new Stable releases explain that they are explicitly promoted trusted builds. Development derives
+the newest authenticated current Stable tag from the publication inventory and exposes an immutable
+Stable-to-Development comparison. Stable derives the highest prior validated Stable tag and exposes an immutable
+tag comparison. Mutable, malformed, identical or hostile comparison values produce no link.
+`downstream-build-N` remains an exact machine/provenance identity but its body now calls it a
+permanent record rather than a peer update channel. Exact source, digest, build and producer details
+remain collapsed; published historical bodies are never rewritten on retry.
+
+Stable Prepare and Hold summaries now state the pending Environment action and user-visible channel
+effect. Hold explicitly preserves the tag/APK/manifest/provenance and reports the actual remaining
+Stable-or-none state. No workflow/job/step name, updater Release name, tag, asset, evidence schema,
+permission, Environment, validation, publication, Stable or Hold semantic changed. Hosted acceptance
+still needs a zero-input Signing Diagnostic plus the next natural Development/Stable/Hold executions;
+do not manufacture public release mutations solely for presentation evidence.
 
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-
