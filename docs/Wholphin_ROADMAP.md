@@ -15,8 +15,7 @@ VALIDATED. CP4B.2 — Authoritative PR Validation Model — is COMPLETE / HOSTED
 `ANDROID_FULL` and `NON_ANDROID`. CP4B.3 — Local / prepare-pr simplification — is COMPLETE / HOSTED
 VALIDATED. P04 — prepare-pr native auto-merge — is COMPLETE / HOSTED VALIDATED. Validation-plan
 visibility and prepare-pr terminal UX are COMPLETE / HOSTED VALIDATED. The Operator UX batch is
-COMPLETE / HOSTED VALIDATED. Release / Diagnostic UX is IMPLEMENTED / OFFLINE VALIDATED with hosted
-acceptance pending.** Baseline T0 is an
+COMPLETE / HOSTED VALIDATED. Release / Diagnostic UX is COMPLETE / HOSTED VALIDATED (PR #74).** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 Checkpoint sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
@@ -24,7 +23,7 @@ VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOS
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE /
 HOSTED VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX
 COMPLETE / HOSTED VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED; Release / Diagnostic UX
-IMPLEMENTED / OFFLINE VALIDATED.**
+COMPLETE / HOSTED VALIDATED.**
 
 CP4B.2 evidence classes: **`ANDROID_FULL` — HOSTED VALIDATED; `NON_ANDROID` — HOSTED VALIDATED.**
 
@@ -198,13 +197,13 @@ need no further change because GitHub supplies run number/time metadata.
 
 This closes the bounded upstream outcome/candidate-body and ordinary generated PR-body items without
 changing lifecycle, permissions, evidence, validation, ancestry, auto-merge, or release authority.
-The next grouped work is **Release / Diagnostic UX**. It may challenge Signing Diagnostic's manual
+At the Operator UX checkpoint, the next grouped work was **Release / Diagnostic UX**. It would challenge Signing Diagnostic's manual
 SHA and improve Development/Stable, Compare Changes, immutable archive emphasis, release wording and
 redundant human-facing provenance without changing updater/tag/asset identities. CP5's optional
 machine-contract renames remain a later explicit value decision; CP7 performance and CP8 final
 consistency follow.
 
-The **Release / Diagnostic UX batch is now implemented and offline validated**. Signing Diagnostic
+The **Release / Diagnostic UX batch is COMPLETE / HOSTED VALIDATED (PR #74)**. Signing Diagnostic
 uses zero operator inputs and remains bound to the exact protected-main dispatch SHA and
 `release-sign` approval. New Development and Stable bodies explain their channel roles, expose only
 validated immutable comparisons, and keep provenance secondary. Immutable `downstream-build-N`
@@ -213,10 +212,22 @@ Stable approval and Hold summaries state the pending authorization and resulting
 state without changing any mutation rule. Current numeric Release names, tags, assets, updater
 endpoints, workflow/job names, Environments, evidence and permissions remain exact.
 
-Natural hosted acceptance is pending; no release mutation should be manufactured only to validate
-presentation. After acceptance, make the explicit CP5 decision on whether any remaining high-risk
-machine-contract rename is worth its migration cost. CP7 performance and CP8 final consistency
-remain later phases.
+P05/V02/V03/V04 are closed. Corrected PR run `34930521117` passed Android setup and actual Full
+`defaultDebug` validation; native auto-merge merged only after required CI succeeded. Protected-main
+run `34931217453` authenticated/reused the exact `ANDROID_FULL` evidence and independently reported
+tooling-only/high, `releaseRequired=false`; no Development APK was required. The first head's setup
+failure was inherited toolchain drift, repaired by removing only obsolete standalone SDK `tools`
+while retaining `platform-tools`, Build Tools `36.0.0`, and NDK `29.0.14206865`, with an exact
+regression contract. See the
+[PR #74 acceptance ledger](T0_1_OPERATOR_UX_INVENTORY.md#pr-74-hosted-acceptance-and-android-setup-correction).
+
+This closes implementation/integration acceptance, not artificial release mutations. Zero-input
+Diagnostic and changed Development/Stable/archive/Hold visual surfaces await their next natural
+operation; no mutation is needed merely to close the batch. Existing bodies remain immutable on
+retry. V01 remains open. Next: **V01 + CP5 decision phase**, audit whether version-format changes
+or remaining machine-name migrations earn their cost after channel-first cleanup; **KEEP** existing
+identities is valid. This is initially a decision, not an implementation mandate. Then **CP7
+performance → CP8 final consistency**; neither starts in this checkpoint.
 
 Hosted CP2 evidence also establishes bounded later work: CP7 must separate runner queue, setup,
 cache/tool installation, test/build execution, Environment wait, and publication timing, and must

@@ -20,16 +20,16 @@
 
 `Operator UX batch — COMPLETE / HOSTED VALIDATED (ordinary PR #72; upstream PR #58)`
 
-`Release / Diagnostic UX batch — IMPLEMENTED / OFFLINE VALIDATED; HOSTED ACCEPTANCE PENDING`
+`Release / Diagnostic UX batch — COMPLETE / HOSTED VALIDATED (PR #74)`
 
-`Next after acceptance: CP5 value decision`
+`Next: V01 + CP5 decision phase (audit/decision only)`
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
 `CP4B.2 COMPLETE / HOSTED VALIDATED`; `CP4B.3 COMPLETE / HOSTED VALIDATED`; `P04 COMPLETE / HOSTED
 VALIDATED`; `Validation-plan visibility COMPLETE / HOSTED VALIDATED`; `prepare-pr terminal UX
 COMPLETE / HOSTED VALIDATED`; `Operator UX batch COMPLETE / HOSTED VALIDATED`; `Release /
-Diagnostic UX batch IMPLEMENTED / OFFLINE VALIDATED`.
+Diagnostic UX batch COMPLETE / HOSTED VALIDATED`.
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -325,13 +325,13 @@ generated authenticated handoff. Counts of 1 attention, 26 FOLLOW and 2 preserve
 secondary. Run names remain unchanged and final.
 
 No upstream lifecycle, ownership, quiet-surface, ancestry, evidence, permission, required-CI, P04
-auto-merge, or Development/Stable authority contract changed. The next grouped work is **Release /
+auto-merge, or Development/Stable authority contract changed. At that checkpoint, the next work was **Release /
 Diagnostic UX**: reassess Signing Diagnostic's manual SHA and improve channel, Compare Changes,
 archive emphasis, release wording and redundant human-facing provenance without changing machine
 identity. CP5 machine-contract renames remain a separate explicit value decision; CP7 and CP8
 follow.
 
-The **Release / Diagnostic UX batch is implemented and offline validated**. Signing Diagnostic is
+The **Release / Diagnostic UX batch is COMPLETE / HOSTED VALIDATED (PR #74)**. Signing Diagnostic is
 now zero-input and derives the exact current protected-main `github.sha`; the existing protected-ref
 guard, `release-sign` Environment, exact same-run artifact ID/digest, source/tree/run/attempt,
 certificate, package and payload checks remain unchanged, and the workflow still has no publisher.
@@ -348,9 +348,31 @@ remain collapsed; published historical bodies are never rewritten on retry.
 Stable Prepare and Hold summaries now state the pending Environment action and user-visible channel
 effect. Hold explicitly preserves the tag/APK/manifest/provenance and reports the actual remaining
 Stable-or-none state. No workflow/job/step name, updater Release name, tag, asset, evidence schema,
-permission, Environment, validation, publication, Stable or Hold semantic changed. Hosted acceptance
-still needs a zero-input Signing Diagnostic plus the next natural Development/Stable/Hold executions;
-do not manufacture public release mutations solely for presentation evidence.
+permission, Environment, validation, publication, Stable or Hold semantic changed.
+
+P05/V02/V03/V04 are closed at the implementation/integration boundary. Corrected PR run
+`34930521117`, attempt 1, passed Android setup and actual Full `defaultDebug` validation for head
+`9cb877692a84f16f98344b2aea1504a68a2c60df`; required CI was green before native auto-merge produced
+main `0a8308c8aad622e58dc18f8b799b7b3d106a8002`. Main run `34931217453`, attempt 1, authenticated
+exact `ANDROID_FULL` / `pr-policy-v1` evidence and tree `a797be1cba170be879c3317b24f5620cee7b2757`,
+skipped repeated pre-commit/offline/Android setup/Gradle, and independently classified Development
+eligibility as tooling-only/high, `releaseRequired=false`, `skipped_non_apk`. No APK was assembled,
+signed, or published. Exact artifact/run/digest details are in the
+[acceptance ledger](T0_1_OPERATOR_UX_INVENTORY.md#pr-74-hosted-acceptance-and-android-setup-correction).
+
+The first head's failure was inherited SDK/toolchain drift: obsolete standalone `tools` could no
+longer be resolved by hosted `sdkmanager`, so Full never began. Only that package request was
+removed; `platform-tools`, Build Tools `36.0.0`, and NDK `29.0.14206865` remain pinned as before.
+No legacy tools-layout consumer existed. The exact regression contract passed alongside 65 focused
+tests, 273 complete offline tests (one existing Windows skip), YAML/pre-commit/Python/whitespace
+checks, and Fast validation. Do not confuse this setup failure with Release/Diagnostic behavior.
+
+No artificial diagnostic, Development, Stable, or Hold operation was dispatched for presentation.
+Those visual surfaces await their next natural operation; integration closure does not claim live
+release mutation. Existing published bodies stay immutable on retry. Next is **V01 + CP5 decision**:
+challenge version-format value and remaining machine-name migrations after channel-first cleanup;
+**KEEP** existing identities is valid. Only afterward come CP7 performance and CP8 consistency.
+This checkpoint authorizes none of those implementations.
 
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-
