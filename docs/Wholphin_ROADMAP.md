@@ -15,7 +15,8 @@ VALIDATED. CP4B.2 — Authoritative PR Validation Model — is COMPLETE / HOSTED
 `ANDROID_FULL` and `NON_ANDROID`. CP4B.3 — Local / prepare-pr simplification — is COMPLETE / HOSTED
 VALIDATED. P04 — prepare-pr native auto-merge — is COMPLETE / HOSTED VALIDATED. Validation-plan
 visibility and prepare-pr terminal UX are COMPLETE / HOSTED VALIDATED. The Operator UX batch is
-COMPLETE / HOSTED VALIDATED. Release / Diagnostic UX is COMPLETE / HOSTED VALIDATED (PR #74).** Baseline T0 is an
+COMPLETE / HOSTED VALIDATED. Release / Diagnostic UX is COMPLETE / HOSTED VALIDATED (PR #74).
+V01 is KEEP / COMPLETE. CP5 is COMPLETE / NO MIGRATION JUSTIFIED. CP7 Performance is next.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 Checkpoint sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
@@ -23,7 +24,7 @@ VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOS
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE /
 HOSTED VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX
 COMPLETE / HOSTED VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED; Release / Diagnostic UX
-COMPLETE / HOSTED VALIDATED.**
+COMPLETE / HOSTED VALIDATED; V01 KEEP / COMPLETE; CP5 COMPLETE / NO MIGRATION JUSTIFIED.**
 
 CP4B.2 evidence classes: **`ANDROID_FULL` — HOSTED VALIDATED; `NON_ANDROID` — HOSTED VALIDATED.**
 
@@ -200,8 +201,8 @@ changing lifecycle, permissions, evidence, validation, ancestry, auto-merge, or 
 At the Operator UX checkpoint, the next grouped work was **Release / Diagnostic UX**. It would challenge Signing Diagnostic's manual
 SHA and improve Development/Stable, Compare Changes, immutable archive emphasis, release wording and
 redundant human-facing provenance without changing updater/tag/asset identities. CP5's optional
-machine-contract renames remain a later explicit value decision; CP7 performance and CP8 final
-consistency follow.
+machine-contract renames remained a later explicit value decision at that checkpoint; the completed
+audit below has since closed them as KEEP. CP7 performance and CP8 final consistency follow.
 
 The **Release / Diagnostic UX batch is COMPLETE / HOSTED VALIDATED (PR #74)**. Signing Diagnostic
 uses zero operator inputs and remains bound to the exact protected-main dispatch SHA and
@@ -224,10 +225,26 @@ regression contract. See the
 This closes implementation/integration acceptance, not artificial release mutations. Zero-input
 Diagnostic and changed Development/Stable/archive/Hold visual surfaces await their next natural
 operation; no mutation is needed merely to close the batch. Existing bodies remain immutable on
-retry. V01 remains open. Next: **V01 + CP5 decision phase**, audit whether version-format changes
-or remaining machine-name migrations earn their cost after channel-first cleanup; **KEEP** existing
-identities is valid. This is initially a decision, not an implementation mandate. Then **CP7
-performance → CP8 final consistency**; neither starts in this checkpoint.
+retry.
+
+The completed V01/CP5 contract-and-consumer audit closed **V01 — KEEP / COMPLETE** and **CP5 —
+COMPLETE / NO MIGRATION JUSTIFIED**. KEEP is the audited decision, not deferred implementation.
+Channel-first presentation distinguishes Development from Stable while retaining the aligned
+`1.0.N` APK/manifest/Release identity, `develop`, `downstream-build-N`, and `mosaic-v1.0.N`.
+Development-specific version identity would complicate updater/history/recovery contracts and would
+conflict with Stable exact-byte promotion; presentation-only identity would disagree with the APK.
+
+H01-H06 are likewise closed as KEEP decisions: retain `CI / Full validation`; the clearer
+Development-qualified Build/Sign/Publish job names; authenticated artifact names; current
+release/tag/asset identities; downstream-owned absence of inherited publishers; and least-privilege
+Upstream Sync workflow-file handling. These identities have live ruleset, evidence, provenance,
+updater, ownership, or permission consumers. Any broader workflow-file publication authority belongs
+to T0-2, not cosmetic migration.
+
+The next implementation phase is **CP7 — Performance**. It will measure offline tooling, Android and
+JDK/SDK/NDK setup, Gradle/cache restoration, Full validation, Release Build, runner queue, and
+Environment wait separately before optimizing. **CP8 — Final consistency** follows CP7; neither
+phase starts in this decision checkpoint.
 
 Hosted CP2 evidence also establishes bounded later work: CP7 must separate runner queue, setup,
 cache/tool installation, test/build execution, Environment wait, and publication timing, and must
