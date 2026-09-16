@@ -30,7 +30,21 @@
 
 `Upstream waiting-state correction - COMPLETE / HOSTED VALIDATED (PR #79; scheduled run #47)`
 
-`Next: CP8 - Final consistency`
+`CP8 - COMPLETE / FINAL CONSISTENCY VERIFIED`
+
+`T0-1 - COMPLETE`
+
+`Next: T0-2 - Full Engineering / Process Audit`
+
+The current operator lifecycle is concise: bounded Fast feedback -> prepare-pr scope/tree integrity
+and exact-head publication -> authoritative `NON_ANDROID` or `ANDROID_FULL` PR CI -> native
+merge-commit auto-merge for eligible ordinary PRs -> protected-main exact-tree reuse or complete
+fallback -> independent Development eligibility -> optional Release Build / isolated Sign / Publish
+-> optional zero-input Stable Promotion. Upstream Observe/Publish is a separate authenticated
+lifecycle; REVIEW/conflict Drafts remain human-owned. Current operating instructions live in
+[PREPARE_PR](PREPARE_PR.md), [UPSTREAM_SYNC](UPSTREAM_SYNC.md), and the Development/Stable/signing
+documents. The detailed T0-1 chronology below is retained as acceptance and negative-knowledge
+evidence, not as a second operating manual.
 
 The complete CP7 evidence corpus, implementation result, and closure decision are in
 [the CP7 performance audit](T0_1_CP7_PERFORMANCE_AUDIT.md#final-hosted-acceptance-and-closure).
@@ -58,8 +72,8 @@ FOLLOW, and 2 DOWNSTREAM-OWNED paths.
 
 Expected authenticated human-review waiting is green; authentication, integrity, ambiguity,
 infrastructure, and API failures remain red. PR #58 predates the final candidate-PR presentation and
-must not be rewritten merely to modernize its body. Future candidates use the current format. No
-functional blocker remains before **CP8 - Final consistency**.
+must not be rewritten merely to modernize its body. Future candidates use the current format. CP8
+found no remaining T0-1 functional blocker.
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
@@ -67,14 +81,15 @@ VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE /
 VALIDATED`; `Validation-plan visibility COMPLETE / HOSTED VALIDATED`; `prepare-pr terminal UX
 COMPLETE / HOSTED VALIDATED`; `Operator UX batch COMPLETE / HOSTED VALIDATED`; `Release /
 Diagnostic UX batch COMPLETE / HOSTED VALIDATED`; `V01 KEEP / COMPLETE`; `CP5 COMPLETE / NO
-MIGRATION JUSTIFIED`; `CP7 COMPLETE / HOSTED VALIDATED`.
-The upstream waiting-state correction is also `COMPLETE / HOSTED VALIDATED`.
+MIGRATION JUSTIFIED`; `CP7 COMPLETE / HOSTED VALIDATED`; `CP8 COMPLETE`.
+The upstream waiting-state correction is also `COMPLETE / HOSTED VALIDATED`. T0-1 is complete.
 
-I06 and I07 close the infrastructure architecture phase. The next program is the engineering
-baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
-inventory; T0-2 performs the complete engineering/process audit and resolves or accepts anything
-that blocks the baseline; T0-3 consolidates current documentation separately from historical
-evidence. Do not begin by renaming labels or implementing cleanup without the T0-1 inventory.
+I06 and I07 close the infrastructure architecture phase. T0-1 completed the cleanup/operator,
+validation, presentation, performance, and consistency work described in
+[the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0). T0-2 now performs the
+complete engineering/process audit and resolves or accepts anything that blocks the baseline;
+T0-3 later consolidates current documentation separately from historical evidence. Do not reopen
+T0-1 KEEP decisions without concrete contradictory evidence.
 
 Baseline T0 is not an application version. It is declared only when operator UX is understandable,
 the delivery/upstream/recovery architecture is coherent and audited, current documentation is
@@ -427,9 +442,10 @@ checks, updater Release-name parsing, distinct rolling/immutable/Stable tag role
 selectors. Workflow-file candidates may continue to require manual handling; any broader authority
 belongs to T0-2.
 
-**CP8 — Final consistency** is the next phase. CP7 closed after the bounded, hosted-validated fixture
-optimization and the determination that no remaining candidate has enough repeated evidence to
-justify its complexity.
+**CP8 — Final consistency is complete.** It reconciled active documentation with the implemented
+contracts, preserved historical evidence explicitly as history, removed the already-applied CP4B.2
+manual patch artifact, and found no production/test inconsistency requiring behavior changes. T0-2
+is the next phase.
 
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-
@@ -774,8 +790,7 @@ delivery/security behavior remains intact.
 
 ## Item 6 I05: delivery presentation
 
-**IMPLEMENTED / OFFLINE VALIDATED; PR → MAIN → DEVELOPMENT LIFECYCLE LABELS LIVE
-VALIDATED; REMAINING NATURAL HOSTED ACCEPTANCE PENDING.** The
+**COMPLETE / HOSTED VALIDATED.** This section retains the original implementation chronology; the
 [I05 presentation ledger](ITEM_6_I05_PRESENTATION.md) records the before-edit name inventory,
 consumer classifications, artifact map, implemented labels, APK migration and historical
 body-only backfill plan. All workflow paths, job IDs, CI/Full validation, Development/recovery
@@ -827,19 +842,18 @@ transport, updater manifests or public Release assets. Missing/empty mapping fai
 the next natural main Release build must validate that hosted path. The full offline suite
 ran 135 tests: 134 passed, one existing Windows executable-bit skip. Ten new presentation
 tests cover compatibility, summaries, guard execution, mapping identity and no historical
-backfill on retry. Natural skip/publication/Stable/recovery/diagnostic/Sync acceptance is pending.
+backfill on retry. Later checkpoints supplied the hosted lifecycle acceptance; zero-input
+Diagnostic presentation observation remains opportunistic, not pending implementation.
 
 Read-only release inspection confirmed numeric titles and the Wholphin APK alias for builds
 5/8/9/11 and Stable 5; current rolling and immutable 11 asset digests match. No APK signature
 reverification or historical mutation occurred. Broader README presentation remains deferred.
 
-**Separate pre-existing Stable follow-up:** `mosaic_stable.verify_manifest` calls
-`verified_manifest` without forwarding the authenticated `buildWorkflow`, whose default is
-the legacy Development workflow. A pure fixture with identical valid bytes/provenance except
-`buildWorkflow = .github/workflows/ci.yml` fails with “Stable input differs from verified
-development manifest.” This line is unchanged by I05 and current Stable tests use legacy
-build provenance. Before promoting a new main-CI-produced build, address that compatibility
-gap with exact producer-binding tests in a separately scoped fix; never bypass the check.
+**Historical Stable producer compatibility finding — resolved:** the I05 checkpoint found that
+`mosaic_stable.verify_manifest` did not forward the authenticated `buildWorkflow`. The later
+single-workflow delivery migration corrected this: the verifier now passes the manifest's exact
+producer workflow into `verified_manifest`, and Stable tests bind the current CI producer. This is
+retained because it explains the exact producer check; it is not an open follow-up.
 
 ## Item 6 I04 audit and high-confidence cleanup
 
@@ -847,10 +861,10 @@ gap with exact producer-binding tests in a separately scoped fix; never bypass t
 PR #26 merged at `3907726ce38a03936e5853e5e8d36fff6d4486e9`. The user reports the latest
 live Development eligibility as `skipped_non_apk` / `tooling-only` / `high` / `24` changed
 paths, with Release build/sign/publish correctly skipped after merge. This is live acceptance
-of the high-risk non-APK path, not evidence of a new signed release. Natural low-risk
-non-Android and normal targeted-Android I03 PR acceptance/timings remain pending.
-At that I04 checkpoint, I05/I06 implementation and automation deletion remained outside scope;
-the current I05/I06 sections above supersede that historical status.
+of the high-risk non-APK path, not evidence of a new signed release. At that checkpoint,
+low-risk/targeted I03 acceptance, I05/I06 implementation, and automation deletion remained outside
+scope. T0-1 later replaced those tiers with the hosted-validated `NON_ANDROID` / `ANDROID_FULL`
+model; the current sections above supersede this historical status.
 
 The merged hosted Linux fix preserves both stage-output assertions and reuses the current
 PowerShell host's absolute executable path with PATH cleared inside the fixtures. Local
@@ -1298,7 +1312,7 @@ Secrets stay step-only. No Stable workflow, signing action, app, CI graph or dev
 Separate Release compilation still follows Full Debug CI; measured item-6 optimization remains
 pending. CI re-runs cannot replace an already published identity with new bytes/run provenance.
 
-[Development contract](MOSAIC_DEVELOPMENT_RELEASE.md#current-trusted-build-sign-and-publish) records
+[Development contract](MOSAIC_DEVELOPMENT_RELEASE.md#current-delivery-and-recovery-model) records
 race behavior and first live acceptance. No new secrets/settings are required or configured.
 Existing Environment reviewer policies, if any, still apply; they are not bypassed.
 
@@ -1315,11 +1329,10 @@ requires a new JVM run. Automatic publication and selector upgrade acceptance aw
 
 ## Stable promotion and update channel selector implemented
 
-**Stable promotion + channel UX - IMPLEMENTED / LIVE STABLE PROMOTION PENDING.**
-Permanent signing, updater routing, development delivery and in-place update acceptance
-remain COMPLETE / LIVE VALIDATED. CI/developer-velocity optimization remains PENDING.
-The existing acceptance checkpoint below is preserved; its Stable NEXT status is
-superseded by this implementation, not by a live promotion.
+At this historical checkpoint, Stable promotion and channel UX were implemented but live
+promotion was pending. Stable Promotion and the later T0-1 CI/developer-velocity simplification
+subsequently completed hosted/live acceptance. The checkpoint below is preserved as chronology,
+not as an open status.
 
 [Stable contract and exact first-promotion command](MOSAIC_STABLE.md) describes manual
 approved downstream-build-N/source/hash promotion to an immutable mosaic-v1.0.N stable tag/release (numeric name v1.0.N),
@@ -1577,7 +1590,7 @@ Acceptance-checkpoint sequence (superseded by routing implementation above):
 permanent signing COMPLETE -> updater routing then NEXT -> rolling
 development release -> live device in-place update acceptance -> stable promotion ->
 CI/developer-velocity optimization. All later items remain pending. Preserve the
-16m43s build / 34s signing timings and [optimization scope](MOSAIC_SIGNING.md#remaining-release-sequence):
+16m43s build / 34s signing timings and [historical sequence](MOSAIC_SIGNING.md#historical-release-sequence-at-first-signing-acceptance):
 slim/quiet prepare-pr.ps1; full diagnostic logs with concise console summaries; avoid
 duplicate local/hosted validation; change-aware validation; fast PR feedback vs Full
 merge gate; merge queue; authoritative main Release artifact reuse; zero-build signing/
@@ -2829,8 +2842,8 @@ f64f8d5d Fix season request status overlay
 6c7dd83e Refresh merged seasons after Jellyfin updates
 Series details
 Key files:
-- [SeriesViewModel.kt](C:/Projects/Wholphin/Wholphin/app/src/main/java/com/github/damontecres/wholphin/ui/detail/series/SeriesViewModel.kt)
-- [SeriesDetails.kt](C:/Projects/Wholphin/Wholphin/app/src/main/java/com/github/damontecres/wholphin/ui/detail/series/SeriesDetails.kt)
+- [SeriesViewModel.kt](../app/src/main/java/com/github/damontecres/wholphin/ui/detail/series/SeriesViewModel.kt)
+- [SeriesDetails.kt](../app/src/main/java/com/github/damontecres/wholphin/ui/detail/series/SeriesDetails.kt)
 SeriesState.seasons remains the original Jellyfin season list used by episode loading and navigation.
 SeriesState.detailsSeasons is a separate merged details-only representation. This preserves the lazy Jellyfin pager and normal episode path.
 updateSeerrDetails():
@@ -2869,14 +2882,14 @@ RequestSeasons.kt now has the compact TV-oriented layout:
 Do not reimplement this request flow elsewhere.
 7. Existing Wholphin acquisition model
 Important files
-- [SeerrAcquisition.kt](C:/Projects/Wholphin/Wholphin/app/src/main/java/com/github/damontecres/wholphin/data/model/SeerrAcquisition.kt)
-- [TvAcquisitionProjection.kt](C:/Projects/Wholphin/Wholphin/app/src/main/java/com/github/damontecres/wholphin/data/model/TvAcquisitionProjection.kt)
-- [DownloadsMembership.kt](C:/Projects/Wholphin/Wholphin/app/src/main/java/com/github/damontecres/wholphin/data/model/DownloadsMembership.kt)
-- [SeerrAcquisitionLedger.kt](C:/Projects/Wholphin/Wholphin/app/src/main/java/com/github/damontecres/wholphin/services/SeerrAcquisitionLedger.kt)
-- [SeerrAcquisitionTracker.kt](C:/Projects/Wholphin/Wholphin/app/src/main/java/com/github/damontecres/wholphin/services/SeerrAcquisitionTracker.kt)
-- [JellyfinAcquisitionReadinessService.kt](C:/Projects/Wholphin/Wholphin/app/src/main/java/com/github/damontecres/wholphin/services/JellyfinAcquisitionReadinessService.kt)
-- [SeerrRequestPagination.kt](C:/Projects/Wholphin/Wholphin/app/src/main/java/com/github/damontecres/wholphin/services/SeerrRequestPagination.kt)
-- [DownloadsPage.kt](C:/Projects/Wholphin/Wholphin/app/src/main/java/com/github/damontecres/wholphin/ui/downloads/DownloadsPage.kt)
+- [SeerrAcquisition.kt](../app/src/main/java/com/github/damontecres/wholphin/data/model/SeerrAcquisition.kt)
+- [TvAcquisitionProjection.kt](../app/src/main/java/com/github/damontecres/wholphin/data/model/TvAcquisitionProjection.kt)
+- [DownloadsMembership.kt](../app/src/main/java/com/github/damontecres/wholphin/data/model/DownloadsMembership.kt)
+- [SeerrAcquisitionLedger.kt](../app/src/main/java/com/github/damontecres/wholphin/services/SeerrAcquisitionLedger.kt)
+- [SeerrAcquisitionTracker.kt](../app/src/main/java/com/github/damontecres/wholphin/services/SeerrAcquisitionTracker.kt)
+- [JellyfinAcquisitionReadinessService.kt](../app/src/main/java/com/github/damontecres/wholphin/services/JellyfinAcquisitionReadinessService.kt)
+- [SeerrRequestPagination.kt](../app/src/main/java/com/github/damontecres/wholphin/services/SeerrRequestPagination.kt)
+- [DownloadsPage.kt](../app/src/main/java/com/github/damontecres/wholphin/ui/downloads/DownloadsPage.kt)
 Request state versus acquisition state
 SeerrRequestState carries:
 - Request, media and TMDB IDs.
@@ -3371,7 +3384,7 @@ Incomplete — 3 episodes missing
 Avoid lifecycle wording such as Stalled.
 Implemented: SeasonIntegrity.kt
 File exists:
-- [SeasonIntegrity.kt](C:/Projects/Wholphin/Wholphin/app/src/main/java/com/github/damontecres/wholphin/data/model/SeasonIntegrity.kt)
+- [SeasonIntegrity.kt](../app/src/main/java/com/github/damontecres/wholphin/data/model/SeasonIntegrity.kt)
 Intended entity fields:
 - Jellyfin user row ID.
 - Jellyfin series UUID.
@@ -3418,7 +3431,7 @@ Do not assume this file compiles.
 Status: Partially implemented and currently broken.
 Implemented: SeasonIntegrityDao.kt
 File exists:
-- [SeasonIntegrityDao.kt](C:/Projects/Wholphin/Wholphin/app/src/main/java/com/github/damontecres/wholphin/data/SeasonIntegrityDao.kt)
+- [SeasonIntegrityDao.kt](../app/src/main/java/com/github/damontecres/wholphin/data/SeasonIntegrityDao.kt)
 It contains:
 - observeSeries(userId, seriesItemId): Flow<List<SeasonIntegrity>>
 - getSeries(userId, seriesItemId)
@@ -3426,13 +3439,13 @@ It contains:
 Status: Implemented but uncompiled/unvalidated.
 No deletion/pruning query exists yet.
 Partially implemented: Room database
-[AppDatabase.kt](C:/Projects/Wholphin/Wholphin/app/src/main/java/com/github/damontecres/wholphin/data/AppDatabase.kt) currently has:
+[AppDatabase.kt](../app/src/main/java/com/github/damontecres/wholphin/data/AppDatabase.kt) currently has:
 - SeasonIntegrity added to entities.
 - Database version changed from 35 to 36.
 - AutoMigration(35, 36).
 - seasonIntegrityDao().
 - converters between nullable Set<Int> and comma-separated strings.
-[DatabaseModule.kt](C:/Projects/Wholphin/Wholphin/app/src/main/java/com/github/damontecres/wholphin/services/hilt/DatabaseModule.kt) provides SeasonIntegrityDao.
+[DatabaseModule.kt](../app/src/main/java/com/github/damontecres/wholphin/services/hilt/DatabaseModule.kt) provides SeasonIntegrityDao.
 Critical status:
 - There is no generated Room schema 36.json.
 - Existing schemas stop at 35.
@@ -3442,7 +3455,7 @@ Critical status:
 Status: Partially implemented, not validated.
 Partially implemented: SeasonIntegrityService.kt
 File exists:
-- [SeasonIntegrityService.kt](C:/Projects/Wholphin/Wholphin/app/src/main/java/com/github/damontecres/wholphin/services/SeasonIntegrityService.kt)
+- [SeasonIntegrityService.kt](../app/src/main/java/com/github/damontecres/wholphin/services/SeasonIntegrityService.kt)
 Current responsibilities:
 - Observe stored integrity entries for a series.
 - Merge stored expectations with newly supplied expectations.

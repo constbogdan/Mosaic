@@ -1,6 +1,6 @@
 # Baseline T0-1 operator UX, workflow, and presentation inventory
 
-Status: **CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED VALIDATED;
+Status: **T0-1 COMPLETE. CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED VALIDATED;
 Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX COMPLETE / HOSTED
 VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED**
 Committed-only publication follow-up: **HOSTED VALIDATED (PR #64)**
@@ -9,7 +9,8 @@ V01: **KEEP / COMPLETE**
 CP5: **COMPLETE / NO MIGRATION JUSTIFIED**
 CP7: **COMPLETE / HOSTED VALIDATED (PR #77)**
 Upstream waiting-state correction: **COMPLETE / HOSTED VALIDATED (PR #79; scheduled run #47)**
-Next: **CP8 — Final consistency**
+CP8: **COMPLETE — FINAL CONSISTENCY VERIFIED**
+Next program phase: **T0-2 — Full Engineering / Process Audit**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
@@ -17,7 +18,8 @@ CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMP
 VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX COMPLETE /
 HOSTED VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED; Release / Diagnostic UX batch
 COMPLETE / HOSTED VALIDATED; V01 KEEP / COMPLETE; CP5 COMPLETE / NO MIGRATION JUSTIFIED; CP7
-COMPLETE / HOSTED VALIDATED; upstream waiting-state correction COMPLETE / HOSTED VALIDATED.**
+COMPLETE / HOSTED VALIDATED; upstream waiting-state correction COMPLETE / HOSTED VALIDATED; CP8
+COMPLETE — FINAL CONSISTENCY VERIFIED.**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
 baseline; historical names in acceptance records are evidence, not active UX. CP2 removed only
@@ -28,6 +30,52 @@ live-proved the exact-tree reuse selector contract exposed by that audit. CP4B.2
 complete two-class PR policy contract. Natural hosted runs validated both `ANDROID_FULL` and
 `NON_ANDROID`; PR #63 live-validated the CP4B.3 removal of duplicate routine local authority while
 leaving that hosted contract unchanged.
+
+## T0-1 CP8 final consistency and closure
+
+Status: **COMPLETE**
+
+The final repository-wide sweep reconciled the implementation, operator documentation, historical
+acceptance records, tests, and machine contracts. The surviving architecture is:
+
+```text
+bounded local Fast feedback
+  -> prepare-pr scope/tree integrity and exact-head publication
+  -> authoritative PR CI: NON_ANDROID or ANDROID_FULL
+  -> native merge-commit auto-merge for eligible ordinary PRs
+  -> protected-main exact-tree evidence reuse, or complete conservative fallback
+  -> independent Development eligibility
+     -> no build, or final-context Release Build -> Sign -> Publish
+  -> optional zero-input Stable Promotion
+```
+
+Upstream Synchronization remains a connected but separate lifecycle: Observe authenticates the
+range and handoff; Publish owns the final candidate/waiting outcome; FOLLOW, REVIEW, and
+DOWNSTREAM-OWNED policy remains authoritative; semantic REVIEW/conflict Drafts remain human-owned;
+and accepted native ancestry closes an episode without an Issue journal.
+
+The CP8 finding disposition is final:
+
+| Class | Finding and disposition |
+|---|---|
+| **FIX** | Reconciled T0-1/CP8 status across the roadmap, handoff, upstream policy, performance audit, and Item 6 checklist. |
+| **FIX** | Replaced active-looking I03/I05, Development eligibility, Stable, Signing Diagnostic, and CP5 migration-pending statements with their completed current state or an explicit historical label. |
+| **FIX** | Corrected current release/signing documentation so native failed-job reruns, zero-input Diagnostic/Stable/Hold, exact-tree reuse, and forward-fix recovery are the only supported operator model. |
+| **REMOVE** | Deleted the already-applied CP4B.2 manual patch artifact after proving that no repository consumer referenced it and its target contract is implemented and hosted validated. |
+| **KEEP** | Retained `CI / Full validation`, `full-validation`, machine-consumed workflow/job/step selectors, `pr-policy-v1`, `NON_ANDROID`, `ANDROID_FULL`, and exact repository/PR/parent/tree/run/attempt/artifact authentication. |
+| **KEEP** | Retained `v1.0.N`, `develop`, `downstream-build-N`, `mosaic-v1.0.N`, `Wholphin-release.apk`, `mosaic-release.json`, final-context Release assembly, isolated signing, idempotent publication, exact-byte Stable promotion, and Hold authorization. |
+| **KEEP** | Retained the three prepare-pr states, native auto-merge safeguards, committed-only publication, upstream Draft authority, `waiting_on_existing_pr`, real bare-Git test transport, fake GitHub boundary, bounded Fast, and complete hosted offline coverage. |
+| **HISTORICAL** | Retained point-in-time audit matrices, superseded workflow/recovery/Issue-journal descriptions, old presentation names, rejected version/name proposals, and acceptance incidents where they explain why the current contract exists. They are not current instructions. |
+| **DEFER** | Left repository-settings drift, broader permission/threat-model questions, recurrence-driven dependency/Gradle hardening, sanitized upstream push diagnostics, and application architecture/test adequacy to T0-2. Documentation navigation/consolidation remains T0-3. |
+
+No current implementation/test contradiction required a production or test change. Exact assertions
+for names, artifacts, evidence, permissions, merge method, branches, versions, and tags remain
+intentional machine-contract tests. Presentation assertions remain semantic or normalized where the
+host shell can alter rendering. The delayed workflow-overview summary remains a GitHub UI
+limitation; the existing dynamic validation-path step and live log are the trustworthy early signal.
+
+All 40 ledger items below now have a terminal state: complete, audited KEEP, audited no-migration,
+or an explicit destination outside T0-1. T0-1 has no remaining functional or documentation blocker.
 
 ## T0-1 upstream waiting-state correction
 
@@ -332,7 +380,7 @@ Stable tags have distinct roles; and several artifact names are authenticated se
 presentation text.
 
 The completed CP7 phase measured those costs and made only the bounded changes justified by the
-evidence. **CP8 — Final consistency** is next.
+evidence. CP8 subsequently completed the final consistency sweep and closed T0-1.
 
 ## T0-1 CP7 performance
 
@@ -636,8 +684,11 @@ Repository baseline: `d36f39342d1d2a003a6e52fca30d4d11a65391ba`
 Baseline tree: `e4b408ce46b7038784e63b69338d41b8443f55ac`
 Audit date: 2026-09-13
 
-This is the measured input to T0-1 CP4B. It describes current behavior; it does not authorize or
-claim any validation, workflow, publication, permission, or repository-setting change.
+This is the measured historical input to T0-1 CP4B. Its matrices describe the then-current
+pre-CP4B system—including targeted hosted validation, the legacy Android `tools` request,
+manual diagnostic SHA input, and validation duplication that later checkpoints replaced.
+The CP8 architecture near the top of this ledger is authoritative. This section does not authorize
+or claim any validation, workflow, publication, permission, or repository-setting change.
 
 ### Executive answer
 
@@ -762,7 +813,7 @@ protected-main exact-tree reuse/fallback -> Development eligibility -> optional 
 The manual `sync-upstream.ps1` remains a documented break-glass path. It creates a dated branch and
 performs an ordinary `git merge upstream/main`; it does not publish or resolve conflicts.
 
-### Complete execution matrix
+### Historical CP4A execution matrix
 
 Commands are literal except for angle-bracket placeholders representing the identities or reviewed
 path/test lists supplied by the enclosing stage.
@@ -1687,7 +1738,7 @@ external action, and owner checkpoint.
 |---|---|---|---|---|
 | R01 — COMPLETE / HOSTED VALIDATED | `.github/workflows/main.yml`; dead guarded `Development build` polluted sidebar | Deleted; ownership policy, fixtures and current docs preserve its intended absence. Current CI is sole owner | Focused policy/workflow tests; hosted sidebar confirmed absent; no settings | CP2 |
 | R02 — COMPLETE / HOSTED VALIDATED | `.github/workflows/release.yml`; dead guarded `Create release`, but unique AAB knowledge | Baseline T0 declines store/AAB ownership; deleted and marked downstream-owned absence; capability retained in historical audit | Focused ownership/release tests; hosted sidebar confirmed absent | CP2 |
-| R03 — COMPLETE FOR REMOVED SURFACES | Active docs presented deleted/obsolete workflow surfaces | Current docs point to CI/Stable/Hold; historical evidence is explicitly labeled historical | Link/pre-commit checks; no GitHub change | CP2; final consistency sweep CP8 |
+| R03 — COMPLETE / CP8 VERIFIED | Active docs presented deleted/obsolete workflow surfaces | Current docs point to CI/Stable/Hold; historical evidence is explicitly labeled historical | Link/pre-commit checks; no GitHub change | CP2/CP8 |
 
 ### LOW-RISK PRESENTATION (4)
 
@@ -1707,8 +1758,8 @@ external action, and owner checkpoint.
 | S03 — CP3 COMPLETE / HOSTED VALIDATED | `mosaic_development_release.record_eligibility` emits full paths/default | One build/no-build sentence; paths and policy evidence collapsed | Release classifier/output tests pass; hosted non-APK presentation observed and APK paths remain live-proven elsewhere | CP3 |
 | S04 — COMPLETE / HOSTED VALIDATED (PR #58) | `hosted_upstream.upstream_summary` duplicated the high-level candidate outcome and buried the downstream PR | Observe owns evidence handoff; Publish owns one final REVIEW-first outcome and exact candidate link; artifact remains complete | Hostile-input/quiet-surface fixtures plus natural existing-candidate run | CP3/CP6 |
 | S05 — COMPLETE / HOSTED VALIDATED (PR #70) | prepare-pr terminal success output was noisier than its operator decision path | Six concise stages, scope/classification once, RUN-only clickable log links, PR link, CI/path state, detailed failure diagnostics and forensic logs | PR #70 exercised the accepted presentation; disposable prepare-pr/output fixtures retain terminal-link fallback and snapshot safety | CP6 |
-| S06 — CP3 PRESENTATION IMPLEMENTED / CP8 SWEEP REMAINS | failure summaries name `$GITHUB_JOB` but not always action/remedy | Plain refusal/failure, mutation status, retry/forward-fix action visible | Current Stable/Hold/Signing/CI failures now state action; final cross-surface sweep remains CP8 | CP3/CP8 |
-| S07 — RECLASSIFIED AS OPERATIONAL | Upstream publication hides the actionable `git push --porcelain` rejection because stdout/stderr are captured but discarded | Bounded sanitized failure detail: operation, remote/refspec, exit, destination existence, rejection category/excerpt from both streams; never credentials | Requires subprocess/error-contract tests, not cosmetic summary editing | CP6 or T0-2 security |
+| S06 — COMPLETE / CP8 VERIFIED | failure summaries name `$GITHUB_JOB` but not always action/remedy | Plain refusal/failure, mutation status, retry/forward-fix action visible | Stable/Hold/Signing/CI failures state the action; CP8 found no contradictory active instruction | CP3/CP8 |
+| S07 — DEFER TO T0-2 SECURITY | Upstream publication hides the actionable `git push --porcelain` rejection because stdout/stderr are captured but discarded | Bounded sanitized failure detail: operation, remote/refspec, exit, destination existence, rejection category/excerpt from both streams; never credentials | Operational diagnostic/security contract requiring subprocess/error-contract tests, not cosmetic T0-1 editing | T0-2 security |
 
 ### PROCESS SIMPLIFICATION (5)
 
@@ -1781,9 +1832,9 @@ DEFER TO T0-2 5** — **40 finite items**.
    prefixes, translated primary decisions, added early summary lines, and collapsed technical
    detail without touching `CI / Full validation`. Repository Full passed, the change merged, and
    the supported hosted rendering/sidebar presentation was observed.
-4. **CP4 — Process simplification:** eliminate redundant validation paths, simplify Signing
-   Diagnostic input, and arm native auto-merge. This depends on CP3’s clear explanations and
-   requires GitHub auto-merge enablement plus hosted exact-tree/fallback acceptance.
+4. **CP4 — Process simplification (complete / hosted validated):** removed redundant local
+   validation paths, simplified Signing Diagnostic input, and armed native auto-merge while
+   retaining hosted authority and conservative fallback.
 5. **CP5 — High-risk contract decision (complete / no migration justified):** the consumer audit
    retained H01-H06. The existing identities protect ruleset, evidence, provenance, updater,
    ownership, or least-privilege contracts; completed presentation work removed the UX rationale for
@@ -1794,13 +1845,15 @@ DEFER TO T0-2 5** — **40 finite items**.
 7. **CP7 — Performance (complete / hosted validated):** CP7.1 moved publication fixtures to private
    real bare origins, restored bounded Fast feedback, and retained broad hosted authority. The final
    audit found no additional optimization with enough evidence to justify its complexity.
-8. **CP8 — Final consistency sweep (next):** compare every surviving Actions/PR/Release/CLI surface to this
-   registry, reconcile docs, and prove no machine contract was cosmetically renamed.
+8. **CP8 — Final consistency sweep (complete):** reconciled every surviving
+   Actions/PR/Release/CLI surface with this registry, corrected stale current-state documentation,
+   removed the applied manual patch artifact, and verified that no machine contract was
+   cosmetically renamed.
 
 Cosmetic CP3 was deliberately separated from the CP5 contract decision. The completed CP5 audit
 found no justified migration. CP2 did not wait for cosmetic work because dead workflows distorted
 the inventory operators saw. CP7 followed that simplification and closed after the one bounded,
-measured optimization; CP8 now performs the final consistency sweep.
+measured optimization; CP8 completed the final consistency sweep. T0-2 is next.
 
 ## Future “Learn more” integration
 

@@ -2,7 +2,8 @@
 
 Status: **Stable promotion COMPLETE / LIVE VALIDATED** (through downstream-build-34). Permanent signing, downstream
 routing, development delivery and in-place updater acceptance remain COMPLETE / LIVE
-VALIDATED. Channel selector and existing-user migration are now LIVE VALIDATED through 1.0.5 -> 1.0.8. CI/developer-velocity optimization remains pending. No stable release was created
+VALIDATED. Channel selector and existing-user migration are now LIVE VALIDATED through 1.0.5 -> 1.0.8. T0-1 CI/developer-velocity simplification is COMPLETE / HOSTED VALIDATED; further
+performance work is evidence-driven rather than a pending migration. No stable release was created
 while implementing this contract.
 
 ## Stable promotion acceptance
@@ -31,7 +32,7 @@ historical bodies are not changed. See the [I05 ledger](ITEM_6_I05_PRESENTATION.
 
 New Stable bodies describe an explicitly promoted trusted build for normal consumption. When an
 older valid Stable exists, the publisher derives its immutable `mosaic-v1.0.N` tag from the same
-release inventory used for rollback/ownership refusal and adds a GitHub Compare Changes link to the
+release inventory used for monotonicity/ownership refusal and adds a GitHub Compare Changes link to the
 new immutable Stable tag. The Release API `name`, stable/development tags, APK/manifest assets and
 updater endpoints remain unchanged. Invalid or mutable comparison identities are never rendered.
 
@@ -182,7 +183,7 @@ without inputs, inspect Prepare's authenticated candidate, and authorize Release
 ## Current development automation boundary
 
 Development now follows successful protected-main push CI automatically; see the
-[current Development contract](MOSAIC_DEVELOPMENT_RELEASE.md#trusted-build-sign-and-publish).
+[current Development contract](MOSAIC_DEVELOPMENT_RELEASE.md#current-delivery-and-recovery-model).
 The automatic trigger and device delivery are COMPLETE / LIVE VALIDATED. No normal manual dispatch
 is required. Device checks are unchanged and installs remain user-driven. Stable remains
 manual, its exact-byte publisher is unchanged, and `release-promote` is the human

@@ -2,7 +2,7 @@
 
 Status: **CP7 COMPLETE / HOSTED VALIDATED**
 Measured: **2026-09-15 through 2026-09-16**
-Next gate: **CP8 - Final consistency sweep**
+Closure: **CP8 COMPLETE; T0-1 COMPLETE**. Next roadmap phase: **T0-2**.
 
 The original audit records the surviving pipeline, timing evidence, latency causes, and ranked
 optimization plan. The final addendum records the one approved optimization, its hosted acceptance,
@@ -539,4 +539,4 @@ natural `ANDROID_FULL` samples are required before any Gradle/cache/input optimi
 Likewise, the roughly 305-second Windows hosted-upstream fixture timing does not describe hosted
 Linux behavior: natural Upstream workflows remain short, so no upstream optimization is justified.
 
-**CP7 is COMPLETE / HOSTED VALIDATED. CP8 - Final consistency sweep is next.**
+**CP7 is COMPLETE / HOSTED VALIDATED. CP8 subsequently closed T0-1; T0-2 is next.**

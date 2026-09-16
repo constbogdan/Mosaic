@@ -6,7 +6,7 @@ channel migration COMPLETE / LIVE VALIDATED**. Automatic release #2 produced 1.0
 approval. The `release-sign` Environment and step-only credentials remain
 in use. Permanent key custody, backups and prior recovery verification are unchanged;
 no private material was handled in this checkpoint. Stable remains manually promoted.
-See [automatic acceptance](MOSAIC_DEVELOPMENT_RELEASE.md#automatic-development-and-channel-migration-acceptance)
+See [automatic acceptance](MOSAIC_DEVELOPMENT_RELEASE.md#historical-automatic-development-and-channel-migration-acceptance)
 and [Stable acceptance](MOSAIC_STABLE.md#stable-promotion-acceptance).
 Earlier pending/manual-only statements below are historical checkpoints.
 
@@ -30,8 +30,9 @@ diagnostic validation/build/sign/verify only; it has no GitHub Release publisher
 mutates Development/Stable. Its first summary explicitly says that nothing will be published,
 and exact source/artifact evidence is collapsed beneath the operator result. Production signing
 summaries remain distinct from the standalone diagnostic. No signer, package, Environment,
-key handling, verification or source identity changes. Natural diagnostic acceptance of
-the new presentation is pending; prior signing evidence below remains historical.
+key handling, verification or source identity changes. The zero-input diagnostic and its
+presentation are implemented and hosted validated; any future natural visual observation is
+opportunistic rather than a completion gate. Prior signing evidence below remains historical.
 See the [I05 presentation ledger](ITEM_6_I05_PRESENTATION.md).
 
 Evidence supplied by the user from successful hosted execution and independent local
@@ -95,22 +96,23 @@ fingerprint/verification metadata is repository-visible; private material remain
 user-controlled. Signing secrets live in the protected `release-sign`
 Environment. PR jobs receive no signing credentials, and signing does not rebuild.
 
-## Remaining release sequence
+## Historical release sequence at first signing acceptance
+
+This sequence records the state at the first permanent-signing checkpoint. Every listed
+delivery boundary is now implemented and live validated; T0-1 later completed the CI and
+developer-velocity simplification without weakening signing authority.
 
 1. **Permanent signing identity - COMPLETE / LIVE VALIDATED.**
 2. **Updater routing - COMPLETE / LIVE VALIDATED.**
 3. **Rolling development release - COMPLETE / LIVE VALIDATED.**
 4. **Live device in-place update acceptance - COMPLETE / LIVE VALIDATED.**
-5. **Stable promotion + channel UX - IMPLEMENTED / LIVE STABLE PROMOTION PENDING.**
-6. **CI/developer-velocity optimization - PENDING.**
+5. **Stable promotion + channel UX - COMPLETE / LIVE VALIDATED.**
+6. **CI/developer-velocity simplification - COMPLETE / HOSTED VALIDATED.**
 
-For item 6, use representative GitHub Actions logs to construct a measured validation-
-overlap/timing matrix before redesigning the pipeline. Retain plans for slim/quiet
-`prepare-pr.ps1`, full diagnostic logs with concise console summaries, avoiding duplicate
-local/hosted validation, change-aware validation, fast PR feedback versus the Full merge
-gate, merge queue, authoritative main Release artifact reuse, and zero-build signing/
-publishing. The signing job already signs without rebuilding; broader artifact reuse
-and publishing optimization are future work. Keep this run's 16m43s/34s timing evidence.
+At that checkpoint, item 6 proposed a measured validation-overlap/timing audit before any
+pipeline redesign. T0-1 later completed concise prepare-pr output, authoritative PR validation,
+exact-tree main reuse, final-context Release assembly, and zero-build signing/publishing while
+retaining the distinct trust boundaries. The 16m43s/34s timing remains historical evidence.
 
 ## Shared signer and development publication
 
@@ -252,11 +254,11 @@ may use GITHUB_TOKEN Contents write after verification, without the signing key.
 Do not reuse Wholphin Sync Bot, add a PAT or create a release App without demonstrated
 need. Only the shared isolated signer step consumes these Environment secrets.
 
-## Original architecture and future publication requirements
+## Historical architecture before publication implementation
 
-The original preparation contract below is retained for context; the implemented
-exercise above establishes artifact transport and isolated signing. Durable publication
-records and release promotion remain future work. Any later implementation must bind canonical repository, successful trusted main CI,
+The original preparation contract below is retained for context. The current Development
+and Stable workflows implement its artifact transport, isolated signing, durable publication,
+and promotion trust boundaries. Any future replacement must continue to bind canonical repository, successful trusted main CI,
 exact source SHA, run ID/attempt, immutable artifact ID/hash and expected workflow
 identity before requesting approval. A self-reported provenance JSON alone is not
 proof of trusted CI. Avoid workflow_run unless all these checks are implemented.
@@ -363,11 +365,12 @@ recovery ends compatible sideload updates; a replacement key generally means a n
 installation/migration. Rotation requires a separately validated supported lineage,
 not simply replacing the keystore. Debug key reset is not Release key recovery.
 
-## Next authorization boundary
+## Historical authorization boundary
 
-Permanent signing, development delivery and in-place updater acceptance are COMPLETE /
-LIVE VALIDATED. Stable promotion is NEXT; automatic publication and CI optimization
-remain unchanged. This documentation checkpoint authorizes no additional live operation.
+At this checkpoint, permanent signing, Development delivery and in-place updater acceptance
+were complete while Stable promotion was next. Stable Promotion, Hold Release, automatic
+Development publication and the T0-1 CI simplification are now complete/live validated.
+This historical record grants no live-operation authority.
 
 ## Updater routing contract
 
