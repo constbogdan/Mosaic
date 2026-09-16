@@ -28,6 +28,8 @@
 
 `CP7 - COMPLETE / HOSTED VALIDATED (PR #77)`
 
+`Upstream waiting-state correction - COMPLETE / HOSTED VALIDATED (PR #79; scheduled run #47)`
+
 `Next: CP8 - Final consistency`
 
 The complete CP7 evidence corpus, implementation result, and closure decision are in
@@ -44,6 +46,21 @@ Gradle-contract change, natural upstream runs are already seconds-class, and aut
 remain KEEP. GitHub still does not expose a running step summary usefully from the workflow overview;
 keep the existing authoritative dynamic step name/live log rather than add presentation state.
 
+The upstream blocked-state correction is **COMPLETE / HOSTED VALIDATED**. Protected-main run #150
+authenticated and reused PR #79 `ANDROID_FULL` evidence in about 12 seconds, evaluated Development
+eligibility in about 12 seconds, required no Development delivery, and completed in about 46
+seconds. Scheduled Upstream Synchronization run #47 naturally reproduced the former #45/#46 state
+and completed green in about 35 seconds. Observe emitted `waiting_on_existing_pr`, retained the
+complete newer observation, and bound PR #58 plus its exact head. Publish reauthenticated the pair
+and blocker, minted no App token (`SYNC_PUBLISH_TOKEN` remained empty), performed no branch or PR
+mutation, and owned the final `Waiting on PR #58` result. The retained range had 3 attention, 32
+FOLLOW, and 2 DOWNSTREAM-OWNED paths.
+
+Expected authenticated human-review waiting is green; authentication, integrity, ambiguity,
+infrastructure, and API failures remain red. PR #58 predates the final candidate-PR presentation and
+must not be rewritten merely to modernize its body. Future candidates use the current format. No
+functional blocker remains before **CP8 - Final consistency**.
+
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
 `CP4B.2 COMPLETE / HOSTED VALIDATED`; `CP4B.3 COMPLETE / HOSTED VALIDATED`; `P04 COMPLETE / HOSTED
@@ -51,6 +68,7 @@ VALIDATED`; `Validation-plan visibility COMPLETE / HOSTED VALIDATED`; `prepare-p
 COMPLETE / HOSTED VALIDATED`; `Operator UX batch COMPLETE / HOSTED VALIDATED`; `Release /
 Diagnostic UX batch COMPLETE / HOSTED VALIDATED`; `V01 KEEP / COMPLETE`; `CP5 COMPLETE / NO
 MIGRATION JUSTIFIED`; `CP7 COMPLETE / HOSTED VALIDATED`.
+The upstream waiting-state correction is also `COMPLETE / HOSTED VALIDATED`.
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation

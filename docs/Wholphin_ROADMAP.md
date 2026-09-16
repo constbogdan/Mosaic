@@ -17,7 +17,8 @@ VALIDATED. P04 — prepare-pr native auto-merge — is COMPLETE / HOSTED VALIDAT
 visibility and prepare-pr terminal UX are COMPLETE / HOSTED VALIDATED. The Operator UX batch is
 COMPLETE / HOSTED VALIDATED. Release / Diagnostic UX is COMPLETE / HOSTED VALIDATED (PR #74).
 V01 is KEEP / COMPLETE. CP5 is COMPLETE / NO MIGRATION JUSTIFIED. CP7 is COMPLETE / HOSTED
-VALIDATED (PR #77). CP8 Final consistency is next.** Baseline T0 is an engineering baseline, not an
+VALIDATED (PR #77). The upstream waiting-state correction is COMPLETE / HOSTED VALIDATED (PR #79;
+scheduled run #47). CP8 Final consistency is next.** Baseline T0 is an engineering baseline, not an
 application release. The ordered program is:
 
 The CP7 performance phase is **COMPLETE / HOSTED VALIDATED**. CP7.1 replaced the prepare-pr test
@@ -26,13 +27,22 @@ Fast to bounded local feedback, and retained the complete offline suite as autho
 Its measured lifecycle, closure decisions, and hosted PR #77 evidence are in
 [the CP7 performance audit](T0_1_CP7_PERFORMANCE_AUDIT.md#final-hosted-acceptance-and-closure).
 
+The authenticated upstream waiting state is also complete and hosted validated. Protected-main run
+#150 reused PR #79 `ANDROID_FULL` evidence, required no Development delivery, and completed in about
+46 seconds. Natural scheduled run #47 then completed green in about 35 seconds while waiting on the
+older authenticated Draft PR #58: Observe retained the complete newer range and blocker head;
+Publish reauthenticated both, minted no App token, performed no branch/PR mutation, and reported
+`Waiting on PR #58`. Expected authenticated human-review waiting is green; ambiguity, identity,
+integrity, infrastructure, and API failures remain red. PR #58 is intentionally not rewritten to
+adopt a presentation format created after it. No functional blocker remains before CP8.
+
 Checkpoint sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE /
 HOSTED VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX
 COMPLETE / HOSTED VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED; Release / Diagnostic UX
 COMPLETE / HOSTED VALIDATED; V01 KEEP / COMPLETE; CP5 COMPLETE / NO MIGRATION JUSTIFIED; CP7
-COMPLETE / HOSTED VALIDATED.**
+COMPLETE / HOSTED VALIDATED; upstream waiting-state correction COMPLETE / HOSTED VALIDATED.**
 
 CP4B.2 evidence classes: **`ANDROID_FULL` — HOSTED VALIDATED; `NON_ANDROID` — HOSTED VALIDATED.**
 
