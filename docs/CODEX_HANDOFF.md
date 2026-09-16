@@ -34,7 +34,9 @@
 
 `T0-1 - COMPLETE`
 
-`Next: T0-2 - Full Engineering / Process Audit`
+`T0-2 audit - COMPLETE / IMPLEMENTATION SCOPE APPROVED`
+
+`Next: T0-2 C1 - GitHub merge-commit only`
 
 The current operator lifecycle is concise: bounded Fast feedback -> prepare-pr scope/tree integrity
 and exact-head publication -> authoritative `NON_ANDROID` or `ANDROID_FULL` PR CI -> native
@@ -86,10 +88,16 @@ The upstream waiting-state correction is also `COMPLETE / HOSTED VALIDATED`. T0-
 
 I06 and I07 close the infrastructure architecture phase. T0-1 completed the cleanup/operator,
 validation, presentation, performance, and consistency work described in
-[the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0). T0-2 now performs the
-complete engineering/process audit and resolves or accepts anything that blocks the baseline;
-T0-3 later consolidates current documentation separately from historical evidence. Do not reopen
-T0-1 KEEP decisions without concrete contradictory evidence.
+[the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0). The comprehensive T0-2
+audit is complete and its [approved decision record](Wholphin_ROADMAP.md#t0-2-audit-contract) limits
+implementation to C1 merge-commit-only repository settings, C2 explicit Gradle/Android bootstrap,
+then C3 bounded sanitized upstream failure diagnostics. T0-3 follows their required acceptance and
+consolidates current documentation separately from historical evidence. Do not reopen T0-1 KEEP or
+T0-2 audit decisions without concrete contradictory evidence.
+
+T0-2 contains no configuration doctor. T0-3 will document the small external GitHub-settings set
+as an operator checklist; automated drift checking requires recurring demonstrated drift and new
+approval. Do not add another T0-2 checkpoint without new concrete evidence and explicit approval.
 
 Baseline T0 is not an application version. It is declared only when operator UX is understandable,
 the delivery/upstream/recovery architecture is coherent and audited, current documentation is
