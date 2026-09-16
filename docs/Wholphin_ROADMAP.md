@@ -19,7 +19,7 @@ COMPLETE / HOSTED VALIDATED. Release / Diagnostic UX is COMPLETE / HOSTED VALIDA
 V01 is KEEP / COMPLETE. CP5 is COMPLETE / NO MIGRATION JUSTIFIED. CP7 is COMPLETE / HOSTED
 VALIDATED (PR #77). The upstream waiting-state correction is COMPLETE / HOSTED VALIDATED (PR #79;
 scheduled run #47). CP8 final consistency is COMPLETE. The T0-2 audit is COMPLETE / SCOPE APPROVED;
-C1 is next.** Baseline T0 is an
+C1 is COMPLETE / LIVE VERIFIED; C2 is next.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 The CP7 performance phase is **COMPLETE / HOSTED VALIDATED**. CP7.1 replaced the prepare-pr test
@@ -290,13 +290,23 @@ application-boundary audit is **complete** and the implementation scope is **app
 section is its durable decision and negative-knowledge record rather than a duplicate operating
 manual. T0-2 now contains exactly:
 
-1. **C1 — GitHub merge-commit only:** enable merge commits and disable squash/rebase so
-   human-reviewed upstream native ancestry cannot be discarded. Do not build a configuration
-   doctor; T0-3 will document an operator settings checklist.
+1. **C1 — GitHub merge-commit only — COMPLETE / LIVE VERIFIED:** merge commits are enabled and
+   squash/rebase are disabled, so human-reviewed upstream native ancestry cannot be discarded.
+   Do not build a configuration doctor; T0-3 will document an operator settings checklist.
 2. **C2 — Explicit build bootstrap:** add the official SHA-256 for Gradle 9.6.1 and explicitly
    provision `platforms;android-37` for `compileSdk = 37`.
 3. **C3 — Sanitized upstream failure diagnostics:** retain a bounded actionable publication failure
    reason without changing authority, permissions, identity, mutation, retry, or lifecycle state.
+
+C1 was verified live on 2026-09-17. Repository settings expose merge commits as the only enabled
+merge method and retain native auto-merge. The unchanged active `main protection` ruleset still
+requires pull requests, resolved conversations, and `Full validation`; blocks deletion and
+non-fast-forward updates; and has no bypass actors. Its allowed-method list remains the pre-C1
+`merge`, `squash`, `rebase` set, but repository-level settings make only `merge` available. Existing
+prepare-pr, exact-tree reuse, and upstream-resolution contracts already enforce and test the native
+two-parent shape, exact head/tree, Draft authority, and no-force behavior, so C1 required no
+repository file change beyond this continuity record. These external settings remain manually
+administered and belong in the T0-3 operator checklist.
 
 After required acceptance for C1, C2, and C3, mark T0-2 complete and begin T0-3. Do not add another
 T0-2 checkpoint without new concrete evidence and explicit approval. The audit's KEEP, WATCH,
