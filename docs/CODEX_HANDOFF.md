@@ -26,17 +26,23 @@
 
 `CP5 — COMPLETE / NO MIGRATION JUSTIFIED`
 
-`CP7 audit - COMPLETE / IMPLEMENTATION NOT STARTED`
+`CP7 - COMPLETE / HOSTED VALIDATED (PR #77)`
 
-`Next: CP7 - Performance implementation (explicit approval required)`
+`Next: CP8 - Final consistency`
 
-The complete CP7 evidence corpus and prioritized plan are in
-[the CP7 performance audit](T0_1_CP7_PERFORMANCE_AUDIT.md). The measured recurring bottlenecks are
-the offline suite (especially native prepare-pr fixtures), hosted Android Full, and final-context
-Release assembly. Exact-tree reuse, no-build eligibility, Sign/Publish, Stable/Hold execution, and
-Upstream Synchronization are KEEP unless new evidence changes their cost. GitHub does not expose the
-running step summary usefully from the workflow overview; keep the existing authoritative dynamic
-step name/live log rather than add a classifier, check-run, or state solely for presentation.
+The complete CP7 evidence corpus, implementation result, and closure decision are in
+[the CP7 performance audit](T0_1_CP7_PERFORMANCE_AUDIT.md#final-hosted-acceptance-and-closure).
+CP7.1 replaced the prepare-pr fixture's fake Git transport with a private real bare origin per test,
+retained fake GitHub state, restored Fast to explicitly bounded modules, and retained the complete
+offline suite as authoritative PR coverage. Local medians improved by about 22.5% for
+`test_prepare_pr.py` and 11.5% for the complete offline suite. PR #77 then measured 88s of hosted
+offline tooling, 29s of Android setup, and 4m42s of Gradle Full. Protected main reused exact evidence
+in 11s, evaluated no-build eligibility in 10s, and completed in 27s.
+
+No additional optimization met the CP7 GO bar. One faster Gradle sample is not enough to justify a
+Gradle-contract change, natural upstream runs are already seconds-class, and authority boundaries
+remain KEEP. GitHub still does not expose a running step summary usefully from the workflow overview;
+keep the existing authoritative dynamic step name/live log rather than add presentation state.
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;
@@ -44,7 +50,7 @@ VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE /
 VALIDATED`; `Validation-plan visibility COMPLETE / HOSTED VALIDATED`; `prepare-pr terminal UX
 COMPLETE / HOSTED VALIDATED`; `Operator UX batch COMPLETE / HOSTED VALIDATED`; `Release /
 Diagnostic UX batch COMPLETE / HOSTED VALIDATED`; `V01 KEEP / COMPLETE`; `CP5 COMPLETE / NO
-MIGRATION JUSTIFIED`.
+MIGRATION JUSTIFIED`; `CP7 COMPLETE / HOSTED VALIDATED`.
 
 I06 and I07 close the infrastructure architecture phase. The next program is the engineering
 baseline described in [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 begins with a read-only presentation
@@ -403,10 +409,9 @@ checks, updater Release-name parsing, distinct rolling/immutable/Stable tag role
 selectors. Workflow-file candidates may continue to require manual handling; any broader authority
 belongs to T0-2.
 
-The next implementation phase is **CP7 — Performance**, based on measured offline tests, Android and
-JDK/SDK/NDK setup, Gradle/cache restoration, Full validation, Release Build, runner queue, and
-Environment-wait costs. **CP8 — Final consistency** follows. Neither begins in this documentation
-checkpoint.
+**CP8 — Final consistency** is the next phase. CP7 closed after the bounded, hosted-validated fixture
+optimization and the determination that no remaining candidate has enough repeated evidence to
+justify its complexity.
 
 Do not confuse validation duplication with publication integrity. Preserve complete intended PR
 scope, branch-only commits, tracked/untracked/deletion/type/mode awareness, exact staging, staged-

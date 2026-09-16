@@ -16,20 +16,23 @@ VALIDATED. CP4B.2 — Authoritative PR Validation Model — is COMPLETE / HOSTED
 VALIDATED. P04 — prepare-pr native auto-merge — is COMPLETE / HOSTED VALIDATED. Validation-plan
 visibility and prepare-pr terminal UX are COMPLETE / HOSTED VALIDATED. The Operator UX batch is
 COMPLETE / HOSTED VALIDATED. Release / Diagnostic UX is COMPLETE / HOSTED VALIDATED (PR #74).
-V01 is KEEP / COMPLETE. CP5 is COMPLETE / NO MIGRATION JUSTIFIED. CP7 Performance is next.** Baseline T0 is an
-engineering baseline, not an application release. The ordered program is:
+V01 is KEEP / COMPLETE. CP5 is COMPLETE / NO MIGRATION JUSTIFIED. CP7 is COMPLETE / HOSTED
+VALIDATED (PR #77). CP8 Final consistency is next.** Baseline T0 is an engineering baseline, not an
+application release. The ordered program is:
 
-The read-only CP7 performance audit is **COMPLETE / IMPLEMENTATION NOT STARTED**. Its measured
-lifecycle model, operator-feedback latency finding, and ranked plan are in
-[the CP7 performance audit](T0_1_CP7_PERFORMANCE_AUDIT.md). No optimization is authorized by that
-audit; CP7.1 timing/fixture-seed work is the recommended first bounded approval.
+The CP7 performance phase is **COMPLETE / HOSTED VALIDATED**. CP7.1 replaced the prepare-pr test
+harness's fake Git transport with private real bare origins, retained fake GitHub state, restored
+Fast to bounded local feedback, and retained the complete offline suite as authoritative PR coverage.
+Its measured lifecycle, closure decisions, and hosted PR #77 evidence are in
+[the CP7 performance audit](T0_1_CP7_PERFORMANCE_AUDIT.md#final-hosted-acceptance-and-closure).
 
 Checkpoint sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE /
 HOSTED VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX
 COMPLETE / HOSTED VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED; Release / Diagnostic UX
-COMPLETE / HOSTED VALIDATED; V01 KEEP / COMPLETE; CP5 COMPLETE / NO MIGRATION JUSTIFIED.**
+COMPLETE / HOSTED VALIDATED; V01 KEEP / COMPLETE; CP5 COMPLETE / NO MIGRATION JUSTIFIED; CP7
+COMPLETE / HOSTED VALIDATED.**
 
 CP4B.2 evidence classes: **`ANDROID_FULL` — HOSTED VALIDATED; `NON_ANDROID` — HOSTED VALIDATED.**
 
@@ -246,14 +249,16 @@ Upstream Sync workflow-file handling. These identities have live ruleset, eviden
 updater, ownership, or permission consumers. Any broader workflow-file publication authority belongs
 to T0-2, not cosmetic migration.
 
-The next implementation phase is **CP7 — Performance**. It will measure offline tooling, Android and
-JDK/SDK/NDK setup, Gradle/cache restoration, Full validation, Release Build, runner queue, and
-Environment wait separately before optimizing. **CP8 — Final consistency** follows CP7; neither
-phase starts in this decision checkpoint.
+CP7 measured offline tooling, setup, Gradle/cache, validation, release, queue, and Environment wait
+separately. PR #77 hosted-validated the bounded fixture optimization: the PR took about 7m06s, with
+88s of offline tooling, 29s of Android setup, and 4m42s of Gradle Full. Protected main reused exact
+PR evidence in 11s, evaluated Development eligibility in 10s, required no build, and completed in
+27s. One faster Gradle sample does not justify a Gradle-contract change, and natural upstream runs
+are already seconds-class. No remaining candidate met CP7's high GO bar. **CP8 — Final consistency**
+is next.
 
-Hosted CP2 evidence also establishes bounded later work: CP7 must separate runner queue, setup,
-cache/tool installation, test/build execution, Environment wait, and publication timing, and must
-review real hosted logs across every surviving workflow before optimizing. T0-2 owns recurrence-based
+Hosted CP2 evidence informed CP7's separation of runner queue, setup, cache/tool installation,
+test/build execution, Environment wait, and publication timing. T0-2 owns recurrence-based
 clean-host dependency reproducibility and the authority decision for genuine upstream workflow-file
 candidates. The preferred default is manual handling rather than broader App permission unless a
 concrete automation requirement is demonstrated. CP3/CP6 own sanitized actionable push diagnostics;

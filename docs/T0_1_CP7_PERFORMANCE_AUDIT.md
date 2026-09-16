@@ -1,11 +1,12 @@
 # T0-1 CP7 performance, latency, and efficiency audit
 
-Status: **AUDIT COMPLETE / IMPLEMENTATION NOT STARTED**
-Measured: **2026-09-15**
-Next gate: **operator approval of one bounded optimization checkpoint**
+Status: **CP7 COMPLETE / HOSTED VALIDATED**
+Measured: **2026-09-15 through 2026-09-16**
+Next gate: **CP8 - Final consistency sweep**
 
-This is the first CP7 deliverable. It records the surviving pipeline, real timing evidence, latency
-causes, and a ranked optimization plan. It does not authorize or implement any optimization.
+The original audit records the surviving pipeline, timing evidence, latency causes, and ranked
+optimization plan. The final addendum records the one approved optimization, its hosted acceptance,
+and the decision that no further CP7 implementation is justified before CP8.
 
 ## Executive judgment
 
@@ -27,8 +28,9 @@ the no-build eligibility job is **8-12 seconds**, Sign is **26-27 seconds**, Pub
 seconds**, and normal Upstream Synchronization is **31-37 seconds**. Stable and Hold runner work is
 about **50 seconds** each; their larger wall time is human Environment approval, not execution.
 
-The first optimization should target offline fixture orchestration and PowerShell process cost. It
-should not weaken fixture isolation. Android/Gradle changes need a separate measured A/B checkpoint.
+CP7.1 addressed offline fixture orchestration without weakening isolation. Its hosted result and the
+remaining-candidate decisions are recorded in the final addendum. No Android/Gradle change is
+justified from the current samples.
 
 ## Surviving lifecycle
 
@@ -253,8 +255,8 @@ Approximate sampled costs inside the 7m19s Gradle run:
 
 PR #74 did not change application or Gradle source, yet main KSP/Kotlin still executed. The generated
 `BuildConfig.SOURCE_SHA` changes for every tested commit and is a plausible invalidation source. This
-is not yet proof. Before changing application identity plumbing, CP7 must compare otherwise-identical
-builds with only the source identity varied and inspect Gradle task input/cache reasons.
+was not proof; the original audit therefore required otherwise-identical builds and task-input/cache
+evidence before any application identity change. The final decision remains DEFER.
 
 Release Build must remain separate. It runs on final protected main, allocates `1.0.N`, embeds exact
 source identity, and assembles minified/resource-shrunk `defaultRelease` bytes. Its
@@ -444,5 +446,97 @@ before accepting this contract complexity.
    optimize Stable, Hold, Sign, Publish, Upstream, reuse, or eligibility without new evidence.
 6. **CP8 - final consistency:** only after approved CP7 changes are hosted-validated.
 
-CP7 is not complete merely because this audit is complete. No implementation should begin until the
-operator selects and authorizes a bounded checkpoint.
+This was the original audit sequence. The operator subsequently authorized CP7.1; the final hosted
+acceptance and disposition of every unimplemented candidate follow.
+
+## Final hosted acceptance and closure
+
+### PR #77 evidence
+
+PR #77 merged as `f235374ed3e59678914d7c788af2eddf3a0a03e6`. The retained local logs and
+hosted timestamps reconcile as follows:
+
+| Evidence | Measured result |
+|---|---:|
+| Local prepare-pr | 42.5s total |
+| Local `LOCAL CHECKS` | 13.3s |
+| PR run [35057161593](https://github.com/constbogdan/Wholphin/actions/runs/35057161593) | 7m06s total |
+| Hosted complete offline tooling | 1m28s / 88s |
+| Android setup | 29s |
+| Full defaultDebug validation | 4m42s |
+| Protected-main run [35057619731](https://github.com/constbogdan/Wholphin/actions/runs/35057619731) | 27s total |
+| Protected-main exact-tree reuse job | 11s |
+| Development eligibility job | 10s; no build required |
+
+The protected-main job authenticated the exact PR evidence, skipped repeated pre-commit, offline,
+Android setup and Gradle work, then evaluated Development eligibility independently. Release Build,
+Sign and Publish did not run.
+
+### CP7.1 - complete / hosted validated
+
+The test-only fake Python Git transport in `test_prepare_pr.py` was replaced with a private real
+local bare origin for every fixture. Fake `gh` remains only for GitHub-only PR, Draft, repository
+settings, API and auto-merge state. Real Git now exercises fetch, `ls-remote`, push, remote-tracking
+refs, branch publication, divergence, native non-fast-forward refusal, preservation of remote state
+and no-force behavior. Each fixture retains private repository, remote, refs, configuration, index,
+worktree, hooks, logs and cleanup.
+
+Controlled Windows medians improved approximately **22.5%** for `test_prepare_pr.py` and
+approximately **11.5%** for the complete local offline suite. The first hosted acceptance completed
+the complete offline suite in **88 seconds**. That hosted result is consistent with improvement, but
+one post-change hosted sample does not prove that CP7.1 alone caused the entire difference from the
+older 115-156 second samples.
+
+Acceptance also found that the generic changed-test-module mapping made local Fast synchronously run
+heavy process-integration suites. The corrected permanent split is:
+
+- local Fast runs only explicitly categorized bounded feedback modules derived from the existing
+  validation policy;
+- `test_prepare_pr.py`, `test_hosted_upstream.py` and complete `test_*.py` coverage remain explicit
+  local/manual and unconditional hosted-PR coverage, not implicit Fast work;
+- Standard, Full and explicit module execution remain available;
+- an explicitly requested offline pattern that discovers zero tests now fails with an actionable
+  diagnostic instead of passing silently.
+
+The acceptance Fast run completed in **8.3 seconds** while running only the two bounded modules
+relevant to that scope. Authoritative hosted coverage remained the complete suite.
+
+One presentation lesson is durable: PowerShell or redirected-output encoding can change decorative
+Unicode separators. Tests assert the ordered semantic scope fields while tolerating only the
+observed separator representations. Exact external protocols such as OSC 8 remain exact contracts.
+Production prepare-pr output was not changed because no production rendering defect was proven.
+
+### Remaining candidates - final decisions
+
+No candidate meets all requirements for `GO before CP8`: a repeatable current hosted bottleneck,
+meaningful expected wall-clock saving, low/moderate implementation risk, and unchanged validation,
+reproducibility, authentication, release and security guarantees.
+
+| Candidate | Final decision | Evidence-based reason |
+|---|---|---|
+| Permanent per-module/per-test timing output | KEEP current runner / not worth T0-1 complexity | No direct saving; the audit and hosted step timing now identify the material costs |
+| Shared immutable repository seeds | KEEP private per-test origins | CP7.1 already achieved material improvement with the simpler isolation model |
+| Two-process module execution | DEFER to future evidence | One 88s hosted sample does not establish a recurring residual problem; estimated saving was only 8-15s hosted |
+| `test_prepare_pr.py` test-ID sharding | DEFER to future evidence | Medium-high orchestration complexity; residual hosted cost needs repeated post-CP7.1 samples |
+| Volatile `SOURCE_SHA` / Kotlin input redesign | DEFER to future evidence | PR #77 Full fell to 4m42 from prior 7m12-7m20 without a Gradle change, so causality is not established |
+| Parallel offline and Android authority jobs | KEEP current serial authority graph | At most 88s now overlaps, while the aggregator/evidence migration is high-risk and high-complexity |
+| Persisted Gradle configuration cache | DEFER to future evidence | Expected 10-20s saving is unproven and introduces cache trust/key complexity |
+| Gradle checksum and explicit compile-SDK provisioning | DEFER as reproducibility hardening | Valuable reliability questions, but no normal-path performance saving and not a CP7 optimization |
+| Signing Diagnostic validation simplification | KEEP | Rare manual path; custody validation is distinct and does not justify another contract change |
+| Move Sign rejection before Java/Build Tools setup | KEEP | Benefits rare malformed-input failures only, not normal delivery |
+| Shallow checkouts | KEEP full-history behavior | Saves about 1-2s while complicating version/evidence object availability |
+| Replace current pre-commit action/install | KEEP | Current 5-6s cost is small and cached |
+| Replace Release inventory scans | KEEP | Current API cost is small and the scan protects ambiguity detection |
+| Remove the PR Debug APK | KEEP | About 1s upload; it is the exact tested operator-installable artifact |
+| Optimize exact-tree reuse or no-build eligibility | KEEP | Already 11s and 10s respectively; each protects a distinct authentication boundary |
+| Merge/reuse PR Debug and final Release Build | KEEP separate | Different variant and final protected-main identity; prior concurrent builds exhausted memory |
+| Optimize Sign, Publish, Stable or Hold | KEEP | Execution is already bounded; authority, byte authentication and approval boundaries are distinct |
+| Optimize Upstream Observe/Publish | KEEP | Recent successful natural runs remain about 31-39s; authentication, permissions and TOCTOU rechecks are intentional |
+| Add another workflow-level early validation signal | KEEP current dynamic step/live log | GitHub overview timing is a UI limitation; alternatives duplicate state or change the authority graph |
+
+The 4m42 Gradle result is a useful natural sample, not evidence that CP7.1 improved Gradle. More
+natural `ANDROID_FULL` samples are required before any Gradle/cache/input optimization is proposed.
+Likewise, the roughly 305-second Windows hosted-upstream fixture timing does not describe hosted
+Linux behavior: natural Upstream workflows remain short, so no upstream optimization is justified.
+
+**CP7 is COMPLETE / HOSTED VALIDATED. CP8 - Final consistency sweep is next.**
