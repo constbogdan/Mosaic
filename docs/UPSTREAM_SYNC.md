@@ -185,6 +185,17 @@ and the trusted-policy semantic REVIEW, directed the operator through `resolve-u
 kept 1 attention / 26 FOLLOW / 2 preserved as secondary context. This closes the presentation batch
 without changing I06 behavior or evidence.
 
+PR #79 and scheduled run #47 subsequently live-validated the distinct newer-episode waiting state.
+Run #47 completed green in about 35 seconds: Observe retained the complete newer observation and
+bound PR #58 plus its exact authenticated head; Publish reauthenticated both, received no App
+publication token, performed no push or PR mutation, and owned the final `Waiting on PR #58`
+outcome. The retained evidence reported 3 attention paths, 32 FOLLOW paths, and 2
+DOWNSTREAM-OWNED paths. This establishes the operational distinction: expected authenticated
+human-review waiting is green, while ambiguity and authentication, integrity, infrastructure, or
+API failure remain red. PR #58 predates the final candidate-body presentation and remains unchanged
+under the Draft/human-authority contract; future naturally created candidates use the current
+format.
+
 An unresolved candidate is identified by trusted policy version plus the paths requiring
 attention, their ownership/status and downstream blob identities, and their textual-conflict
 signature. It excludes the whole downstream HEAD, so unrelated downstream movement can reuse the
@@ -210,8 +221,8 @@ and 09:00/18:00/00:00 in summer. GitHub cron does not follow DST and may start l
 separates configured cron from actual observation time. Complete observations retain excluded
 paths for future Repo Intelligence without modifying that system.
 
-**CURRENT CHECKPOINT:** I06 checkpoint 4 is complete/live validated; checkpoint 5 lifecycle
-simplification is next. I06 as a whole remains in progress.
+**CURRENT CHECKPOINT:** I06 is complete/live validated. The later authenticated upstream waiting-
+state correction is also complete/hosted validated; T0-1 CP8 final consistency is next.
 
 ```yaml
 Detection: OPERATIONAL
@@ -219,6 +230,7 @@ Ownership-aware observation: IMPLEMENTED + OFFLINE TESTED
 Normal/Draft candidate publication: NATIVE MERGE MODEL + OFFLINE TESTED
 Native FOLLOW + quiet no-delta acceptance: LIVE VALIDATED
 Native lifecycle simplification: COMPLETE + OFFLINE TESTED
+Authenticated older-candidate waiting: COMPLETE + HOSTED VALIDATED
 ```
 
 PR #55 is the representative native live episode: observation `34701161886`, PR Full

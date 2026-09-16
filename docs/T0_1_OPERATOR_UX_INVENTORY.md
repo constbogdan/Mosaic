@@ -8,6 +8,7 @@ Release / Diagnostic UX batch: **COMPLETE / HOSTED VALIDATED (PR #74)**
 V01: **KEEP / COMPLETE**
 CP5: **COMPLETE / NO MIGRATION JUSTIFIED**
 CP7: **COMPLETE / HOSTED VALIDATED (PR #77)**
+Upstream waiting-state correction: **COMPLETE / HOSTED VALIDATED (PR #79; scheduled run #47)**
 Next: **CP8 — Final consistency**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
@@ -16,7 +17,7 @@ CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMP
 VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX COMPLETE /
 HOSTED VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED; Release / Diagnostic UX batch
 COMPLETE / HOSTED VALIDATED; V01 KEEP / COMPLETE; CP5 COMPLETE / NO MIGRATION JUSTIFIED; CP7
-COMPLETE / HOSTED VALIDATED.**
+COMPLETE / HOSTED VALIDATED; upstream waiting-state correction COMPLETE / HOSTED VALIDATED.**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
 baseline; historical names in acceptance records are evidence, not active UX. CP2 removed only
@@ -27,6 +28,29 @@ live-proved the exact-tree reuse selector contract exposed by that audit. CP4B.2
 complete two-class PR policy contract. Natural hosted runs validated both `ANDROID_FULL` and
 `NON_ANDROID`; PR #63 live-validated the CP4B.3 removal of duplicate routine local authority while
 leaving that hosted contract unchanged.
+
+## T0-1 upstream waiting-state correction
+
+Status: **COMPLETE / HOSTED VALIDATED (PR #79; scheduled run #47)**
+
+PR #79 introduced the authenticated `waiting_on_existing_pr` state. Protected-main run #150
+authenticated and reused PR #79 `ANDROID_FULL` evidence: Full reuse took about 12 seconds,
+Development eligibility took about 12 seconds, no Development Build/Sign/Publish was required, and
+the complete run took about 46 seconds.
+
+Natural scheduled Upstream Synchronization run #47 then reproduced the state that had made runs
+#45/#46 red. It completed green in about 35 seconds. Observe retained the complete newer upstream
+observation, emitted `waiting_on_existing_pr`, and bound blocking PR #58 plus its exact authenticated
+head. Publish reobserved the current pair, authenticated the same blocker handoff, and owned the
+final `Waiting on PR #58` result. `SYNC_PUBLISH_TOKEN` remained empty: no App token was minted, no
+candidate branch was pushed, and no PR was created, updated, force-updated, or duplicated. The
+retained range reported 3 attention paths, 32 FOLLOW paths, and 2 DOWNSTREAM-OWNED paths.
+
+The permanent distinction is: **expected authenticated human-review waiting is green; an
+authentication, integrity, ambiguity, infrastructure, or API failure is red.** Generic fail-closed
+handling remains unchanged. PR #58 predates the final candidate-body presentation and remains
+untouched under the Draft/human-authority contract; future naturally created candidates use the
+current presentation. No functional blocker remains before CP8.
 
 ## T0-1 validation-plan visibility
 
