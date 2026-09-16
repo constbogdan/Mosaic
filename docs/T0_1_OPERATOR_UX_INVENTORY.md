@@ -7,15 +7,16 @@ Committed-only publication follow-up: **HOSTED VALIDATED (PR #64)**
 Release / Diagnostic UX batch: **COMPLETE / HOSTED VALIDATED (PR #74)**
 V01: **KEEP / COMPLETE**
 CP5: **COMPLETE / NO MIGRATION JUSTIFIED**
-CP7 audit: **COMPLETE / IMPLEMENTATION NOT STARTED**
-Next: **CP7 — Performance**
+CP7: **COMPLETE / HOSTED VALIDATED (PR #77)**
+Next: **CP8 — Final consistency**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED
 VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX COMPLETE /
 HOSTED VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED; Release / Diagnostic UX batch
-COMPLETE / HOSTED VALIDATED; V01 KEEP / COMPLETE; CP5 COMPLETE / NO MIGRATION JUSTIFIED.**
+COMPLETE / HOSTED VALIDATED; V01 KEEP / COMPLETE; CP5 COMPLETE / NO MIGRATION JUSTIFIED; CP7
+COMPLETE / HOSTED VALIDATED.**
 
 This is the authoritative execution ledger for T0-1. The inventory tables preserve the CP1
 baseline; historical names in acceptance records are evidence, not active UX. CP2 removed only
@@ -306,10 +307,33 @@ versioning; updater discovery parses the GitHub Release name; rolling, immutable
 Stable tags have distinct roles; and several artifact names are authenticated selectors rather than
 presentation text.
 
-The next implementation phase is **CP7 — Performance**, driven by measured offline fixture/test,
-Android/JDK/SDK/NDK setup, Gradle/cache restoration, Full validation, Release Build, runner queue,
-and Environment-wait costs. CP8 final consistency follows CP7. Neither phase began in this decision
-closure.
+The completed CP7 phase measured those costs and made only the bounded changes justified by the
+evidence. **CP8 — Final consistency** is next.
+
+## T0-1 CP7 performance
+
+Status: **COMPLETE / HOSTED VALIDATED (PR #77)**
+
+CP7.1 replaced the test-only fake Git transport used by prepare-pr publication fixtures with a
+private local bare origin per fixture. The fake GitHub boundary remains for PR, Draft, repository
+settings, auto-merge, and API state. Real Git now proves fetch, push, refs, divergence,
+non-fast-forward refusal, and no-force behavior. Local measurement showed an approximately 22.5%
+median improvement for `test_prepare_pr.py` and approximately 11.5% for the complete offline suite.
+
+The follow-up restored Fast as bounded local feedback: it automatically selects only explicitly
+bounded modules derived from the existing policy, while heavyweight process-integration tests remain
+explicit local checks and unconditional authoritative PR coverage. Explicitly requested test patterns
+now fail when they discover zero tests. The PowerShell/Python separator fix remained test-side; exact
+OSC 8 protocol assertions and production prepare-pr output were preserved.
+
+PR #77 completed in about 7m06s: offline tooling took 88s, Android setup 29s, and Gradle Full 4m42s.
+Protected main authenticated and reused the exact PR evidence in 11s; Development eligibility took
+10s, correctly found no build requirement, and the complete main run finished in 27s. One faster
+Gradle sample does not establish a stable optimization or CP7.1 causation. Recent natural Upstream
+Synchronization runs are already seconds-class. No remaining candidate met the high GO bar; further
+Gradle, sharding, parallelism, setup, release, signing, publication, or upstream changes are deferred
+until repeated evidence demonstrates a material bottleneck. See
+[the CP7 performance audit](T0_1_CP7_PERFORMANCE_AUDIT.md#final-hosted-acceptance-and-closure).
 
 ## T0-1 CP4B.1 exact-tree reuse contract repair
 
@@ -1603,7 +1627,7 @@ if its live value is false. Upstream Drafts retain separate human readiness and 
 
 ## Performance inventory
 
-Known evidence: local Full is approximately **9–11 minutes**; one observed offline tooling phase
+Baseline evidence before CP7: local Full was approximately **9–11 minutes**; one observed offline tooling phase
 was **6m38s**; Android Full was **3m16s**; protected-main Release Build is commonly **10+ minutes**
 (I02 measured 9m12s). The hosted upstream fixture suite alone creates many real disposable Git
 topologies and was recently ~4m35s, making it the first offline profiling suspect. Other Python
@@ -1611,9 +1635,10 @@ suites, process startup, serial execution and repeated fixture setup need measur
 assumption. Release assembly runs in a fresh job/workspace after Debug validation, so cross-job
 Gradle/cache misses are the first Build hypothesis.
 
-T0-1 CP7 must capture per-suite/per-test and Gradle task/cache/configuration timings before changing
-parallelism, fixtures, task graphs or caches. Preserve deterministic isolation and provenance;
-performance is not permission to merge security fixtures or build/sign jobs.
+CP7 captured per-suite, step, and lifecycle timings before changing fixture orchestration. It
+preserved deterministic isolation and provenance; performance was not permission to merge security
+fixtures or build/sign jobs. Final measurements and decisions are recorded in
+[the CP7 performance audit](T0_1_CP7_PERFORMANCE_AUDIT.md#final-hosted-acceptance-and-closure).
 
 ## Signing Diagnostic conclusion
 
@@ -1684,22 +1709,20 @@ external action, and owner checkpoint.
 
 ### PERFORMANCE (6)
 
-The comprehensive evidence model and ranked plan are recorded in
-[the CP7 performance audit](T0_1_CP7_PERFORMANCE_AUDIT.md). The audit replaces the early estimates
-below where newer measurements differ: current hosted offline cost is 115-156 seconds and is
-dominated by `test_prepare_pr.py`; current Android Full is about 7m12s-7m20s after setup; exact-tree
-main reuse remains about 9-12 seconds. CP7 implementation has not started. The first recommended
-bounded checkpoint is timing output plus immutable fixture-seed reuse with private mutable state per
-test; any parallel execution requires a subsequent explicit approval.
+The comprehensive evidence model, implementation result, and closure decision are recorded in
+[the CP7 performance audit](T0_1_CP7_PERFORMANCE_AUDIT.md). CP7.1 is hosted validated. PR #77 measured
+the complete offline suite at 88s, Android setup at 29s, Gradle Full at 4m42s, and protected-main
+exact-tree reuse at 11s. These are distinct natural samples, not a claim that CP7.1 caused every
+hosted improvement. No further candidate met the high GO bar.
 
 | ID | Source / current problem | Target and dependency/risk | Validation / external action | CP |
 |---|---|---|---|---|
-| F01 | Offline tooling ~6m38s; hosted Git fixtures likely dominate | Per-suite/test profile; share only immutable setup proven isolation-safe; assess process parallelism | Repeated timing + full offline equivalence | CP7 |
-| F02 | Android Full ~3m16s and repeated across paths | Measure Gradle task/cache overlap before changing authoritative validation model | Task graph/cache evidence + complete validation | CP7 after CP4 |
-| F03 | Release Build ~10m+, fresh job after Debug | Profile configuration/task/cache/download time; assess safe cache/artifact reuse without crossing build/sign authority | Hosted timing and provenance/security regression | CP7 |
-| F04 | Hosted duration reports can conflate runner queue, setup, execution and Environment/publication wait | Record those phases separately; never present runner wait as validation/build time | PR/main/rerun samples with job timestamps | CP7 |
-| F05 | One run spent ~18.6s on 232 offline tests but restored ~934 MB of Gradle/wrapper cache and performed heavy Android/JDK setup | Measure cache value, preinstalled-tool rejection, duplicate downloads and license noise before changing setup | Repeated clean/warm hosted runs; preserve pinned/reproducible toolchain | CP7 |
-| F06 | No consolidated real-run corpus yet covers every surviving workflow and alternate path | Analyze PR/main CI, Development Build/Sign/Publish, Stable, Hold, Signing Diagnostic, Upstream Sync, reruns, reuse, queues, transient dependency failures, refusals and skips before optimization | Evidence table from existing hosted logs; no manufactured mutations | CP7; feed CP3/CP6 and T0-2/T0-3 |
+| F01 — COMPLETE / HOSTED VALIDATED | Fake Git transport inflated prepare-pr fixtures | Private real bare origin per fixture; fake GitHub boundary retained; Fast selects only bounded modules | Local repeated timings plus PR #77 authoritative suite | CP7.1 complete |
+| F02 — DEFER | Android/Gradle remains the largest execution stage | Require repeated comparable task/cache evidence before changing the authoritative model | Natural hosted samples | Future evidence |
+| F03 — KEEP | Release Build is final-context Release assembly | Preserve separate variant and authority boundary; revisit only with measured recurring waste | Existing provenance/security contract | No CP7 change |
+| F04 — COMPLETE | Duration categories were previously conflated | Report queue, setup, execution, and Environment wait separately | Hosted job and step timestamps | CP7 complete |
+| F05 — DEFER | Setup/cache/tool costs vary by clean/warm runner | Preserve pinned reproducible tools; optimize only with repeated evidence | Natural clean/warm hosted runs | Future evidence |
+| F06 — COMPLETE | No consolidated lifecycle evidence existed | Audit surviving PR/main, delivery, promotion, hold, diagnostic, upstream, rerun, reuse, refusal, and skip paths | CP7 audit and PR #77 acceptance | CP7 complete |
 
 ### RELEASE PRESENTATION (4)
 
@@ -1744,15 +1767,16 @@ DEFER TO T0-2 5** — **40 finite items**.
 6. **CP6 — PR and Release presentation (complete through the hosted-validated Operator and Release /
    Diagnostic UX batches):** channel-first presentation, Compare Changes, archive demotion, and
    concise provenance solved the identified UX problems without changing machine identity.
-7. **CP7 — Performance (next):** profile first, then optimize offline fixtures, Android validation
-   and Release Build independently. Separate queue/Environment wait from actual execution and setup.
-8. **CP8 — Final consistency sweep:** compare every surviving Actions/PR/Release/CLI surface to this
+7. **CP7 — Performance (complete / hosted validated):** CP7.1 moved publication fixtures to private
+   real bare origins, restored bounded Fast feedback, and retained broad hosted authority. The final
+   audit found no additional optimization with enough evidence to justify its complexity.
+8. **CP8 — Final consistency sweep (next):** compare every surviving Actions/PR/Release/CLI surface to this
    registry, reconcile docs, and prove no machine contract was cosmetically renamed.
 
 Cosmetic CP3 was deliberately separated from the CP5 contract decision. The completed CP5 audit
 found no justified migration. CP2 did not wait for cosmetic work because dead workflows distorted
-the inventory operators saw. CP7 follows the completed simplification and decision work because
-removing duplication was higher leverage than accelerating duplicate work.
+the inventory operators saw. CP7 followed that simplification and closed after the one bounded,
+measured optimization; CP8 now performs the final consistency sweep.
 
 ## Future “Learn more” integration
 
