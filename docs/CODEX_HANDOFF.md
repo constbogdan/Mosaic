@@ -38,7 +38,9 @@
 
 `T0-2 C1 - COMPLETE / LIVE VERIFIED`
 
-`Next: T0-2 C2 - Explicit build bootstrap`
+`T0-2 C2 - IMPLEMENTED / LOCAL VALIDATED; HOSTED ACCEPTANCE PENDING`
+
+`Next after C2 hosted acceptance: T0-2 C3 - Sanitized upstream publication diagnostics`
 
 The current operator lifecycle is concise: bounded Fast feedback -> prepare-pr scope/tree integrity
 and exact-head publication -> authoritative `NON_ANDROID` or `ANDROID_FULL` PR CI -> native
@@ -106,6 +108,14 @@ prepare-pr/reuse/upstream tests already protect native two-parent ancestry, exac
 authority, and no-force behavior; no implementation or test change was justified. External merge
 settings remain manually administered and must be included in the T0-3 operator checklist. C2 is
 next.
+
+C2 adds the official Gradle `9.6.1-bin` SHA-256
+`9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14` to the unchanged wrapper URL
+and explicitly provisions `platforms;android-37` for the existing `compileSdk = 37`. The shared
+setup retains `platform-tools`, Build Tools `36.0.0`, NDK `29.0.14206865`, and no standalone
+`tools`. The existing setup contract test now binds the wrapper URL/checksum and compile SDK to the
+explicit platform package. Local focused checks and Fast pass; authoritative clean-runner
+`ANDROID_FULL` acceptance remains pending. Do not start C3 before that acceptance.
 
 T0-2 contains no configuration doctor. T0-3 will document the small external GitHub-settings set
 as an operator checklist; automated drift checking requires recurring demonstrated drift and new
@@ -4362,9 +4372,15 @@ Historical transitional state: until the dedicated `chore/format-baseline` clean
 
 The planned formatting-baseline change must remain mechanical and separate from application work: normalize known EOF debt, apply the pinned KTLint configuration to the fork-owned Kotlin delta, inspect the resulting diff, and run Full validation. Once the repository has a clean baseline, CI must return to `pre-commit --all-files`, and local Standard/Full validation should incorporate the same formatting contract so local success cannot silently disagree with CI again.
 
-### Android 37 CI setup correction
+### Historical Android 37 CI setup incident
 
-**Expected -> Observed -> Consequence:** because the app declares compile/target SDK 37, the first fork CI setup explicitly requested `platforms;android-37` from `sdkmanager`; the configured SDK channel did not publish that package and setup failed before Gradle ran. Upstream added Android 17/API 37 while leaving its successful Ubuntu setup on `tools`, `platform-tools`, Build Tools 36.0.0, and NDK 29.0.14206865. The fork therefore restores that exact package list and lets the runner/Android Gradle Plugin use the required platform through the same supported path as upstream. Do not downgrade compile SDK or guess an explicit platform package solely from `compileSdk` when maintaining this workflow.
+The first fork CI attempt to request `platforms;android-37` failed before Gradle because that
+package was not available through the configured SDK channel at the time. Later cleanup removed the
+obsolete standalone `tools` request and relied on the hosted runner/Android Gradle Plugin for the
+platform. T0-2 C2 supersedes only that platform omission: the audited current bootstrap now
+explicitly provisions `platforms;android-37` for `compileSdk = 37`, while retaining
+`platform-tools`, Build Tools `36.0.0`, NDK `29.0.14206865`, and no standalone `tools`. Clean-runner
+hosted acceptance must prove the package is currently available and the complete build succeeds.
 
 ### Canonical upstream version tags in fork CI
 

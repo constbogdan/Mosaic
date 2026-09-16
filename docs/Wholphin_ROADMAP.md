@@ -19,7 +19,7 @@ COMPLETE / HOSTED VALIDATED. Release / Diagnostic UX is COMPLETE / HOSTED VALIDA
 V01 is KEEP / COMPLETE. CP5 is COMPLETE / NO MIGRATION JUSTIFIED. CP7 is COMPLETE / HOSTED
 VALIDATED (PR #77). The upstream waiting-state correction is COMPLETE / HOSTED VALIDATED (PR #79;
 scheduled run #47). CP8 final consistency is COMPLETE. The T0-2 audit is COMPLETE / SCOPE APPROVED;
-C1 is COMPLETE / LIVE VERIFIED; C2 is next.** Baseline T0 is an
+C1 is COMPLETE / LIVE VERIFIED; C2 is IMPLEMENTED / LOCAL VALIDATED with hosted acceptance pending.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 The CP7 performance phase is **COMPLETE / HOSTED VALIDATED**. CP7.1 replaced the prepare-pr test
@@ -293,8 +293,9 @@ manual. T0-2 now contains exactly:
 1. **C1 — GitHub merge-commit only — COMPLETE / LIVE VERIFIED:** merge commits are enabled and
    squash/rebase are disabled, so human-reviewed upstream native ancestry cannot be discarded.
    Do not build a configuration doctor; T0-3 will document an operator settings checklist.
-2. **C2 — Explicit build bootstrap:** add the official SHA-256 for Gradle 9.6.1 and explicitly
-   provision `platforms;android-37` for `compileSdk = 37`.
+2. **C2 — Explicit build bootstrap — IMPLEMENTED / LOCAL VALIDATED; HOSTED ACCEPTANCE PENDING:**
+   add the official SHA-256 for Gradle 9.6.1 and explicitly provision `platforms;android-37` for
+   `compileSdk = 37`.
 3. **C3 — Sanitized upstream failure diagnostics:** retain a bounded actionable publication failure
    reason without changing authority, permissions, identity, mutation, retry, or lifecycle state.
 
@@ -307,6 +308,13 @@ prepare-pr, exact-tree reuse, and upstream-resolution contracts already enforce 
 two-parent shape, exact head/tree, Draft authority, and no-force behavior, so C1 required no
 repository file change beyond this continuity record. These external settings remain manually
 administered and belong in the T0-3 operator checklist.
+
+C2 pins the official Gradle `9.6.1-bin` distribution SHA-256
+`9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14` and adds
+`platforms;android-37` to the shared Android setup. Gradle version, distribution type/URL and wrapper
+JAR remain unchanged; Build Tools remain `36.0.0`, NDK remains `29.0.14206865`, and standalone
+`tools` remains absent. Focused setup/bootstrap checks and Fast pass locally. Clean-runner
+`ANDROID_FULL` acceptance is still required before C2 is complete; C3 remains next afterward.
 
 After required acceptance for C1, C2, and C3, mark T0-2 complete and begin T0-3. Do not add another
 T0-2 checkpoint without new concrete evidence and explicit approval. The audit's KEEP, WATCH,
