@@ -19,6 +19,10 @@ Status terms used below:
 - Post-Item-6 baseline cleanup: T0-1 CP2 removed inherited `.github/workflows/main.yml` and
   `.github/workflows/release.yml`. Both are now explicit DOWNSTREAM-OWNED absences. The Appstore /
   Fire TV AAB behavior recorded in the historical audit is not a supported Baseline T0 channel.
+- Final T0-1 reconciliation, 2026-09-16: T0-1 is **COMPLETE / HOSTED VALIDATED**. The A-series
+  audit tables and I01/I02 measurements below are point-in-time evidence, not current workflow
+  instructions. Current operation is defined by the completed implementation entries and linked
+  operator documents; T0-2 is the next program phase.
 
 ## Audit and decision packages
 
@@ -87,10 +91,16 @@ Status terms used below:
   - UTF-8/editorconfig/mojibake protection is a hard constraint. The formerly broken `PREPARE_PR` handoff anchor currently resolves to an existing heading; recheck links after documentation consolidation.
 
 - [x] **A09 — AUDIT — Preserve and refine Upstream Sync outcomes, journal, conflicts, schedule, and concurrency** (Items 24–26, 62–64, 108–119, 134)
-  - I06 result: observation remains read-only; repository-scoped App authority is minted only for normal, REVIEW or semantic-conflict candidate publication. Exact SHA-pair/policy identity, non-force publication, human-edit preservation and no automatic semantic resolution remain enforced.
-  - Structured outcomes now distinguish no delta, all-excluded, ready/review/semantic candidates, existing/created normal or Draft PRs, expected block and infrastructure/publication failure. Clean candidate handoff closes its historical journal; REVIEW/conflict journals stay open, while no-delta and all-excluded observations remain machine evidence without Issues.
-  - Safe Draft conflict workspaces use a downstream-only parent, downstream conflict bytes, non-conflicting context and deterministic JSON, with neither markers nor fabricated upstream ancestry. The real Series conflict remains a generic regression fixture, not a hard-coded resolution.
-  - Schedule is fixed UTC 06:00/15:00/21:00, approximately 08:00/17:00/23:00 Bucharest in winter; DST drift and scheduler delay are explicit. Existing priority labels are used without permission broadening; missing labels require one-time external creation. Natural hosted acceptance is pending.
+  - Final I06 result: observation remains read-only; repository-scoped App authority is minted only
+    when deterministic candidate publication requires it. Native Git ancestry and managed PR state
+    replace the former Issue/journal lifecycle. Exact SHA-pair/policy identity, non-force publication,
+    human-edit preservation and no automatic semantic resolution remain enforced.
+  - Structured outcomes distinguish no delta, all excluded, candidate create/reuse, the authenticated
+    `waiting_on_existing_pr` state, and genuine blocked/infrastructure/publication failures. Expected
+    authenticated human-review waiting is green; ambiguity, drift, malformed state and failures are red.
+  - REVIEW/conflict work remains human-controlled through a Draft native-merge candidate and the
+    authenticated resolver. No conflict markers, fabricated ancestry or automatic semantic choice may
+    be published. The schedule remains fixed at UTC 06:00/15:00/21:00 with documented DST behavior.
 
 - [x] **A10 — AUDIT — Plan repository identity, metadata, review policy, and external GitHub organization** (Items 21, 22, 36, 37, 65–72, 78)
   - README/labels/issues/project/milestones/badges/backfill remain plans, not operational claims. Mosaic should identify as a personal experimental downstream, credit Wholphin, and encourage upstream/ecosystem reuse.
@@ -131,10 +141,17 @@ Status terms used below:
   - Live acceptance: PR #24 classified the visible Settings wording change `apk-relevant` / `normal` / `releaseRequired: true`. Protected-main CI run `34407365166`, attempt `1`, validated merged SHA `44e81da48ca50b70f1be364b3008294130d8721d`, then sequentially assembled version `1.0.11` and uploaded unsigned artifact ID `10126382836` (archive SHA-256 `2a3274203cc1b1815ed540b0a87c47a59379897e4f4fb4226f61126e70c35caa`; APK SHA-256 `76a5e078a43f75b28403131082882404dfbee286b9b50f58e826a6cea9e69db9`). Development run `34408806518`, attempt `1`, authenticated that exact producer/artifact/provenance, ran zero Gradle, signed and verified APK SHA-256 `98472b4e2537669b0894c6cf49ebc0c20229c633307f82b11da8e8e265d1c941`, and published byte-identical immutable `downstream-build-11` and rolling `develop` outputs with updater compatibility intact.
   - Device acceptance: Wholphin detected Development version `1.0.11` / code `11`; installing it displayed the accepted `Settings → More → Enhanced features` wording, proving the published APK contained the merged source change.
   - Measured live timing: protected-main Full `5m25s`; Release assembly `9m12s`; complete main CI `15m56s`; Development classify `11s`, sign `34s`, publish `17s`, complete workflow `1m13s`.
-  - Follow-up checkpoint: **IMPLEMENTED / OFFLINE VALIDATED; HOSTED ACCEPTANCE PENDING.** Full PR CI retains its actual synthetic-merge SHA/tree in the existing Debug artifact identity. Protected-main authenticates the unique merged PR, exact parents, expected workflow/run/job/Full step, artifact ownership/digest and GitHub Git commit/tree; exact final `main^{tree}` equality reuses Debug Full evidence. Direct main, targeted/non-Android, failed/cancelled, missing/expired, stale/ambiguous, parent/tree mismatch and API uncertainty retain the existing main Full fallback. Current PR Release APK bytes remain non-reusable because `SOURCE_SHA`, `BUILD_TIME`, and first-parent-derived version identity are commit-context inputs; authoritative final-main Release assembly is unchanged.
+  - Follow-up checkpoint: **COMPLETE / HOSTED VALIDATED.** Successful PRs emit authenticated
+    `NON_ANDROID` or `ANDROID_FULL` exact-tree evidence. Protected main authenticates the unique PR,
+    parents, workflow/run/job/required steps, class, artifact and GitHub commit/tree before reuse;
+    every uncertainty retains the complete conservative fallback. PR Release APK bytes remain
+    non-reusable because final-main source/version identity is commit-context input.
 
-- [ ] **I03 — IMPLEMENT — Optimize PR/local validation and human-facing progress** (Items 6, 11–14, 38–40, 50, 53–55, 59–61, 80, 97–99, 132, 137–139, 142, 143)
-  - Status: **IMPLEMENTED / OFFLINE VALIDATED / HOSTED HIGH-RISK PATH LIVE VALIDATED.** Low-risk non-Android and normal targeted-Android hosted paths remain pending; do not manufacture PRs solely for acceptance.
+- [x] **I03 — IMPLEMENT — Optimize PR/local validation and human-facing progress** (Items 6, 11–14, 38–40, 50, 53–55, 59–61, 80, 97–99, 132, 137–139, 142, 143)
+  - Status: **COMPLETE / HOSTED VALIDATED.** T0-1 superseded the original three-tier hosted design
+    with the simpler authoritative `NON_ANDROID` / `ANDROID_FULL` PR contract, exact-tree main reuse,
+    Fast local feedback and fail-closed fallback. The original implementation evidence below is retained
+    as history rather than an open acceptance list.
   - Completion criterion: deterministic tiers run relevant checks with unknown paths escalating; local and GitHub output show truthful stages/timings while full logs remain available; no safety confirmation/tree identity is lost; VS Code tasks match real parameter contracts; no dangerous mutation task is exposed; checkpoint dry-run/offline and required live acceptance are documented.
   - Implementation evidence: `scripts/mosaic_validation_policy.py` reuses I01 classifications and independently selects `non-android`, `targeted-android`, or `full`. Normal Android paths map to auditable package test filters; direct test changes map by class; unmapped production paths use `com.github.damontecres.wholphin.*`; unknown, CI/workflow/action, build/package, release/signing/updater/identity and persistence inputs select Full. No-rename range discovery keeps moved/deleted inputs visible.
   - Local evidence: unchanged `-Level Fast|Standard|Full` commands now work without fake filters. Explicit filters remain supported. Fast runs the smallest selected path; Standard adds changed-scope pre-commit/offline tooling and Android compile evidence where applicable; Full uses all-files pre-commit, all offline tests and one combined full defaultDebug invocation. High/unknown scope escalates conservatively.
@@ -143,8 +160,8 @@ Status terms used below:
   - Offline evidence: policy/tests cover low-risk non-Android, high-risk isolated tooling, normal APK, sensitive APK/release/build, unknown fallback, explicit/mapped/broad tests, VS Code tasks, stage success/failure/logs/error excerpts, PR summary wiring, unchanged main authority, and zero-Gradle Development. PowerShell parser and YAML parsing pass; repository-wide pre-commit and final handoff validation remain required.
   - Minimum live acceptance: (1) docs/isolated-tooling PR proves no Android setup/Gradle and accurate summary; (2) ordinary app PR proves mapped targeted compile/tests; (3) high-risk/unknown PR proves Full; (4) merged main proves Full plus conditional I02 Release artifact and unchanged zero-Gradle Development. Record elapsed times against the former 5–7 minute unconditional PR Full baseline.
 
-- [ ] **I04 — IMPLEMENT — Remove proven dead work and consolidate measured tooling hot spots** (Items 15, 16, 56–58, 100–102, 126–131, 142)
-  - Status: **IMPLEMENTED / OFFLINE VALIDATED / HOSTED HIGH-RISK PATH LIVE VALIDATED.** Merged through PR #26 at `3907726ce38a03936e5853e5e8d36fff6d4486e9`. Low/normal I03 natural hosted acceptance remained a follow-up; I05 and I06 were implemented in later checkpoints.
+- [x] **I04 — IMPLEMENT — Remove proven dead work and consolidate measured tooling hot spots** (Items 15, 16, 56–58, 100–102, 126–131, 142)
+  - Status: **COMPLETE / HOSTED VALIDATED.** Merged through PR #26 at `3907726ce38a03936e5853e5e8d36fff6d4486e9`; T0-1 completed the remaining inherited-workflow cleanup and measured performance decisions.
   - Latest live acceptance (user-reported): Development eligibility emitted `skipped_non_apk`, release relevance `tooling-only`, validation risk `high`, and `24` changed paths. Release build/sign/publish correctly skipped after merge; protected-main validation remains authoritative. No synthetic publication or workflow dispatch is needed to repeat this evidence.
   - Hosted portability correction: both stage-output integration fixtures now launch the current PowerShell host's absolute executable path instead of hard-coded `powershell.exe`. Their empty-PATH regression setup retains every blank-line and single-writer assertion. Windows had masked the nested-command defect by providing `powershell.exe`; hosted Linux provided `pwsh` only. Local focused tests passed; the complete 125-test offline suite passed with one existing Windows executable-bit fixture skip (124 passes).
   - Completion criterion: every deletion has caller/operator evidence, one canonical helper owns each deterministic contract, API/checkouts/artifact transfers are reduced without stale security state, transient retries are bounded/idempotent, and retained upstream/recovery/exercise paths have an explicit purpose.
@@ -157,8 +174,11 @@ Status terms used below:
   - Warning ownership: Room index and diagnostic/update API warnings are inherited application debt; Gradle/configuration-resolution warnings belong to future dependency/build migration; Media3 codec/libMPV messages are expected environment diagnostics; Release lint debt remains a separate broad baseline. None is opportunistically changed here.
   - At I04, deletion of `main.yml` was deferred alongside lifecycle/artifact presentation, broad retries, configuration-derived version identity, and permission/Environment consolidation. T0-1 CP2 later completed the separately reviewed inherited-workflow deletion; the other boundaries remain governed by their own checkpoints.
 
-- [ ] **I05 — IMPLEMENT — Apply coherent lifecycle naming and compatible release presentation** (Items 17–20, 42, 45–47, 57, 77, 103–107, 123–125, 142, 143)
-  - Status: **IMPLEMENTED / OFFLINE VALIDATED; PR → MAIN → DEVELOPMENT LIFECYCLE LABELS LIVE VALIDATED; REMAINING NATURAL HOSTED ACCEPTANCE PENDING.** Asset/API-title migration and historical writes remain deferred. [I05 ledger](ITEM_6_I05_PRESENTATION.md) contains the complete pre-edit name/consumer inventory, artifact table, decisions and backfill plan.
+- [x] **I05 — IMPLEMENT — Apply coherent lifecycle naming and compatible release presentation** (Items 17–20, 42, 45–47, 57, 77, 103–107, 123–125, 142, 143)
+  - Status: **COMPLETE / HOSTED VALIDATED.** Presentation, Stable producer compatibility and later
+    T0-1 operator/release UX are accepted. Natural visual observations of the standalone diagnostic or
+    mapping retention are opportunistic, not completion gates. [I05 ledger](ITEM_6_I05_PRESENTATION.md)
+    retains the pre-edit inventory and historical decisions.
   - Implemented: coherent workflow display names and trigger-time run identities; safe job/step labels; Published/Promoted/Recovered/Skipped/failure summaries; diagnostic-only wording; distinct future rolling/archive/Stable bodies with source/install guidance; immutable-SHA eligibility compare links; presentation-only Sync headings with unchanged machine outcomes/exit codes. Guard-rejected Development triggers get a read-only explanation, without granting release eligibility.
   - Human-first run-name follow-up: PR CI uses `PR #N · <head branch>`; protected-main pushes deliberately use the documented blank fallback to preserve GitHub's native merge/push title; Development reuses the triggering CI `display_title` with CI-run-number then SHA fallbacks; manual Development keeps the approved SHA; Stable uses `Stable · from downstream-build-N`. No API, commit-message parsing or machine identity depends on these labels. PR #30 live-validated the complete presentation chain as `PR #30 · chore/item-6-lifecycle-labels` → native `Merge pull request #30 from constbogdan/chore/item-6-lifecycle-labels` → `Development · Merge pull request #30 from constbogdan/chore/item-6-lifecycle-labels`.
   - Preserved: all workflow paths, internal IDs/outputs/dependencies, `CI`, `Full validation`, production `sign` API names, signing/Environment/Stable authority, artifact prefixes/IDs, tags, version allocator, manifest and updater identity. Installed UpdateChecker parses API `name`, so `v1.0.N` remains; branded channel titles are body headings. Existing APK aliases and exact two-asset inventory remain unchanged; their coordinated migration is planned, not implemented.
@@ -184,25 +204,21 @@ Status terms used below:
 
 ### Post-Item-6 transition
 
-I06 and I07 are **COMPLETE / LIVE VALIDATED**. The next top-level program is
-[Baseline T0](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0): T0-1 Cleanup & Operator Experience, T0-2 Full Engineering / Process
-Audit, then T0-3 Documentation, Wiki & Roadmap. Baseline T0 is not an application release and must
-not be declared until its audit has no unresolved/unaccepted blocker and the current architecture is
-navigable from `docs/README.md`. T0-1 CP1 and CP2 are complete: the authoritative
-[operator UX inventory and implementation ledger](T0_1_OPERATOR_UX_INVENTORY.md) defines the
-finite CP3–CP8 work. CP2 is hosted validated with exactly five supported Actions surfaces and no APK
-build/sign/publish for its tooling-only main range. Next is CP3 Low-risk names and summaries.
+I06, I07 and T0-1 are **COMPLETE / HOSTED VALIDATED**. The authoritative
+[operator UX inventory and implementation ledger](T0_1_OPERATOR_UX_INVENTORY.md) records the
+completed CP1–CP8 sequence. [Baseline T0](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0)
+continues with T0-2 Full Engineering / Process Audit, then T0-3 Documentation, Wiki & Roadmap.
 
-- [ ] **D02 — DOCUMENT — Consolidate operational documentation after each checkpoint** (Items 45–47, 51, 62, 70–72, 75, 119, 123–125)
-  - Status: **ONGOING.**
+- [x] **D02 — DOCUMENT — Consolidate operational documentation after each checkpoint** (Items 45–47, 51, 62, 70–72, 75, 119, 123–125)
+  - Status: **COMPLETE for Item 6 / T0-1.** T0-3 owns any broader documentation consolidation.
   - Completion criterion: operational docs describe only current behavior; handoff retains expensive historical lessons/corrections; links/UTF-8 checks pass; each checkpoint reports old/new graph, measured savings, evidence retained, risks, compatibility, and next work.
 
 - [ ] **E01 — EXTERNAL / USER APPROVAL — Apply GitHub settings/metadata or mutate historical/public state** (Items 36, 37, 40, 65–69, 78, 93, 106, 115, 120, 122, 138, 139)
   - Status: **BLOCKED by design until separately authorized.**
   - Completion criterion: a reviewed proposal identifies exact setting/object mutations, permissions, rollback, cost/eligibility, and security impact; the user explicitly authorizes execution. Repository code may prepare proposals/tests but cannot imply these controls are live.
 
-- [ ] **V01 — VALIDATE — Keep every checkpoint independently safe and produce the final Item 6 report** (Items 48, 74, 75, 142, 143)
-  - Status: **READY as the governing validation gate.**
+- [x] **V01 — VALIDATE — Keep every checkpoint independently safe and produce the final Item 6 report** (Items 48, 74, 75, 142, 143)
+  - Status: **COMPLETE for Item 6 / T0-1.** Later phases retain their own validation gates.
   - Completion criterion: every PR leaves main buildable and Development/Stable/recovery/updater contracts usable; infrastructure changes receive strong old/new offline coverage and the minimum approved live acceptance; quick wins and caution items remain explicit; final before/after matrix and measured outcomes satisfy Item 74.
 
 ## I02 evidence and measurement pass (2026-09-09)

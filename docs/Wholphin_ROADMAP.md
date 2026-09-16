@@ -10,7 +10,7 @@ authoritative; the obsolete Issue/journal/finalizer lifecycle is removed.
 **I07 — COMPLETE / LIVE VALIDATED.** Development uses forward-fix recovery. Stable supports the
 minimal emergency Hold Release followed by forward-fix and zero-input Stable Promotion.
 
-**Baseline T0 — IN PROGRESS. T0-1 CP4B.1 exact-tree reuse contract repair is COMPLETE / HOSTED
+**Baseline T0 — IN PROGRESS. T0-1 is COMPLETE. CP4B.1 exact-tree reuse contract repair is COMPLETE / HOSTED
 VALIDATED. CP4B.2 — Authoritative PR Validation Model — is COMPLETE / HOSTED VALIDATED for both
 `ANDROID_FULL` and `NON_ANDROID`. CP4B.3 — Local / prepare-pr simplification — is COMPLETE / HOSTED
 VALIDATED. P04 — prepare-pr native auto-merge — is COMPLETE / HOSTED VALIDATED. Validation-plan
@@ -18,8 +18,8 @@ visibility and prepare-pr terminal UX are COMPLETE / HOSTED VALIDATED. The Opera
 COMPLETE / HOSTED VALIDATED. Release / Diagnostic UX is COMPLETE / HOSTED VALIDATED (PR #74).
 V01 is KEEP / COMPLETE. CP5 is COMPLETE / NO MIGRATION JUSTIFIED. CP7 is COMPLETE / HOSTED
 VALIDATED (PR #77). The upstream waiting-state correction is COMPLETE / HOSTED VALIDATED (PR #79;
-scheduled run #47). CP8 Final consistency is next.** Baseline T0 is an engineering baseline, not an
-application release. The ordered program is:
+scheduled run #47). CP8 final consistency is COMPLETE. T0-2 is next.** Baseline T0 is an
+engineering baseline, not an application release. The ordered program is:
 
 The CP7 performance phase is **COMPLETE / HOSTED VALIDATED**. CP7.1 replaced the prepare-pr test
 harness's fake Git transport with private real bare origins, retained fake GitHub state, restored
@@ -42,7 +42,8 @@ CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMP
 HOSTED VALIDATED; Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX
 COMPLETE / HOSTED VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED; Release / Diagnostic UX
 COMPLETE / HOSTED VALIDATED; V01 KEEP / COMPLETE; CP5 COMPLETE / NO MIGRATION JUSTIFIED; CP7
-COMPLETE / HOSTED VALIDATED; upstream waiting-state correction COMPLETE / HOSTED VALIDATED.**
+COMPLETE / HOSTED VALIDATED; upstream waiting-state correction COMPLETE / HOSTED VALIDATED; CP8
+COMPLETE. T0-1 COMPLETE.**
 
 CP4B.2 evidence classes: **`ANDROID_FULL` — HOSTED VALIDATED; `NON_ANDROID` — HOSTED VALIDATED.**
 
@@ -76,25 +77,22 @@ removed as duplicate. Do not rename or collapse before this inventory.
 
 Human-facing text should read like product UI, using natural capitalization and spaces instead of
 unnecessary underscores, hyphens, lowercase identifiers, classifier jargon, or redundant
-`Mosaic —` prefixes. Machine identifiers remain machine-safe. `Full validation → Prepare` is a
-coordinated migration because required checks, provenance, PR evidence reuse, upstream evidence,
-tests and docs consume the existing name.
+`Mosaic —` prefixes. Machine identifiers remain machine-safe. The completed CP5 audit retained
+`Full validation`: migrating it to `Prepare` would require a coordinated ruleset, provenance,
+PR-evidence, upstream-evidence, test, and documentation change without a remaining UX benefit.
 
 Every operation must state intent immediately and every completed stage its main result in one
 concise line. Explain why conditional work runs, skips, reuses evidence, waits, refuses, or needs
 more validation. Use `run identity/intent → progress → concise result → collapsed evidence`; move
 technical detail to logs/artifacts by default, and explain minutes-long work before the wait.
 
-Backlog: eliminate duplicate Full validation across local validation, prepare-pr, PR CI and main;
-establish one authoritative Full execution per path; assess PR Full for every
-`releaseRequired=true` APK change while preserving exact-tree reuse; profile offline tests and
-Development Build; collapse Confirmed Paths; improve PR and
-post-merge summaries/links; simplify the Signing Diagnostic SHA input, stale compatibility and the
-retired `mosaic-release-signing` Environment after operator confirmation. CP2 removed the obsolete
-inherited Development Build and Create release surfaces; Baseline T0 deliberately does not own
-Appstore or Fire TV AAB distribution. Later, audit compatibility for human Development versions such as
-`v1.0.34-1-g<sha>` while retaining `downstream-build-N` machine identity, and add Compare Changes
-links.
+T0-1 resolved that backlog with authoritative two-class PR validation, exact-tree main reuse,
+bounded local Fast feedback, zero-input Signing Diagnostic, compact PR/Actions output, authenticated
+Compare Changes links, and measured CP7 decisions. CP2 removed the obsolete inherited Development
+Build and Create release surfaces; Baseline T0 deliberately does not own Appstore or Fire TV AAB
+distribution. CP5 retained the established version/job/check identities after consumer audits, and
+CP8 verified the resulting documentation and contracts. The retired `mosaic-release-signing`
+Environment remains external operator cleanup only; no active repository consumer references it.
 
 CP4A established that the clearest removable duplication is an explicit local Full immediately
 followed by prepare-pr Full against the same mutable snapshot. Hosted PR validation remains the
@@ -265,15 +263,15 @@ separately. PR #77 hosted-validated the bounded fixture optimization: the PR too
 PR evidence in 11s, evaluated Development eligibility in 10s, required no build, and completed in
 27s. One faster Gradle sample does not justify a Gradle-contract change, and natural upstream runs
 are already seconds-class. No remaining candidate met CP7's high GO bar. **CP8 — Final consistency**
-is next.
+is complete; T0-2 is next.
 
 Hosted CP2 evidence informed CP7's separation of runner queue, setup, cache/tool installation,
 test/build execution, Environment wait, and publication timing. T0-2 owns recurrence-based
 clean-host dependency reproducibility and the authority decision for genuine upstream workflow-file
 candidates. The preferred default is manual handling rather than broader App permission unless a
-concrete automation requirement is demonstrated. CP3/CP6 own sanitized actionable push diagnostics;
-the current generic publication error is insufficient because `git push --porcelain` rejection detail
-may arrive on stdout as well as stderr.
+concrete automation requirement is demonstrated. Sanitized actionable push diagnostics are deferred
+to T0-2 security/operational review; the current generic publication error is insufficient because
+`git push --porcelain` rejection detail may arrive on stdout as well as stderr.
 
 CP3 removes redundant prefixes from the presentation-only Stable, Signing Diagnostic, and Upstream
 workflow names and gives CI, Development eligibility/publication, Stable, Hold, Signing Diagnostic,
@@ -912,10 +910,10 @@ Wholphin defines the safety/workflow contract: one appropriate protected integra
 | Owner | Responsibilities |
 | --- | --- |
 | Local / Codex | Implementation, fast/high-value feedback, downstream workspace safety, minimum useful pre-publication validation, autonomous publication after explicit user authorization. |
-| GitHub | CURRENT: authoritative CI, formatting/lint, compile/tests/build, mergeability/policy and durable PR state, operational hosted upstream detection, live-validated PR Debug artifacts, and live-validated manual Mosaic Release signing/artifacts. CURRENT: automatic Mosaic Development delivery and manual Stable promotion are live validated. FUTURE: repair sync publication binding, live sync-PR validation, security/dependency checks and measured CI optimization. |
-| Human | Publication authorization, semantic/product judgment, exceptional conflicts, Android TV/manual runtime validation where required, completed-PR merge/reject and release approval. |
+| GitHub | Authoritative PR CI, native auto-merge after protection, exact-tree protected-main reuse/fallback, PR Debug artifacts, automatic Development Build/Sign/Publish, zero-input Stable Promotion/Hold, and hosted Upstream Synchronization. |
+| Human | Publication authorization, semantic/product judgment, Android TV/manual runtime validation where required, Environment approvals, and merge/reject authority for upstream REVIEW/conflict Drafts. |
 
-Prefer deterministic GitHub/tooling for objective checks. Evaluate established tools before building custom alternatives; future agents assist fuzzy/semantic analysis and never replace deterministic validation. The two normal decisions are explicit readiness to publish, followed by review of the completed PR and merge/reject; [PREPARE_PR.md](PREPARE_PR.md) owns the detailed workflow.
+Prefer deterministic GitHub/tooling for objective checks. Evaluate established tools before building custom alternatives; future agents assist fuzzy/semantic analysis and never replace deterministic validation. Ordinary work has one pre-publication human boundary before prepare-pr arms native auto-merge; upstream REVIEW/conflict Drafts retain a later human merge/reject boundary. [PREPARE_PR.md](PREPARE_PR.md) owns the detailed workflow.
 
 ### P0 - immediate publication handoff
 
@@ -923,7 +921,7 @@ Prefer deterministic GitHub/tooling for objective checks. Evaluate established t
 - [x] Establish authenticated `gh` as the standard GitHub publication interface and dogfood successful PR creation.
 - Keep prepare-pr thin and autonomous after explicit publication authorization. Preserve scope/tree checks, required validation, PR-only integration and inherited publisher guards as ongoing invariants.
 
-### P1 - approved next: move toil off the workstation
+### P1 - completed: move toil off the workstation
 
 Current Mosaic release sequence:
 
@@ -934,8 +932,8 @@ Current Mosaic release sequence:
 5. **Stable promotion + channel UX - COMPLETE / LIVE VALIDATED.**
 6. **Automatic Development delivery - COMPLETE / LIVE VALIDATED.**
 
-Next plumbing: Upstream Sync publication credential binding. The historical Item 6
-optimization/refactor/cleanup workstream follows; it is distinct from release milestone 6.
+Upstream Sync publication, Item 6 consolidation, and T0-1 simplification are complete. The
+historical evidence below records how the final operating model was reached.
 
 [Automatic acceptance](MOSAIC_DEVELOPMENT_RELEASE.md#historical-automatic-development-and-channel-migration-acceptance)
 records PR #20, automatic release #2, v1.0.8/build-8 and in-app 1.0.5 -> 1.0.8 with preserved
@@ -955,20 +953,20 @@ Completed evidence and remaining work:
 - [x] **Permanent signing / first signing acceptance COMPLETE + OPERATIONAL:** run 34323962085, source `055dde77b00c9b6e814d1115422bc60f8fd334b3`, Mosaic 1.0.3/code 3. Hosted signing, independent certificate/package/provenance verification and emulator installation succeeded. Build ~16m43s, signing job ~34s. See [acceptance evidence](MOSAIC_SIGNING.md#first-permanent-release-signing-acceptance). That exercise published no GitHub Release. Its preserved 1.0.3 installation has since been updated in place to 1.0.5 through Mosaic; see delivery acceptance above.
 - [x] Implement shared Mosaic updater source routing for checks, APK metadata and installed-version notes, with custom URL overrides and legacy-default migration. [Contract and compatibility](MOSAIC_SIGNING.md#updater-routing-contract). Downstream discovery, notes/source metadata, alias download and in-place update are COMPLETE / LIVE VALIDATED.
 - [x] Implement the [Mosaic rolling development publication mechanism](MOSAIC_DEVELOPMENT_RELEASE.md), reusing successful exact-main CI and the shared isolated signer. Manual exact-SHA authorization only; unsigned artifact 10099950969 was recovered using tooling 7d55b98b22e2d440599dfef7288f2ac066a0f8b1 and published as downstream-build-5/develop. Publication and in-place device acceptance are COMPLETE / LIVE VALIDATED.
-- [ ] Consider main Debug artifact retention separately; its existing build output could be retained without another build. Main rolling development Release and updater routing are live validated; stable promotion and channel UX are implemented, with first live Stable publication pending. Application identity and source version allocation are implemented. PR Debug test signing is not that future Release identity.
-- [ ] **I03 implemented/offline validated; hosted acceptance pending:** classifier-selected local/PR tiers, mapped JVM fallback, concise stage output, per-stage logs, valid native VS Code tasks, and PR summaries are implemented. Protected main remains authoritative Full plus conditional I02 Release ownership; Development remains zero Gradle. Accept with real non-Android, normal targeted-Android, and high-risk Full PR runs and record timing savings against the former ~5–7 minute unconditional PR Full path.
+- [x] Keep PR Debug artifacts as the operator-installable tested bytes; protected main does not retain another Debug artifact because exact-tree policy evidence already authenticates the PR result. Final-context Release assembly remains separate.
+- [x] **I03 superseded and completed by the T0-1 two-class authority model:** every PR runs changed-range pre-commit plus the complete offline suite; `NON_ANDROID` omits Android validation and `ANDROID_FULL` runs the complete defaultDebug graph. Both classes and protected-main exact-tree reuse are hosted validated.
 - [x] Formalize minimal release remediation: native failed-job reruns before publication; Development forward-fix; emergency Stable Hold followed by forward-fix and exact-byte promotion; manual correctly signed higher-version APK if the updater is broken. No rollback/repoint framework.
 
 ### P2 - future established security, dependency and review tooling
 
 - [ ] Evaluate/adopt GitHub-native security and dependency capabilities, CodeQL, dependency review, secret scanning/push protection, and Renovate or Dependabot before custom alternatives. Audit actual settings/eligibility; choose one low-noise dependency-update owner per ecosystem.
 - [ ] Evaluate Codex PR review, CodeRabbit and Copilot review where appropriate; trial one advisory reviewer and measure signal, noise, latency, access and actual cost/eligibility before adoption.
-- [ ] After I03 hosted acceptance, profile classifier-selected PR timings and tune mappings only from evidence; preserve broad fallback and protected-main authority.
+- [ ] Revisit validation performance only from repeated post-CP7 evidence; preserve broad hosted coverage, exact-tree authentication, and protected-main fallback.
 - [ ] Prefer GitHub checks, issues and native notifications for operational status; add other notifications only for a demonstrated need.
 
 ### P3 - future downstream releases and broader portability
 
-- [ ] Define downstream release ownership, versioning, signing, RC/stable promotion, provenance, SBOMs, retention and release approval before enabling publishers.
+- [ ] Define release ownership, versioning, signing, provenance, retention, and approval separately before enabling publishers in another downstream repository; Wholphin's Development/Stable/Hold model is already operational.
 - [ ] Port the proven contract to Seerr only after deliberately reconciling `origin/develop` versus `upstream/develop` divergence and auditing inherited container/chart/Pages/tag/release/issue/PR mutation workflows.
 - [ ] Preserve Seerr's appropriate `develop` integration branch, pnpm/Node/Docker validation and repository-specific release lifecycle; adapt the contract to the other pending downstream repositories with their own toolchains and policies.
 
@@ -1026,56 +1024,23 @@ routing and Stable/Development/Custom migration. Stable promotion of downstream-
 after successful main CI are COMPLETE / LIVE VALIDATED. Stable promotion remains manual. Broader Settings
 redesign, General/Playback/Library/Downloads/Updates/Integrations/Advanced grouping,
 notification improvements where warranted and consistent progress/status UX are future
-work, separate from this Updates-only change and from pending CI optimization.
+work, separate from this Updates-only change and from recurrence-driven performance work.
 
 
 ### Post-delivery optimization and product follow-ups
 
-**Next plumbing:** repair Upstream Sync publisher credential binding while preserving
-read-only observation and narrowly scoped separate publication authority. No change to
-keys, settings, workflow behavior or CI gates is authorized by this documentation checkpoint.
+**Item 6 and T0-1 infrastructure work is complete.** The implemented graph uses bounded local Fast,
+authoritative two-class PR validation, native auto-merge, authenticated exact-tree reuse with a
+complete main fallback, independent Development eligibility, final-context Release assembly,
+isolated signing, publication, optional Stable promotion, and authenticated upstream observation /
+publication. CP7 retained already-fast trust boundaries and rejected further optimization without
+repeatable evidence. The complete timing and decision record is in
+[the CP7 audit](T0_1_CP7_PERFORMANCE_AUDIT.md).
 
-**Historical Item 6: measured optimization + refactor + cleanup (PENDING).** Begin with
-representative local prepare-pr and GitHub Actions logs; construct a task/timing/overlap
-matrix before redesigning. This workstream retains its historical Item 6 name even though
-release milestone 6 (automatic delivery) is now complete.
-
-| Existing evidence | Implication to investigate |
-| --- | --- |
-| Expensive PR Debug validation, repeated on merged main | Quantify overlap and risk-aware placement |
-| Main CI roughly 5-7 minutes; earlier examples 6-7 minutes | Use actual representative task logs |
-| Automatic Development: Release build 9m55s, sign 37s, publish 18s; total 11m02s | Separate Release compilation dominates delivery |
-| Earlier exercise: build ~16m43s, signing ~34s | Preserve memory/validation context when comparing |
-| Stable verify 38s, publish 20s, total ~1m05s | Artifact-only delivery can be short |
-| Recovery performs zero Gradle work after build | Preserve unsigned/signed retry checkpoints |
-
-Target to investigate, **not the current gate policy**:
-
-```text
-PR -> fast/change-aware checks -> targeted tests -> risk classification -> merge
-protected main -> authoritative heavy validation ONCE -> Release APK ONCE
-               -> immutable artifact -> sign -> verify -> publish Development
-```
-
-Higher-risk PRs may still require Full validation before merge. Failed post-merge Full
-validation must make main red and block publication. Keep current required Full CI until a
-separately approved redesign establishes the replacement. Preserve fast PR feedback versus
-Full merge gates, merge queue, change-aware validation, artifact reuse and zero-build signing/
-publishing as measured options, not completed optimizations.
-
-Audit all Actions workflows together: dead/redundant workflow code, obsolete compatibility
-branches, unused scripts/helpers, duplicate GitHub API/provenance requests, unnecessary
-checkouts/transfers, slow Python helpers, caching and unnecessary Gradle tasks. Determine
-CP2 proved, removed, and hosted-validated the skipped inherited Development build and tag-release workflows. Both
-paths are intentional downstream-owned absences; store/AAB distribution remains unsupported until
-a deliberately owned pipeline is designed. Next standardize surviving workflow/job/step/artifact
-names, summaries, outputs, scripts and tests.
-Misleading real-publication labels include `Mosaic signing exercise verified` and
-`signed-mosaic-signing-exercise-...`. Candidate lifecycle names after the audit:
-CI (Pull Request/Main with Development Build/Sign/Publish); Mosaic Stable Promotion;
-Upstream Synchronization. Renaming must preserve provenance/
-recovery and required-check compatibility. Improve GITHUB_STEP_SUMMARY, progress/status and
-slim/quiet prepare-pr.ps1 output while retaining complete diagnostic logs.
+Future pipeline work is demand-driven: T0-2 may audit security/reproducibility questions, and a
+measured recurrence may reopen a specific performance candidate. Existing check/job/artifact/
+version identities remain audited KEEP decisions, not unfinished naming work. Store/AAB
+distribution remains unsupported until a deliberately owned pipeline is designed.
 
 **Update and Settings UX (PENDING):** automatic discovery worked but proactive notification
 was absent during normal use, re-entry and force-stop/reopen; Settings/About showed the

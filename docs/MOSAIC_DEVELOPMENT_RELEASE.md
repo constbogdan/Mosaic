@@ -7,7 +7,9 @@ For routine Sign or pre-mutation Publish failures, use GitHub **Re-run failed jo
 
 - Inconsistent or ambiguous remote state: fail closed and inspect.
 - Stale source or expired/deleted artifact: forward-fix from current protected `main`.
-- Bad already-published APK, withdrawal, or rolling rollback/repointing: I07.
+- Bad already-published APK: forward-fix through protected `main`; an urgent bad Stable may use
+  Hold Release before the fixed Development is promoted. There is no Development withdrawal,
+  rollback, or repoint mechanism.
 
 Historical sections below retain migration evidence only; commands and workflows described there are not current operator capabilities.
 
@@ -22,11 +24,11 @@ publication never rewrites historical bodies.
 
 ## Change-aware Development eligibility
 
-**IMPLEMENTED / OFFLINE VALIDATED; post-merge live acceptance pending.** After trusted
-exact-main CI, the workflow now performs a read-only classification before Android setup,
-Gradle, version allocation, signing or publication. The comparison range begins at the
-source SHA of the last successfully exposed Development publication and ends at the
-current trusted main SHA. It is intentionally not limited to the latest commit.
+**COMPLETE / LIVE VALIDATED.** After authenticated protected-main validation (exact-tree PR reuse
+or the complete conservative fallback), the workflow performs read-only eligibility classification
+before Android setup, Release assembly, version allocation, signing, or publication. The comparison
+range begins at the source SHA of the last successfully exposed Development publication and ends at
+the current trusted main SHA. It is intentionally not limited to the latest commit.
 
 The baseline is authenticated by matching the rolling `develop` prerelease and direct tag
 to the corresponding annotated `downstream-build-N` provenance, immutable prerelease, and
@@ -45,10 +47,11 @@ The execution graph after I02 is:
 
 ```text
 exact protected-main push CI
+  -> authenticate exact PR policy evidence or run complete conservative validation fallback
   -> authenticate last published Development source
   -> classify complete unpublished source..main range
-     -> proven non-APK: skipped_non_apk; Debug validation still runs, but no Release assembly/sign/publish/release
-     -> APK-relevant or uncertain: Debug validation -> sequential bounded Release assembly
+     -> proven non-APK: skipped_non_apk; no Release assembly/sign/publish/release
+     -> APK-relevant or uncertain: sequential bounded Release assembly
         -> authenticated unsigned same-run artifact
         -> protected sign job -> verify -> publication-only job
 ```
@@ -83,7 +86,8 @@ Authoritative main CI also retains its existing Release R8 mapping as a separate
 seven-day Actions diagnostic, with source/version/build/run and mapping hash metadata.
 No rebuild or public Release asset is added. See the [I05 ledger](ITEM_6_I05_PRESENTATION.md)
 for the name inventory and concrete deferred alias/title/backfill plans. I05 is offline
-validated; natural hosted skip/publication/recovery/mapping acceptance remains pending.
+validated in this historical checkpoint; later hosted checkpoints accepted the surviving
+skip/publication/native-rerun/mapping contracts.
 
 ## Historical: automatic Development and channel migration acceptance
 
@@ -129,7 +133,9 @@ Earlier implementation-pending and manual-only checkpoints below are historical.
 This checkpoint records user-supplied hosted and device acceptance evidence. No live
 operation was rerun while documenting it. The complete downstream development delivery
 and in-place updater path is now operational. Automatic publication remains disabled;
-stable promotion is NEXT and is not implemented by this checkpoint.
+Stable promotion was next and was not implemented by this checkpoint. Later checkpoints
+superseded both conditions: automatic Development publication and Stable Promotion are
+complete/live validated.
 
 ### Original build and recovered publication
 
@@ -215,13 +221,16 @@ Both recovery paths contain zero Gradle work; immutable accepted bytes remain pr
 2. **Updater routing - COMPLETE / LIVE VALIDATED.**
 3. **Rolling development release - COMPLETE / LIVE VALIDATED.**
 4. **Live device in-place update acceptance - COMPLETE / LIVE VALIDATED.**
-5. **Stable promotion + channel UX - IMPLEMENTED / LIVE STABLE PROMOTION PENDING.**
-6. **I02 main-CI artifact ownership - IMPLEMENTED / OFFLINE VALIDATED; LIVE ACCEPTANCE PENDING.**
+5. **At this checkpoint: Stable promotion + channel UX - implementation pending live acceptance.**
+6. **At this checkpoint: I02 main-CI artifact ownership - implementation pending live acceptance.**
 
-### Retained CI and developer-velocity evidence
+Both items subsequently completed hosted/live acceptance; this list is retained only as the
+historical sequencing record.
 
-The I02 artifact-ownership optimization is implemented/offline validated, with local Full
-and hosted live acceptance pending. Local `prepare-pr.ps1` still performs work later repeated by hosted
+### Historical CI and developer-velocity evidence
+
+At this checkpoint, the I02 artifact-ownership optimization was implemented/offline validated,
+with local Full and hosted live acceptance pending. Local `prepare-pr.ps1` still performed work later repeated by hosted
 CI; PR/main/signing paths repeat expensive Kotlin/Gradle work, with
 `compileDefaultDebugKotlin` a major cost. Earlier signing acceptance measured roughly
 **16m43s build versus 34s signing**; recent ordinary main CI took roughly **6-7 minutes**.
@@ -238,18 +247,18 @@ measured task-overlap/timing matrix before redesigning local/hosted validation. 
 checkpoint changes no automation, stable promotion, CI or application behavior.
 
 
-## Current trusted build, sign and publish
+## Historical: Checkpoint-2 build, sign and publish transition
 
-**Current Checkpoint-2 implementation; hosted acceptance pending:** normal automatic delivery
-now stays in the protected-main `CI` run as dependent `release-build`, `sign-development`, and
-`publish-development` jobs. The former Development workflow is manual-only exact-SHA fallback;
-the recovery workflow remains unchanged. The historical `workflow_run` acceptance below remains
-evidence for the preserved signing/publication/updater contracts, not the current normal trigger.
+At this Checkpoint-2 transition, normal automatic delivery moved into the protected-main `CI` run
+as dependent `release-build`, `sign-development`, and `publish-development` jobs. The former
+Development workflow was temporarily retained as an exact-SHA fallback and the Recovery workflow
+still existed. Both were later removed after native failed-job reruns were live validated. The
+historical `workflow_run` acceptance below remains evidence for preserved signing/publication/
+updater contracts, not the current trigger or recovery model.
 
-Normal publication needs no dispatch or SHA input: successful protected-main validation feeds
+Normal publication needed no dispatch or SHA input: successful protected-main validation fed
 the isolated same-run jobs directly. The manual
-the former Development fallback workflow, Stable,
-and exceptional recovery remain explicit operations.
+Development fallback, Stable, and exceptional Recovery were explicit operations at this checkpoint.
 
 All jobs require canonical constbogdan/Wholphin, protected refs/heads/main and successful
 push-CI provenance whose head repository/branch/SHA match the publication run's exact SHA.
@@ -528,4 +537,4 @@ Fully unattended execution depends on a compatible existing approval policy. Ext
 settings were not inspected or changed; no bypass is added. Existing tag/release rules must
 permit the current publisher. The main CI Release assembly now follows Debug validation
 sequentially in the same workspace; Development consumes that authenticated artifact with
-zero Gradle. I02 hosted live timing and end-to-end artifact acceptance remain pending.
+zero Gradle. I02 hosted live timing and end-to-end artifact acceptance subsequently passed.

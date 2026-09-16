@@ -221,8 +221,9 @@ and 09:00/18:00/00:00 in summer. GitHub cron does not follow DST and may start l
 separates configured cron from actual observation time. Complete observations retain excluded
 paths for future Repo Intelligence without modifying that system.
 
-**CURRENT CHECKPOINT:** I06 is complete/live validated. The later authenticated upstream waiting-
-state correction is also complete/hosted validated; T0-1 CP8 final consistency is next.
+**CURRENT CHECKPOINT:** I06 and the later authenticated upstream waiting-state correction are
+complete/hosted validated. T0-1 CP8 found no remaining functional inconsistency and closed T0-1;
+the next roadmap phase is T0-2.
 
 ```yaml
 Detection: OPERATIONAL
@@ -508,7 +509,8 @@ Validate workflow YAML/actionlint, Python syntax, repository-wide pre-commit and
 `git diff --check`. Newly untracked implementation files also need explicit
 pre-commit file checks because `--all-files` follows Git's tracked inventory.
 Do not run the hosted helper against a developer checkout or create a real sync PR
-as an implementation test. Live branch/PR publication and its CI handoff await the first genuine upstream delta.
+as an implementation test. Genuine upstream episodes have now live validated branch/PR
+publication, CI handoff, native ancestry, no-delta, candidate reuse, and authenticated waiting.
 
 ## Onboarding another maintained downstream repository
 

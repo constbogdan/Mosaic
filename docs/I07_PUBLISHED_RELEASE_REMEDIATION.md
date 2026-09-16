@@ -179,14 +179,17 @@ Completed after I07: zero-input Signing Diagnostic; prepare-pr native auto-merge
 validation with exact-tree main reuse; simplified local preparation; early validation-plan output;
 collapsed PR scope; and immutable release Compare Changes links.
 
-The following remain deliberately outside I07 and are not operational yet:
+The later T0-1 CP5 consumer audit closed these proposed migrations as **KEEP / COMPLETE**,
+not as deferred implementation:
 
-- coordinate the `Full validation` → `Prepare` machine-contract migration and required-check
-  update;
-- rename `Build Development Release`, `Sign Development`, and `Publish Development` to
-  `Build`, `Sign`, and `Publish`;
-- complete workflow/action naming cleanup;
-- evaluate Development versions such as `v1.0.34-1-g<sha>` and `v1.0.34-2-g<sha>`;
+- keep the protected `CI / Full validation` identity and its evidence/ruleset consumers;
+- keep `Build Development Release`, `Sign Development`, and `Publish Development`, which
+  provide useful channel context;
+- keep authenticated workflow, artifact, release, tag, asset, and updater identities;
+- keep the aligned `1.0.N` APK/manifest/Development/Stable version identity so Stable can
+  continue exact-byte promotion.
+
+The original naming/version proposals are therefore resolved decisions, not open I07 work.
 
 ## Rejected machinery
 
