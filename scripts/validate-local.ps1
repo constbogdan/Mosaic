@@ -151,14 +151,33 @@ try {
         }
         $stages.Add([pscustomobject]@{ Name = 'Changed-scope pre-commit'; Log = 'pre-commit.log'; File = $preCommit.File; Args = $preCommitArguments; Display = $preCommitDisplay })
     }
-    $deferCompleteOfflineToPr = $Level -eq 'Fast' -and $plan.offlineTestPattern -eq 'test_*.py'
-    if ($deferCompleteOfflineToPr) {
-        if ($env:MOSAIC_OUTPUT_COMPACT -ne '1') { Write-Host 'Fast skipped the complete offline suite; authoritative PR CI will run it.' }
-        Write-MosaicRunLog $output 'Complete offline tooling deferred to authoritative PR CI.'
+    $offlinePatterns = if ($isFullPath) {
+        @('test_*.py')
+    } elseif ($Level -eq 'Fast') {
+        @($plan.localFastOfflinePatterns | Where-Object { $_ })
+    } elseif ($plan.offlineTestPattern) {
+        @($plan.offlineTestPattern)
+    } else {
+        @()
     }
-    if ($isFullPath -or ($plan.offlineTestPattern -and -not $deferCompleteOfflineToPr)) {
-        $offlinePattern = if ($isFullPath) { 'test_*.py' } else { $plan.offlineTestPattern }
-        $stages.Add([pscustomobject]@{ Name = 'Offline tooling tests'; Log = 'offline-tests.log'; File = $python; Args = @('-B', 'scripts/run_offline_tests.py', '--pattern', $offlinePattern); Display = "python -B scripts/run_offline_tests.py --pattern '$offlinePattern'" })
+    $deferredOfflineToPr = (
+        $Level -eq 'Fast' -and
+        $plan.offlineTestPattern -and
+        ($plan.offlineTestPattern -eq 'test_*.py' -or $plan.offlineTestPattern -notin $offlinePatterns)
+    )
+    if ($deferredOfflineToPr) {
+        if ($env:MOSAIC_OUTPUT_COMPACT -ne '1') { Write-Host 'Fast deferred heavyweight or complete offline tooling to authoritative PR CI.' }
+        Write-MosaicRunLog $output 'Heavyweight or complete offline tooling deferred to authoritative PR CI.'
+    }
+    foreach ($offlinePattern in $offlinePatterns) {
+        $multipleOfflinePatterns = $offlinePatterns.Count -gt 1
+        $offlineName = if ($multipleOfflinePatterns) { "Offline tooling tests ($offlinePattern)" } else { 'Offline tooling tests' }
+        $offlineLog = if ($multipleOfflinePatterns) {
+            "offline-tests-$([IO.Path]::GetFileNameWithoutExtension($offlinePattern)).log"
+        } else {
+            'offline-tests.log'
+        }
+        $stages.Add([pscustomobject]@{ Name = $offlineName; Log = $offlineLog; File = $python; Args = @('-B', 'scripts/run_offline_tests.py', '--pattern', $offlinePattern); Display = "python -B scripts/run_offline_tests.py --pattern '$offlinePattern'" })
     }
     if ($effectiveMode -eq 'targeted-android') {
         Initialize-JavaEnvironment

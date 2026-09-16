@@ -70,6 +70,33 @@ class ValidationPolicyTest(unittest.TestCase):
                 self.assertEqual(policy.NON_ANDROID, plan["validationMode"])
                 self.assertEqual("test_*.py", plan["offlineTestPattern"])
 
+    def test_fast_offline_feedback_runs_only_explicitly_bounded_modules(self):
+        cases = (
+            ("scripts/test_mosaic_change_classification.py", ["test_mosaic_change_classification.py"]),
+            ("scripts/mosaic_validation_policy.py", ["test_mosaic_validation_policy.py"]),
+            ("scripts/resolve_upstream.py", ["test_resolve_upstream.py"]),
+            ("scripts/test_prepare_pr.py", []),
+            ("scripts/hosted_upstream.py", []),
+            ("scripts/test_hosted_upstream.py", []),
+            ("scripts/tooling_test_support.py", []),
+        )
+        for path, expected in cases:
+            with self.subTest(path=path):
+                self.assertEqual(
+                    expected,
+                    policy.plan_paths([path])["localFastOfflinePatterns"],
+                )
+
+        mixed = policy.plan_paths([
+            "scripts/mosaic_validation_policy.py",
+            "scripts/test_prepare_pr.py",
+        ])
+        self.assertEqual("test_*.py", mixed["offlineTestPattern"])
+        self.assertEqual(
+            ["test_mosaic_validation_policy.py"],
+            mixed["localFastOfflinePatterns"],
+        )
+
     def test_upstream_automation_uses_explicit_release_and_offline_boundaries(self):
         ownership = policy.plan_paths(["scripts/upstream_ownership_policy.json"])
         self.assertEqual("tooling-only", ownership["releaseRelevance"])
@@ -273,9 +300,9 @@ class ValidationIntegrationContractTest(unittest.TestCase):
         self.assertIn("Fast provides local feedback only", core)
         self.assertIn("$selectedTests = if ($Level -eq 'Fast' -and $TestFilter.Count)", core)
         self.assertIn("elseif ($Level -eq 'Fast' -and $plan.validationMode -eq 'full')", core)
-        self.assertIn("$offlinePattern = if ($isFullPath) { 'test_*.py' }", core)
-        self.assertIn("$deferCompleteOfflineToPr = $Level -eq 'Fast'", core)
-        self.assertIn("Fast skipped the complete offline suite", core)
+        self.assertIn("@($plan.localFastOfflinePatterns", core)
+        self.assertIn("$deferredOfflineToPr", core)
+        self.assertIn("Fast deferred heavyweight or complete offline tooling", core)
         self.assertIn("Reviewed untracked pre-commit", core)
         self.assertIn("$plan.reviewedUntrackedPaths", core)
         self.assertIn("@('run', '--all-files')", core)
@@ -347,6 +374,10 @@ class ValidationIntegrationContractTest(unittest.TestCase):
         self.assertIn(
             "python -B scripts/run_offline_tests.py --pattern 'test_*.py'", workflow
         )
+        offline_step = workflow.split("      - name: Run offline tooling checks", 1)[1]
+        offline_step = offline_step.split("      - name:", 1)[0]
+        self.assertIn("if: github.event_name == 'pull_request'", offline_step)
+        self.assertIn("--pattern 'test_*.py'", offline_step)
         self.assertIn(
             "steps.pr-validation.outputs.validation_mode != 'non-android'", workflow
         )

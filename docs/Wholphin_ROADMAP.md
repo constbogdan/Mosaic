@@ -19,6 +19,11 @@ COMPLETE / HOSTED VALIDATED. Release / Diagnostic UX is COMPLETE / HOSTED VALIDA
 V01 is KEEP / COMPLETE. CP5 is COMPLETE / NO MIGRATION JUSTIFIED. CP7 Performance is next.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
+The read-only CP7 performance audit is **COMPLETE / IMPLEMENTATION NOT STARTED**. Its measured
+lifecycle model, operator-feedback latency finding, and ranked plan are in
+[the CP7 performance audit](T0_1_CP7_PERFORMANCE_AUDIT.md). No optimization is authorized by that
+audit; CP7.1 timing/fixture-seed work is the recommended first bounded approval.
+
 Checkpoint sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
 VALIDATED; CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED; CP4B.1 COMPLETE / HOSTED VALIDATED;
 CP4B.2 COMPLETE / HOSTED VALIDATED; CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE /
