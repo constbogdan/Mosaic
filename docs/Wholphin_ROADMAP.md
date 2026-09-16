@@ -18,7 +18,8 @@ visibility and prepare-pr terminal UX are COMPLETE / HOSTED VALIDATED. The Opera
 COMPLETE / HOSTED VALIDATED. Release / Diagnostic UX is COMPLETE / HOSTED VALIDATED (PR #74).
 V01 is KEEP / COMPLETE. CP5 is COMPLETE / NO MIGRATION JUSTIFIED. CP7 is COMPLETE / HOSTED
 VALIDATED (PR #77). The upstream waiting-state correction is COMPLETE / HOSTED VALIDATED (PR #79;
-scheduled run #47). CP8 final consistency is COMPLETE. T0-2 is next.** Baseline T0 is an
+scheduled run #47). CP8 final consistency is COMPLETE. The T0-2 audit is COMPLETE / SCOPE APPROVED;
+C1 is next.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 The CP7 performance phase is **COMPLETE / HOSTED VALIDATED**. CP7.1 replaced the prepare-pr test
@@ -50,8 +51,9 @@ CP4B.2 evidence classes: **`ANDROID_FULL` — HOSTED VALIDATED; `NON_ANDROID` �
 1. **T0-1 — Cleanup & Operator Experience:** inventory every human-facing surface and machine
    contract before simplifying validation duplication, workflow/operator presentation, obsolete
    surfaces, performance bottlenecks, and PR/release navigation.
-2. **T0-2 — Full Engineering / Process Audit:** classify repository-wide findings as `BLOCKS T0`,
-   `IMPORTANT`, `IMPROVEMENT`, or `VERIFIED / NO ISSUE`; resolve or explicitly accept blockers.
+2. **T0-2 — Engineering / Process Audit and bounded corrections:** the audit is complete and its
+   implementation scope is exactly C1 merge-commit-only settings, C2 explicit build bootstrap, and
+   C3 sanitized upstream failure diagnostics.
 3. **T0-3 — Documentation, Wiki & Roadmap:** consolidate current sources of truth separately from
    historical evidence and make the architecture navigable from `docs/README.md`.
 
@@ -283,15 +285,42 @@ error-handling work for CP6 or T0-2 security review, not folded into cosmetic CP
 
 ### T0-2 audit contract
 
-Audit CI/CD, validation policy and duplication, coverage, build/sign/publish provenance, Stable
-Promotion, Hold Release, Upstream Synchronization, rulesets, permissions, tokens, Environments,
-secret boundaries, rerun/recovery, concurrency/races, idempotency, stale/foreign/ambiguous states,
-version/updater compatibility, duplicate/dead helpers and workflows, local/hosted parity,
-test/build performance, dependency/tool pinning, and application boundaries needed for resumed
-product development. Classify findings as `BLOCKS T0`, `IMPORTANT`, `IMPROVEMENT`, or
-`VERIFIED / NO ISSUE`; do not automatically fix all findings. Unsafe, unreliable, misleading, or
-materially painful blockers must be fixed or explicitly accepted before stating: **No known issue
-blocks Baseline T0.**
+The comprehensive architecture, correctness, security, build, delivery, upstream, test, and
+application-boundary audit is **complete** and the implementation scope is **approved**. This
+section is its durable decision and negative-knowledge record rather than a duplicate operating
+manual. T0-2 now contains exactly:
+
+1. **C1 — GitHub merge-commit only:** enable merge commits and disable squash/rebase so
+   human-reviewed upstream native ancestry cannot be discarded. Do not build a configuration
+   doctor; T0-3 will document an operator settings checklist.
+2. **C2 — Explicit build bootstrap:** add the official SHA-256 for Gradle 9.6.1 and explicitly
+   provision `platforms;android-37` for `compileSdk = 37`.
+3. **C3 — Sanitized upstream failure diagnostics:** retain a bounded actionable publication failure
+   reason without changing authority, permissions, identity, mutation, retry, or lifecycle state.
+
+After required acceptance for C1, C2, and C3, mark T0-2 complete and begin T0-3. Do not add another
+T0-2 checkpoint without new concrete evidence and explicit approval. The audit's KEEP, WATCH,
+FEATURE, and FUTURE conclusions remain closed; in particular, T0-2 does not authorize application,
+provenance, CI, performance, dependency-hardening, monitoring, or documentation redesign.
+
+The accepted disposition is:
+
+- **KEEP:** current application boundaries; exact-tree validation and conservative fallback;
+  release, signing, Stable, Hold, provenance, native-rerun, upstream-ownership and semantic-review
+  authority; `waiting_on_existing_pr`; realistic Git fixtures; compatibility; and least privilege.
+- **WATCH:** the one-off clean-host dependency-resolution incident, measured Gradle/Android costs,
+  and acceptance cases requiring a naturally occurring real-world condition. New evidence or
+  recurrence is required before reopening them.
+- **FEATURE:** product-specific architecture, behavior, and tests belong to resumed feature work,
+  not baseline infrastructure redesign.
+- **FUTURE:** byte-for-byte build reproducibility, generalized security tooling, and automated
+  settings monitoring require demonstrated need and separate approval. T0-3 owns documentation
+  navigation and the concise external-GitHub-settings operator checklist.
+
+There is no T0-2 application refactor, provenance or CI redesign, further performance work,
+dependency-hardening program, configuration doctor, scheduled settings monitor, documentation
+consolidation, or knowledge graph. The existing architecture was challenged rather than retained by
+default; the surviving mechanisms each protect a reviewed consumer or authority boundary.
 
 ### T0-3 documentation contract
 
