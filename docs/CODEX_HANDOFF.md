@@ -36,7 +36,9 @@
 
 `T0-2 audit - COMPLETE / IMPLEMENTATION SCOPE APPROVED`
 
-`Next: T0-2 C1 - GitHub merge-commit only`
+`T0-2 C1 - COMPLETE / LIVE VERIFIED`
+
+`Next: T0-2 C2 - Explicit build bootstrap`
 
 The current operator lifecycle is concise: bounded Fast feedback -> prepare-pr scope/tree integrity
 and exact-head publication -> authoritative `NON_ANDROID` or `ANDROID_FULL` PR CI -> native
@@ -94,6 +96,16 @@ implementation to C1 merge-commit-only repository settings, C2 explicit Gradle/A
 then C3 bounded sanitized upstream failure diagnostics. T0-3 follows their required acceptance and
 consolidates current documentation separately from historical evidence. Do not reopen T0-1 KEEP or
 T0-2 audit decisions without concrete contradictory evidence.
+
+C1 is **COMPLETE / LIVE VERIFIED**. On 2026-09-17, GitHub reported merge commits enabled,
+squash/rebase disabled, and auto-merge enabled. The unchanged active `main protection` ruleset
+still requires PRs, resolved conversations, and `Full validation`; blocks deletion and
+non-fast-forward updates; and has no bypass actors. Its broader allowed-method list is unchanged,
+while repository-level settings make merge commits the only effective method. Existing
+prepare-pr/reuse/upstream tests already protect native two-parent ancestry, exact head/tree, Draft
+authority, and no-force behavior; no implementation or test change was justified. External merge
+settings remain manually administered and must be included in the T0-3 operator checklist. C2 is
+next.
 
 T0-2 contains no configuration doctor. T0-3 will document the small external GitHub-settings set
 as an operator checklist; automated drift checking requires recurring demonstrated drift and new
