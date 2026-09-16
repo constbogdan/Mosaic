@@ -223,8 +223,9 @@ def blob_url(repository, sha, path):
 
 def candidate_pr_navigation(observation):
     """Return one canonical downstream PR link, never an upstream-controlled URL."""
-    number = str(observation.get("pr_number") or "")
-    supplied_url = str(observation.get("pr_url") or "").rstrip("/")
+    waiting = observation.get("outcome") == "waiting_on_existing_pr"
+    number = str(observation.get("blocking_pr_number" if waiting else "pr_number") or "")
+    supplied_url = str(observation.get("blocking_pr_url" if waiting else "pr_url") or "").rstrip("/")
     if not number and supplied_url:
         match = re.fullmatch(rf"https://github\.com/{re.escape(ORIGIN)}/pull/(\d+)", supplied_url)
         number = match.group(1) if match else ""
@@ -325,7 +326,9 @@ def technical_evidence(observation):
             "upstream_base_sha", "upstream_sha", "downstream_repo", "downstream_sha",
             "comparison_baseline", "candidate_sha", "candidate_tree", "branch", "outcome",
             "candidate_parents", "classification_range_count", "ownership_counts", "review_paths",
-            "conflict_paths", "clean_path_count",
+            "conflict_paths", "clean_path_count", "blocking_pr_number", "blocking_pr_url",
+            "blocking_pr_head_sha", "blocking_pr_branch", "blocking_upstream_sha",
+            "blocking_downstream_sha",
             "configured_schedule_utc", "observed_at", "run_url")
         if observation.get(key) is not None
     }, indent=2, ensure_ascii=True)
@@ -386,7 +389,7 @@ def observation_handoff_summary(observation):
 def upstream_summary(observation, *, publication=False, operation_error=False):
     outcome = observation['outcome']
     handed_off = {'observed_excluded', 'ready', 'review_required', 'semantic_conflict',
-                  'existing_pr', 'existing_draft_pr'}
+                  'existing_pr', 'existing_draft_pr', 'waiting_on_existing_pr'}
     if not publication and not operation_error and outcome in handed_off:
         return observation_handoff_summary(observation)
     changes = observation.get('automation_changes', [])
@@ -408,6 +411,7 @@ def upstream_summary(observation, *, publication=False, operation_error=False):
         action = (f'{attention_count} path{"s" if attention_count != 1 else ""} {attention_verb} semantic resolution. '
                   'No automatic merge is performed.')
     else:
+        blocking_number = display_text(observation.get('blocking_pr_number') or '')
         heading = {
             'no_delta': 'No upstream changes',
             'observed_excluded': f'{change_count} upstream {change_word} · observed but excluded',
@@ -415,6 +419,8 @@ def upstream_summary(observation, *, publication=False, operation_error=False):
             'review_required': f'{change_count} upstream {change_word} · review required',
             'existing_pr': f'{change_count} upstream {change_word} · candidate already open',
             'existing_draft_pr': f'{change_count} upstream {change_word} · review candidate already open',
+            'waiting_on_existing_pr': (f'Waiting on PR #{blocking_number}' if blocking_number
+                                       else 'Waiting on existing upstream PR'),
             'pr_created': f'{change_count} upstream {change_word} · candidate created',
             'review_pr_created': f'{change_count} upstream {change_word} · review candidate created',
         }.get(outcome, 'Upstream check complete')
@@ -427,6 +433,8 @@ def upstream_summary(observation, *, publication=False, operation_error=False):
                                 'A Draft candidate will be prepared next.'),
             'existing_pr': 'Continue review in the existing candidate PR; no duplicate was created.',
             'existing_draft_pr': 'Continue semantic resolution in the existing Draft PR; no duplicate was created.',
+            'waiting_on_existing_pr': ('The current newer upstream observation is retained. '
+                                       'No duplicate candidate branch or PR was created.'),
             'pr_created': 'Review the candidate PR. Merge or reject remains a human decision.',
             'review_pr_created': 'Resolve the identified paths in the Draft PR. No automatic merge is performed.',
         }.get(outcome, 'Inspect the technical details before taking action.')
@@ -457,7 +465,12 @@ def upstream_summary(observation, *, publication=False, operation_error=False):
                        '</code>; observed start: <code>' +
                        display_text(observation.get('observed_at', 'unknown')) + '</code>.']
     primary = []
-    if attention_count:
+    if outcome == 'waiting_on_existing_pr':
+        primary += ['### Existing review blocker', '']
+        if pr_navigation:
+            primary += [pr_navigation, '']
+        primary += ['Resolve the authenticated existing candidate before publishing this distinct newer episode.']
+    elif attention_count:
         primary += ['### Review required', '']
         if pr_navigation:
             primary += [pr_navigation, '']
@@ -616,7 +629,48 @@ def blocked_workspace_matches(git, candidate, upstream, downstream, policy_versi
             and bool(record["conflicts"]))
 
 
-def existing_candidate(pulls, observation, candidate):
+def authenticate_open_managed_candidate(git, pull, policy_version):
+    """Authenticate one open managed PR as a native merge or blocked review workspace."""
+    if pull.get("state") != "open":
+        raise Blocked("The managed sync PR is not open; preserve the human PR decision.")
+    match = BRANCH.fullmatch(str(pull.get("head", {}).get("ref") or ""))
+    head_sha = str(pull.get("head", {}).get("sha") or "")
+    try:
+        number = int(pull.get("number"))
+    except (TypeError, ValueError):
+        number = 0
+    if not match or number <= 0 or not re.fullmatch(r"[0-9a-f]{40}", head_sha):
+        raise Blocked("Open managed sync PR identity cannot be authenticated.")
+    review_ref = f"refs/review/{number}"
+    actual_head = git.text("rev-parse", review_ref)
+    if actual_head != head_sha:
+        raise Blocked("Open managed sync PR head changed during authentication.")
+    upstream, downstream = match.groups()
+    try:
+        verify_native_merge_candidate(git, review_ref, downstream, upstream)
+        native = True
+    except OperationError:
+        raise
+    except Blocked:
+        native = False
+    blocked = blocked_workspace_matches(
+        git, review_ref, upstream, downstream, policy_version
+    )
+    if not native and not blocked:
+        raise Blocked("Open managed sync PR does not contain its named authenticated input pair.")
+    if (blocked or pull_episode(pull)) and not pull.get("draft"):
+        raise Blocked("Attention-required managed sync PR is no longer Draft; preserve the human PR decision.")
+    return {
+        "blocking_pr_number": number,
+        "blocking_pr_url": pull.get("html_url"),
+        "blocking_pr_head_sha": head_sha,
+        "blocking_pr_branch": pull["head"]["ref"],
+        "blocking_upstream_sha": upstream,
+        "blocking_downstream_sha": downstream,
+    }
+
+
+def existing_candidate(git, pulls, observation, candidate, policy_version):
     same = [pull for pull in pulls if pull["head"]["ref"] == observation["branch"]]
     if len(same) > 1 or (same and same[0]["state"] != "open"):
         raise Blocked("This exact SHA pair has a closed or ambiguous PR decision; do not automatically reopen or recreate it.")
@@ -643,9 +697,12 @@ def existing_candidate(pulls, observation, candidate):
         if episode:
             raise Blocked("The unresolved episode has a closed PR decision; do not automatically reopen or recreate it.")
     others = [pull for pull in pulls if pull["state"] == "open"]
+    if len(others) > 1:
+        raise Blocked("Multiple managed sync PRs could block this episode; inspect without mutation.")
     if others:
-        observation["existing_pr_url"] = others[0]["html_url"]
-        raise Blocked("Another sync PR is open; review/merge or deliberately close it before a new proposal. History was not overwritten.")
+        blocker = authenticate_open_managed_candidate(git, others[0], policy_version)
+        observation.update(outcome="waiting_on_existing_pr", **blocker)
+        return True
     return False
 
 
@@ -783,7 +840,7 @@ def inspect(git, github, observation, anchor=INITIAL_ANCHOR):
             row["path"] for row in observation["automation_changes"] if row["ownership"] == "REVIEW"})
         finalize_attention(git, observation, base, up)
         description(observation)
-        existing_candidate(pulls, observation, candidate)
+        existing_candidate(git, pulls, observation, candidate, policy["schemaVersion"])
         return
     if merge.returncode:
         raise Blocked("Normal integration failed before publication.")
@@ -808,12 +865,25 @@ def inspect(git, github, observation, anchor=INITIAL_ANCHOR):
                        status="Review required" if review else "Candidate ready")
     finalize_attention(git, observation, base, up)
     description(observation)  # Check durable PR metadata fits before any push.
-    existing_candidate(pulls, observation, candidate)
+    existing_candidate(git, pulls, observation, candidate, policy["schemaVersion"])
 
 
-def publish(git, github, observation, expected_up, expected_down):
+def publish(git, github, observation, expected_up, expected_down,
+            expected_blocking_pr="", expected_blocking_head=""):
     if (observation.get("upstream_sha"), observation.get("downstream_sha")) != (expected_up, expected_down):
         raise Blocked("Refs changed between read and publish jobs; rerun to observe current inputs.")
+    expected_wait = bool(str(expected_blocking_pr).strip() or str(expected_blocking_head).strip())
+    if expected_wait and not (str(expected_blocking_pr).strip() and str(expected_blocking_head).strip()):
+        raise Blocked("Observe handoff contains an incomplete blocking PR identity.")
+    if observation["outcome"] == "waiting_on_existing_pr":
+        actual = (str(observation.get("blocking_pr_number") or ""),
+                  str(observation.get("blocking_pr_head_sha") or ""))
+        expected = (str(expected_blocking_pr).strip(), str(expected_blocking_head).strip())
+        if not expected_wait or actual != expected:
+            raise Blocked("Blocking PR state changed between read and publish jobs; rerun safely.")
+        return
+    if expected_wait:
+        raise Blocked("Blocking PR state changed between read and publish jobs; rerun safely.")
     if observation["outcome"] in {"no_delta", "observed_excluded"}:
         return
     if observation["outcome"] in {"existing_pr", "existing_draft_pr"}:
@@ -941,6 +1011,8 @@ def main():
     parser.add_argument("--publish", action="store_true")
     parser.add_argument("--expected-upstream", default="")
     parser.add_argument("--expected-downstream", default="")
+    parser.add_argument("--expected-blocking-pr", default="")
+    parser.add_argument("--expected-blocking-head", default="")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     o = {"schema_version": 1, "upstream_repo": UPSTREAM, "upstream_ref": "refs/heads/main",
@@ -964,7 +1036,8 @@ def main():
             git.identities()
             inspect(git, github, o)
             if args.publish:
-                publish(git, github, o, args.expected_upstream, args.expected_downstream)
+                publish(git, github, o, args.expected_upstream, args.expected_downstream,
+                        args.expected_blocking_pr, args.expected_blocking_head)
     except (Blocked, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as exc:
         failed = True
         operation_error = isinstance(exc, OperationError) or not isinstance(exc, Blocked)
@@ -975,7 +1048,8 @@ def main():
         args.output.write_text(json.dumps(o, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
         if os.environ.get("GITHUB_OUTPUT"):
             with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as stream:
-                for key in ("outcome", "upstream_sha", "downstream_sha"):
+                for key in ("outcome", "upstream_sha", "downstream_sha",
+                            "blocking_pr_number", "blocking_pr_head_sha"):
                     stream.write(f"{key}={o.get(key, '')}\n")
         if os.environ.get("GITHUB_STEP_SUMMARY"):
             with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as stream:

@@ -384,11 +384,128 @@ class HostedSyncTests(unittest.TestCase):
             self.observe()
 
     def test_new_upstream_preserves_older_open_pr(self):
-        self.upstream()
-        git, o = self.observe()
-        self.retain_pr(git, o)
-        self.upstream("newer.txt")
-        with self.assertRaisesRegex(sync.Blocked, "Another sync PR is open"):
+        self.upstream(".github/workflows/first.yml", "review first\n")
+        old_git, old = self.observe()
+        sync.publish(old_git, self.github, old, old["upstream_sha"], old["downstream_sha"])
+        self.retain_pr(old_git, old, draft=True, body=self.github.created[0][1])
+        published_count = len(self.github.created)
+
+        self.upstream(".github/workflows/second.yml", "review second\n")
+        waiting_git, waiting = self.observe()
+
+        self.assertEqual("waiting_on_existing_pr", waiting["outcome"])
+        self.assertEqual(2, waiting["incoming_count"])
+        self.assertEqual(2, waiting["classification_range_count"])
+        self.assertEqual(
+            {".github/workflows/first.yml", ".github/workflows/second.yml"},
+            set(waiting["changed_paths"]),
+        )
+        self.assertEqual(123, waiting["blocking_pr_number"])
+        self.assertEqual(old["candidate_sha"], waiting["blocking_pr_head_sha"])
+        self.assertEqual(old["branch"], waiting["blocking_pr_branch"])
+        self.assertEqual(old["upstream_sha"], waiting["blocking_upstream_sha"])
+        self.assertEqual(old["downstream_sha"], waiting["blocking_downstream_sha"])
+        self.assertEqual(old["pr_url"], waiting["blocking_pr_url"])
+        self.assertIn('"blocking_pr_head_sha"', sync.technical_evidence(waiting))
+
+        observe_summary = sync.upstream_summary(waiting)
+        self.assertTrue(observe_summary.startswith("## Upstream observation recorded"))
+        self.assertNotIn("## Waiting on PR #123", observe_summary)
+        with patch.dict(os.environ, {}, clear=True):
+            sync.publish(
+                waiting_git,
+                self.github,
+                waiting,
+                waiting["upstream_sha"],
+                waiting["downstream_sha"],
+                waiting["blocking_pr_number"],
+                waiting["blocking_pr_head_sha"],
+            )
+        self.assertFalse(waiting_git.pushes)
+        self.assertEqual(published_count, len(self.github.created))
+        summary = sync.upstream_summary(waiting, publication=True)
+        self.assertTrue(summary.startswith("## Waiting on PR #123"))
+        self.assertIn("PR #123  [open](https://github.com/constbogdan/Wholphin/pull/123)", summary)
+        self.assertIn("current newer upstream observation is retained", summary)
+        self.assertIn("No duplicate candidate branch or PR was created", summary)
+
+        retry_git, retry = self.observe()
+        self.assertEqual("waiting_on_existing_pr", retry["outcome"])
+        self.assertEqual(waiting["candidate_sha"], retry["candidate_sha"])
+        sync.publish(
+            retry_git,
+            self.github,
+            retry,
+            retry["upstream_sha"],
+            retry["downstream_sha"],
+            waiting["blocking_pr_number"],
+            waiting["blocking_pr_head_sha"],
+        )
+        self.assertFalse(retry_git.pushes)
+        self.assertEqual(published_count, len(self.github.created))
+
+    def test_waiting_blocker_head_change_between_jobs_refuses(self):
+        self.upstream(".github/workflows/first.yml", "review first\n")
+        old_git, old = self.observe()
+        self.retain_pr(old_git, old, draft=True)
+        self.upstream(".github/workflows/second.yml", "review second\n")
+        _, first = self.observe()
+
+        changed_head = old_git.run(
+            "commit-tree",
+            old["candidate_tree"],
+            "-p", old["downstream_sha"],
+            "-p", old["upstream_sha"],
+            input="Authenticated but changed blocker head\n",
+        ).stdout.strip()
+        old_git.run(
+            "push", "--force", str(self.remotes["origin"]),
+            f"{changed_head}:refs/pull/123/head",
+        )
+        self.github.records[0]["head"]["sha"] = changed_head
+        publish_git, current = self.observe()
+        self.assertEqual("waiting_on_existing_pr", current["outcome"])
+        with self.assertRaisesRegex(sync.Blocked, "Blocking PR state changed"):
+            sync.publish(
+                publish_git,
+                self.github,
+                current,
+                first["upstream_sha"],
+                first["downstream_sha"],
+                first["blocking_pr_number"],
+                first["blocking_pr_head_sha"],
+            )
+        self.assertFalse(publish_git.pushes or self.github.created)
+
+    def test_multiple_older_open_managed_candidates_remain_ambiguous(self):
+        self.upstream(".github/workflows/first.yml", "review first\n")
+        old_git, old = self.observe()
+        self.retain_pr(old_git, old, draft=True)
+        second = {**self.github.records[0], "number": 124,
+                  "html_url": "https://github.com/constbogdan/Wholphin/pull/124"}
+        old_git.run(
+            "push", str(self.remotes["origin"]),
+            f"{old['candidate_sha']}:refs/pull/124/head",
+        )
+        self.github.records.append(second)
+        self.upstream(".github/workflows/second.yml", "review second\n")
+        with self.assertRaisesRegex(sync.Blocked, "Multiple managed sync PRs"):
+            self.observe()
+
+    def test_malformed_older_open_managed_candidate_remains_blocked(self):
+        self.upstream(".github/workflows/first.yml", "review first\n")
+        old_git, old = self.observe()
+        malformed = old_git.run(
+            "commit-tree", old["candidate_tree"], "-p", old["candidate_sha"],
+            input="Malformed managed candidate\n",
+        ).stdout.strip()
+        old_git.run(
+            "push", str(self.remotes["origin"]),
+            f"{malformed}:refs/pull/123/head",
+        )
+        self.github.records = [self.pr(old, head=malformed, draft=True)]
+        self.upstream(".github/workflows/second.yml", "review second\n")
+        with self.assertRaisesRegex(sync.Blocked, "does not contain its named authenticated input pair"):
             self.observe()
 
     def test_human_changes_to_pr_head_preserved(self):
@@ -467,6 +584,7 @@ class HostedSyncTests(unittest.TestCase):
         self.assertIn('contains(fromJSON', mint)
         for outcome in ('ready', 'review_required', 'semantic_conflict'):
             self.assertIn(outcome, mint)
+        self.assertNotIn('waiting_on_existing_pr', mint)
         self.assertIn('id: publication', mint)
         self.assertIn('uses: actions/create-github-app-token@', mint)
         for expected in ('client-id: ${{ vars.SYNC_BOT_CLIENT_ID }}', 'private-key: ${{ secrets.SYNC_BOT_PRIVATE_KEY }}',
@@ -477,6 +595,12 @@ class HostedSyncTests(unittest.TestCase):
         self.assertIn('GH_TOKEN: ${{ github.token }}', execution)
         self.assertIn('EXPECTED_UPSTREAM: ${{ needs.observe.outputs.upstream }}', execution)
         self.assertIn('EXPECTED_DOWNSTREAM: ${{ needs.observe.outputs.downstream }}', execution)
+        self.assertIn('EXPECTED_BLOCKING_PR: ${{ needs.observe.outputs.blocking_pr }}', execution)
+        self.assertIn('EXPECTED_BLOCKING_HEAD: ${{ needs.observe.outputs.blocking_head }}', execution)
+        self.assertIn('--expected-blocking-pr "$EXPECTED_BLOCKING_PR"', execution)
+        self.assertIn('--expected-blocking-head "$EXPECTED_BLOCKING_HEAD"', execution)
+        self.assertIn('blocking_pr: ${{ steps.observe.outputs.blocking_pr_number }}', observe)
+        self.assertIn('blocking_head: ${{ steps.observe.outputs.blocking_pr_head_sha }}', observe)
         self.assertIn('if: always()', execution)
         self.assertNotIn('MOSAIC_', workflow)
 
@@ -905,6 +1029,84 @@ class HostedSyncTests(unittest.TestCase):
                       summary)
         self.assertIn("inspect the outcome artifact and branch before rerunning", summary)
         self.assertIn("permission_denied: fixture publication failed", summary)
+
+    def test_waiting_cli_exits_green_and_binds_complete_handoff(self):
+        blocker_head = "c" * 40
+        current_upstream = "a" * 40
+        current_downstream = "b" * 40
+        runtime = {
+            key: os.environ[key]
+            for key in ("PATH", "SYSTEMROOT", "TEMP", "TMP")
+            if key in os.environ
+        }
+        runtime.update({
+            "GITHUB_ACTIONS": "true",
+            "GITHUB_REPOSITORY": sync.ORIGIN,
+            "GITHUB_REF": "refs/heads/main",
+            "GITHUB_EVENT_NAME": "workflow_dispatch",
+            "RUNNER_TEMP": str(self.root),
+            "GITHUB_OUTPUT": str(self.root / "waiting-outputs"),
+        })
+
+        def waiting(git, gh, observation):
+            observation.update(
+                outcome="waiting_on_existing_pr",
+                upstream_sha=current_upstream,
+                downstream_sha=current_downstream,
+                branch=sync.branch_name(current_upstream, current_downstream),
+                candidate_sha="d" * 40,
+                candidate_tree="e" * 40,
+                candidate_parents=[current_downstream, current_upstream],
+                comparison_baseline="f" * 40,
+                upstream_base_sha="f" * 40,
+                incoming_count=1,
+                incoming_commits=[{"sha": current_upstream, "subject": "Newer upstream"}],
+                changed_paths=["newer.txt"],
+                automation_changes=[{"path": "newer.txt", "ownership": "FOLLOW"}],
+                classification_range_count=1,
+                conflict_paths=[],
+                review_paths=[],
+                ownership_counts={"FOLLOW": 1, "REVIEW": 0, "DOWNSTREAM-OWNED": 0},
+                ancestry_validated=True,
+                blocking_pr_number=123,
+                blocking_pr_url="https://github.com/constbogdan/Wholphin/pull/123",
+                blocking_pr_head_sha=blocker_head,
+                blocking_pr_branch=sync.branch_name("1" * 40, "2" * 40),
+                blocking_upstream_sha="1" * 40,
+                blocking_downstream_sha="2" * 40,
+            )
+
+        observe_output = self.root / "waiting-observation.json"
+        with patch.dict(os.environ, runtime, clear=True), \
+                patch("sys.argv", ["hosted_upstream", "--output", str(observe_output)]), \
+                patch.object(sync, "inspect", side_effect=waiting):
+            self.assertEqual(0, sync.main())
+        retained = json.loads(observe_output.read_text())
+        self.assertEqual("waiting_on_existing_pr", retained["outcome"])
+        self.assertEqual(["newer.txt"], retained["changed_paths"])
+        self.assertEqual(blocker_head, retained["blocking_pr_head_sha"])
+        outputs = (self.root / "waiting-outputs").read_text()
+        self.assertIn("outcome=waiting_on_existing_pr", outputs)
+        self.assertIn("blocking_pr_number=123", outputs)
+        self.assertIn(f"blocking_pr_head_sha={blocker_head}", outputs)
+
+        publish_output = self.root / "waiting-publication.json"
+        runtime["GITHUB_OUTPUT"] = str(self.root / "waiting-publish-outputs")
+        argv = [
+            "hosted_upstream", "--publish",
+            "--expected-upstream", current_upstream,
+            "--expected-downstream", current_downstream,
+            "--expected-blocking-pr", "123",
+            "--expected-blocking-head", blocker_head,
+            "--output", str(publish_output),
+        ]
+        with patch.dict(os.environ, runtime, clear=True), patch("sys.argv", argv), \
+                patch.object(sync, "inspect", side_effect=waiting):
+            self.assertEqual(0, sync.main())
+        self.assertEqual(
+            "waiting_on_existing_pr",
+            json.loads(publish_output.read_text())["outcome"],
+        )
 
     def test_upstream_contained_after_accepted_merge_no_new_pr(self):
         self.upstream()

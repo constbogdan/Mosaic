@@ -282,10 +282,13 @@ Ref drift stops the run for a fresh observation; main is never pushed or modifie
   An open Draft carrying the same episode marker is also reused when unrelated downstream
   movement changes the exact-pair branch or continued upstream movement refreshes evidence.
   Its branch is not rewritten. Preserve human changes to existing branches or PRs; never force push.
-- If any other sync PR is open (including a manual dated one), leave it unchanged
-  and record a blocked attempt. Finish its review/merge or deliberately close it
-  before proposing a different unresolved episode. Automation does not stack, rebase,
-  overwrite or auto-close PRs.
+- If exactly one older open managed sync PR is fully authenticated as its named native
+  merge or blocked review workspace, a distinct current episode emits
+  `waiting_on_existing_pr`. Observe retains the complete newer range and blocker identity;
+  Publish reobserves the range, reauthenticates the same PR number and head, then reports
+  `Waiting on PR #N` without a publication token, branch push or PR mutation. Automation
+  does not stack, rebase, overwrite or auto-close PRs. Multiple, drifting, malformed or
+  unauthenticated managed candidates remain hard failures.
 - A closed PR for the exact pair is a human decision: do not reopen or recreate it
   automatically. A later distinct pair can be considered after older open PRs close.
   Intentional rejection of individual changes across all future upstream states is
@@ -450,7 +453,11 @@ or untrusted upstream code runs in a write-credential context.
 There is no custom database, state branch, Issue journal or service. Run summaries and retained
 versioned JSON record observations; the deterministic branch and native PR represent candidate
 work. Exact retries reuse the authenticated candidate. Native PR merge/close and accepted Git
-ancestry are terminal facts. A
+ancestry are terminal facts. A `waiting_on_existing_pr` artifact is transient evidence, not a
+new ledger: it retains the complete current upstream/downstream pair, deterministic candidate,
+commit/path/classification/conflict evidence and authenticated blocker PR identity for 14 days.
+After the blocker is resolved, the next run recomputes the remaining range from native Git
+ancestry; no branch or PR is created merely to preserve an advancing observation. A
 semantic-conflict Draft remains open with status `Blocked — semantic integration required`.
 
 Expected blocked semantic state returns a structured outcome rather than impersonating a
