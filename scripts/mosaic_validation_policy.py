@@ -94,8 +94,24 @@ OFFLINE_TEST_MAP = {
 }
 
 
-def offline_test_pattern(paths):
-    """Choose the narrowest offline fixture pattern that safely covers tooling changes."""
+BOUNDED_LOCAL_FAST_OFFLINE_PATTERNS = frozenset({
+    "test_mosaic_change_classification.py",
+    "test_mosaic_delivery_output.py",
+    "test_mosaic_development_release.py",
+    "test_mosaic_hold_release.py",
+    "test_mosaic_signing_exercise.py",
+    "test_mosaic_stable.py",
+    "test_mosaic_validation_policy.py",
+    "test_mosaic_validation_reuse.py",
+    "test_mosaic_version.py",
+    "test_resolve_upstream.py",
+    "test_run_offline_tests.py",
+    "test_verify_mosaic_apk.py",
+})
+
+
+def offline_test_patterns(paths):
+    """Return every offline fixture pattern associated with the changed paths."""
     tests = set()
     for path in paths:
         if path in {
@@ -112,9 +128,22 @@ def offline_test_pattern(paths):
             tests.add("test_*.py")
         elif path in OFFLINE_TEST_MAP:
             tests.add(OFFLINE_TEST_MAP[path])
+    return tests
+
+
+def offline_test_pattern(paths):
+    """Choose the narrowest comprehensive offline pattern for explicit validation."""
+    tests = offline_test_patterns(paths)
     if not tests:
         return ""
     return next(iter(tests)) if len(tests) == 1 else "test_*.py"
+
+
+def local_fast_offline_patterns(paths):
+    """Return explicitly bounded modules suitable for automatic local Fast feedback."""
+    return sorted(
+        offline_test_patterns(paths) & BOUNDED_LOCAL_FAST_OFFLINE_PATTERNS
+    )
 
 
 def _matches(path, patterns):
@@ -183,6 +212,7 @@ def plan_paths(paths, explicit_filters=(), force_full=False):
         "focusedFallbackPaths": fallback,
         "fullTriggerPaths": full_paths,
         "offlineTestPattern": offline_test_pattern(paths),
+        "localFastOfflinePatterns": local_fast_offline_patterns(paths),
         "reason": reason,
     }
 

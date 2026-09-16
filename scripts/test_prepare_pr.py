@@ -15,9 +15,72 @@ from tooling_test_support import normalized_native_output
 
 ROOT = Path(__file__).resolve().parents[1]
 POWERSHELL = shutil.which("pwsh") or shutil.which("powershell")
+GIT = shutil.which("git")
+SCOPE_SEPARATOR_PATTERN = r"[\u00b7\ufffd\u2556]"
+
+
+def isolated_git_environment(source, global_config):
+    """Return a deterministic fixture environment without inherited Git shaping."""
+    environment = {
+        key: value
+        for key, value in source.items()
+        if not key.upper().startswith("GIT_")
+    }
+    environment.update(
+        {
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": str(global_config),
+            "GIT_TERMINAL_PROMPT": "0",
+        }
+    )
+    return environment
+
+
+def assert_semantic_scope(test_case, result, path_count, release_relevance, risk):
+    """Assert scope fields while treating the rendered separator as presentation."""
+    path_label = "path" if path_count == 1 else "paths"
+    pattern = (
+        rf"Scope: {path_count} {path_label} {SCOPE_SEPARATOR_PATTERN} "
+        rf"{release_relevance} {SCOPE_SEPARATOR_PATTERN} {risk} risk"
+    )
+    test_case.assertRegex(normalized_native_output(result), pattern)
 
 
 class PreparePrFixtureTest(unittest.TestCase):
+    def test_fixture_git_transport_is_private_and_configuration_isolated(self):
+        hostile = isolated_git_environment(
+            {
+                "PATH": "fixture-path",
+                "GIT_DIR": "foreign.git",
+                "GIT_WORK_TREE": "foreign-worktree",
+                "GIT_CONFIG_COUNT": "1",
+            },
+            Path("fixture-global.gitconfig"),
+        )
+        self.assertEqual("fixture-path", hostile["PATH"])
+        self.assertNotIn("GIT_DIR", hostile)
+        self.assertNotIn("GIT_WORK_TREE", hostile)
+        self.assertNotIn("GIT_CONFIG_COUNT", hostile)
+        self.assertEqual("1", hostile["GIT_CONFIG_NOSYSTEM"])
+        self.assertEqual("fixture-global.gitconfig", hostile["GIT_CONFIG_GLOBAL"])
+
+        self.assertEqual(
+            "true",
+            self.origin_git("rev-parse", "--is-bare-repository").stdout.strip(),
+        )
+        self.assertEqual(
+            self.origin.as_posix(),
+            self.git("remote", "get-url", "origin").stdout.strip(),
+        )
+        self.assertIn(
+            "/github.com/constbogdan/Wholphin.git",
+            self.origin.as_posix(),
+        )
+        self.assertEqual(
+            self.remote_head("main"),
+            self.git("rev-parse", "refs/remotes/origin/main").stdout.strip(),
+        )
+
     def test_native_diagnostic_normalization_handles_ansi_wrapping_and_columns(self):
         cases = {
             (
@@ -51,12 +114,41 @@ class PreparePrFixtureTest(unittest.TestCase):
                     stderr=stderr,
                 )
                 self.assertEqual(expected, normalized_native_output(result))
+        for separator in ("\u00b7", "\ufffd", "\u2556"):
+            with self.subTest(scope_separator=separator):
+                result = subprocess.CompletedProcess(
+                    args=[],
+                    returncode=0,
+                    stdout=f"Scope: 2 paths {separator} tooling-only {separator} high risk\n",
+                    stderr="",
+                )
+                assert_semantic_scope(self, result, 2, "tooling-only", "high")
 
     def setUp(self):
-        if not POWERSHELL:
-            self.skipTest("PowerShell is unavailable")
+        if not POWERSHELL or not GIT:
+            self.skipTest("PowerShell or Git is unavailable")
         self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name)
+        self.fixture_root = Path(self.temporary.name)
+        self.root = self.fixture_root / "work"
+        self.origin = (
+            self.fixture_root / "github.com" / "constbogdan" / "Wholphin.git"
+        )
+        self.global_git_config = self.fixture_root / "global.gitconfig"
+        self.global_git_config.write_text("", encoding="utf-8")
+        self.git_environment = isolated_git_environment(
+            os.environ,
+            self.global_git_config,
+        )
+        self.root.mkdir()
+        self.origin.parent.mkdir(parents=True)
+        self.run_git(
+            self.fixture_root,
+            "init",
+            "--bare",
+            "--quiet",
+            "--initial-branch=main",
+            str(self.origin),
+        )
         (self.root / "scripts").mkdir()
         (self.root / ".github").mkdir()
         shutil.copy2(ROOT / "scripts/prepare-pr.ps1", self.root / "scripts/prepare-pr.ps1")
@@ -98,24 +190,39 @@ $global:LASTEXITCODE = 0
         self.git("init", "--quiet", "--initial-branch=main")
         self.git("config", "user.name", "Fixture User")
         self.git("config", "user.email", "fixture@example.invalid")
-        self.git("remote", "add", "origin", "https://github.com/constbogdan/Wholphin.git")
+        self.git("config", "core.autocrlf", "true")
+        self.git("remote", "add", "origin", self.origin.as_posix())
         self.git("remote", "add", "upstream", "https://github.com/damontecres/Wholphin.git")
         self.git("add", ".")
         self.git("commit", "--quiet", "-m", "fixture baseline")
-        self.git("update-ref", "refs/remotes/origin/main", "HEAD")
+        self.git("push", "--quiet", "origin", "HEAD:refs/heads/main")
+        self.git("fetch", "--quiet", "origin", "main")
         self.git("switch", "--quiet", "-c", "chore/cp4b3-fixture")
         (self.root / "file.txt").write_text("reviewed\n", encoding="utf-8")
 
     def tearDown(self):
         self.temporary.cleanup()
 
-    def git(self, *args, check=True):
+    def run_git(self, cwd, *args, check=True):
         return subprocess.run(
-            ["git", *args],
-            cwd=self.root,
+            [GIT, *args],
+            cwd=cwd,
             check=check,
             capture_output=True,
             text=True,
+            env=self.git_environment,
+        )
+
+    def git(self, *args, check=True):
+        return self.run_git(self.root, *args, check=check)
+
+    def origin_git(self, *args, check=True):
+        return self.run_git(
+            self.fixture_root,
+            "--git-dir",
+            str(self.origin),
+            *args,
+            check=check,
         )
 
     def prepare(self, phase, *extra, env=None, check=True):
@@ -139,7 +246,7 @@ $global:LASTEXITCODE = 0
             capture_output=True,
             encoding="utf-8",
             errors="replace",
-            env={**os.environ, **(env or {})},
+            env={**self.git_environment, **(env or {})},
         )
 
     def state(self):
@@ -151,6 +258,40 @@ $global:LASTEXITCODE = 0
         self.git("commit", "--quiet", "-m", message)
         return self.git("rev-parse", "HEAD").stdout.strip()
 
+    def branch_name(self):
+        return self.git("branch", "--show-current").stdout.strip()
+
+    def remote_head(self, branch=None):
+        branch = branch or self.branch_name()
+        result = self.origin_git(
+            "rev-parse",
+            "--verify",
+            f"refs/heads/{branch}",
+            check=False,
+        )
+        return result.stdout.strip() if result.returncode == 0 else None
+
+    def configure_remote_branch(self, expected):
+        branch = self.branch_name()
+        actual = self.remote_head(branch)
+        if not expected:
+            if actual:
+                self.origin_git("update-ref", "-d", f"refs/heads/{branch}")
+            return
+        if actual == expected:
+            return
+        if actual:
+            raise AssertionError(
+                f"fixture remote {branch} is already {actual}, not {expected}"
+            )
+        self.git(
+            "push",
+            "--quiet",
+            "origin",
+            f"{expected}:refs/heads/{branch}",
+        )
+        self.assertEqual(expected, self.remote_head(branch))
+
     def fake_publish_env(
         self,
         remote_sha="",
@@ -158,53 +299,17 @@ $global:LASTEXITCODE = 0
         scenario="default",
         list_head_before="",
     ):
+        self.configure_remote_branch(remote_sha)
         fixture_root = self.root / ".logs" / f"fake-publish-{scenario}"
         tool_dir = fixture_root / "tools"
         tool_dir.mkdir(parents=True, exist_ok=True)
-        git_trace = fixture_root / "git.jsonl"
         gh_trace = fixture_root / "gh.jsonl"
-        git_proxy = tool_dir / "git_proxy.py"
         gh_proxy = tool_dir / "gh_proxy.py"
-        git_proxy.write_text(
-            """import json
-import os
-from pathlib import Path
-import subprocess
-import sys
-
-args = sys.argv[1:]
-logical = args[2:] if args[:2] == [\"-c\", \"core.quotepath=false\"] else args
-with open(os.environ[\"FAKE_GIT_TRACE\"], \"a\", encoding=\"utf-8\") as stream:
-    stream.write(json.dumps(logical) + \"\\n\")
-if logical and logical[0] == \"ls-remote\":
-    remote_sha = os.environ.get(\"FAKE_REMOTE_SHA\", \"\")
-    if remote_sha:
-        print(f\"{remote_sha}\\t{logical[-1]}\")
-    raise SystemExit(0)
-if logical and logical[0] == \"fetch\" and \"origin\" in logical:
-    raise SystemExit(0)
-if logical and logical[0] == \"push\":
-    head = subprocess.check_output(
-        [os.environ[\"REAL_GIT\"], \"rev-parse\", \"HEAD\"],
-        text=True,
-    ).strip()
-    (Path(os.environ[\"FAKE_GH_STATE\"]) / \"published-head\").write_text(head)
-    print(\"simulated push\")
-    raise SystemExit(0)
-delegated = [
-    f\"{arg[:-6]}^{{tree}}\"
-    if os.name == \"nt\" and arg.endswith(\"{tree}\") and not arg.endswith(\"^{tree}\")
-    else arg
-    for arg in args
-]
-raise SystemExit(subprocess.run([os.environ[\"REAL_GIT\"], *delegated]).returncode)
-""",
-            encoding="utf-8",
-        )
         gh_proxy.write_text(
             """import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 
 args = sys.argv[1:]
@@ -224,10 +329,25 @@ def bump(path):
     return value
 
 
+def remote_head():
+    result = subprocess.run(
+        [
+            os.environ[\"REAL_GIT\"],
+            \"--git-dir\",
+            os.environ[\"FAKE_ORIGIN\"],
+            \"rev-parse\",
+            \"--verify\",
+            f\"refs/heads/{os.environ['FAKE_BRANCH']}\",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip() if result.returncode == 0 else os.environ[\"FAKE_HEAD\"]
+
+
 def summary(number=63):
     list_count = bump(list_count_path)
-    published_head = state_dir / \"published-head\"
-    head = published_head.read_text() if published_head.exists() else os.environ[\"FAKE_HEAD\"]
+    head = remote_head()
     before = os.environ.get(\"FAKE_LIST_HEAD_BEFORE\", \"\")
     if before and list_count == 1:
         head = before
@@ -241,8 +361,7 @@ def summary(number=63):
 
 def view():
     view_count = bump(view_count_path)
-    published_head = state_dir / \"published-head\"
-    head = published_head.read_text() if published_head.exists() else os.environ[\"FAKE_HEAD\"]
+    head = remote_head()
     if mode == \"wrong_head_sha\":
         head = \"f\" * 40
     if mode == \"head_drift\" and view_count > 1:
@@ -320,29 +439,26 @@ raise SystemExit(2)
             encoding="utf-8",
         )
         if os.name == "nt":
-            for name, proxy in (("git", git_proxy), ("gh", gh_proxy)):
-                (tool_dir / f"{name}.cmd").write_text(
-                    f'@"{sys.executable}" "{proxy}" %*\n',
-                    encoding="utf-8",
-                )
+            (tool_dir / "gh.cmd").write_text(
+                f'@"{sys.executable}" "{gh_proxy}" %*\n',
+                encoding="utf-8",
+            )
         else:
-            for name, proxy in (("git", git_proxy), ("gh", gh_proxy)):
-                wrapper = tool_dir / name
-                wrapper.write_text(
-                    f'#!/bin/sh\nexec "{sys.executable}" "{proxy}" "$@"\n',
-                    encoding="utf-8",
-                )
-                wrapper.chmod(wrapper.stat().st_mode | stat.S_IXUSR)
+            wrapper = tool_dir / "gh"
+            wrapper.write_text(
+                f'#!/bin/sh\nexec "{sys.executable}" "{gh_proxy}" "$@"\n',
+                encoding="utf-8",
+            )
+            wrapper.chmod(wrapper.stat().st_mode | stat.S_IXUSR)
         return {
-            "PATH": str(tool_dir) + os.pathsep + os.environ["PATH"],
-            "REAL_GIT": shutil.which("git"),
-            "FAKE_GIT_TRACE": str(git_trace),
+            "PATH": str(tool_dir) + os.pathsep + self.git_environment["PATH"],
+            "REAL_GIT": GIT,
             "FAKE_GH_TRACE": str(gh_trace),
             "FAKE_GH_STATE": str(fixture_root),
-            "FAKE_REMOTE_SHA": remote_sha,
+            "FAKE_ORIGIN": str(self.origin),
             "FAKE_PR_MODE": pr_mode,
             "FAKE_HEAD": self.git("rev-parse", "HEAD").stdout.strip(),
-            "FAKE_BRANCH": self.git("branch", "--show-current").stdout.strip(),
+            "FAKE_BRANCH": self.branch_name(),
             "FAKE_LIST_HEAD_BEFORE": list_head_before,
         }
 
@@ -412,7 +528,7 @@ raise SystemExit(2)
             self.assertNotIn("[log", pass_line)
         self.assertIn("[log: 01-preflight.log]", result.stdout)
         self.assertIn("[log: 06-publish.log]", result.stdout)
-        self.assertIn("Scope: 1 path · unknown · high risk", result.stdout)
+        assert_semantic_scope(self, result, 1, "unknown", "high")
         self.assertIn(
             "PR #63 created  [open: https://example.invalid/pr/63]",
             result.stdout,
@@ -442,6 +558,16 @@ raise SystemExit(2)
         self.assertIn("Preflight passed. Branch=", forensic)
         self.assertIn("Confirmed publication path: file.txt", forensic)
         self.assertIn("Publication completed.", forensic)
+        repo_arguments = [
+            args[args.index("--repo") + 1]
+            for args in self.fake_trace("gh")
+            if "--repo" in args
+        ]
+        self.assertTrue(repo_arguments)
+        self.assertEqual(
+            ["constbogdan/Wholphin"] * len(repo_arguments),
+            repo_arguments,
+        )
 
     def test_guided_hyperlinks_use_osc8_and_normalize_to_semantic_labels(self):
         env = {
@@ -474,7 +600,7 @@ raise SystemExit(2)
         }
         result = self.prepare("Guided", env=env, check=False)
         self.assertEqual(0, result.returncode, normalized_native_output(result))
-        self.assertIn("Scope: 1 path · tooling-only · normal risk", result.stdout)
+        assert_semantic_scope(self, result, 1, "tooling-only", "normal")
         self.assertIn(
             "Expected path: Non-Android authoritative validation",
             result.stdout,
@@ -502,7 +628,7 @@ raise SystemExit(2)
         }
         result = self.prepare("Guided", env=env, check=False)
         self.assertEqual(0, result.returncode, normalized_native_output(result))
-        self.assertIn("Scope: 1 path · apk-relevant · normal risk", result.stdout)
+        assert_semantic_scope(self, result, 1, "apk-relevant", "normal")
         self.assertIn(
             "Expected path: Android Full authoritative validation",
             result.stdout,
@@ -544,9 +670,11 @@ raise SystemExit(2)
         self.assertIn("PR #63 created", result.stdout)
         self.assertIn("Auto-merge: ENABLED", result.stdout)
         self.assertEqual(reviewed_head, self.git("rev-parse", "HEAD").stdout.strip())
-        pushes = [args for args in self.fake_trace("git") if args and args[0] == "push"]
-        self.assertEqual([["push", "-u", "origin", "chore/cp4b3-fixture"]], pushes)
-        self.assertNotIn("--force", result.stdout + result.stderr)
+        self.assertEqual(reviewed_head, self.remote_head())
+        self.assertEqual(
+            reviewed_head,
+            self.git("rev-parse", "refs/remotes/origin/chore/cp4b3-fixture").stdout.strip(),
+        )
         merge_commands = self.auto_merge_commands()
         self.assertEqual(1, len(merge_commands))
         self.assertIn("--auto", merge_commands[0])
@@ -616,7 +744,15 @@ raise SystemExit(2)
         diagnostic = normalized_native_output(result)
         self.assertIn("publication would require a force push", diagnostic)
         self.assertIn("[log: 02-publish.log]", diagnostic)
-        self.assertFalse(any(args and args[0] == "push" for args in self.fake_trace("git")))
+        self.assertEqual(divergent, self.remote_head())
+        native_push = self.git(
+            "push",
+            "origin",
+            self.branch_name(),
+            check=False,
+        )
+        self.assertNotEqual(0, native_push.returncode)
+        self.assertEqual(divergent, self.remote_head())
 
     def test_committed_only_existing_pr_is_reused_without_duplicate(self):
         reviewed_head = self.commit_current_worktree()
@@ -633,6 +769,7 @@ raise SystemExit(2)
         self.assertTrue(any(args[:2] == ["pr", "list"] for args in gh_commands))
         self.assertFalse(any(args[:2] == ["pr", "create"] for args in gh_commands))
         self.assertEqual(1, len(self.auto_merge_commands()))
+        self.assertEqual(reviewed_head, self.remote_head())
 
     def test_new_pr_is_authenticated_before_head_bound_native_auto_merge(self):
         reviewed_head = self.commit_current_worktree()
@@ -711,13 +848,17 @@ raise SystemExit(2)
         self.assertEqual(0, result.returncode, normalized_native_output(result))
         self.assertIn("Auto-merge: EXCLUDED", result.stdout)
         gh_commands = self.fake_trace("gh")
-        git_commands = self.fake_trace("git")
         self.assertTrue(any(args[:2] == ["pr", "list"] for args in gh_commands))
         self.assertFalse(any(args[:2] == ["pr", "create"] for args in gh_commands))
         self.assertFalse(any(args[:2] == ["pr", "ready"] for args in gh_commands))
         self.assertEqual([], self.auto_merge_commands())
         self.assertFalse(any(args and args[0] == "api" for args in gh_commands))
-        self.assertFalse(any("--force" in args for args in git_commands))
+        published_head = self.git("rev-parse", "HEAD").stdout.strip()
+        self.assertEqual(published_head, self.remote_head())
+        self.assertEqual(
+            0,
+            self.git("merge-base", "--is-ancestor", first, published_head).returncode,
+        )
 
     def test_wrong_repository_base_or_head_identity_refuses(self):
         reviewed_head = self.commit_current_worktree()

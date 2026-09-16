@@ -19,6 +19,13 @@ def main(argv=None):
     os.environ.pop("GITHUB_OUTPUT", None)
 
     suite = unittest.defaultTestLoader.discover(str(Path(args.start)), pattern=args.pattern)
+    if suite.countTestCases() == 0:
+        print(
+            f"No offline tooling tests matched pattern {args.pattern!r} "
+            f"under {str(Path(args.start))!r}.",
+            file=sys.stderr,
+        )
+        return 1
     result = unittest.TextTestRunner(verbosity=2, buffer=True).run(suite)
     return 0 if result.wasSuccessful() else 1
 

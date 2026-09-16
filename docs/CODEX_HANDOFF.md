@@ -26,7 +26,17 @@
 
 `CP5 — COMPLETE / NO MIGRATION JUSTIFIED`
 
-`Next: CP7 — Performance`
+`CP7 audit - COMPLETE / IMPLEMENTATION NOT STARTED`
+
+`Next: CP7 - Performance implementation (explicit approval required)`
+
+The complete CP7 evidence corpus and prioritized plan are in
+[the CP7 performance audit](T0_1_CP7_PERFORMANCE_AUDIT.md). The measured recurring bottlenecks are
+the offline suite (especially native prepare-pr fixtures), hosted Android Full, and final-context
+Release assembly. Exact-tree reuse, no-build eligibility, Sign/Publish, Stable/Hold execution, and
+Upstream Synchronization are KEEP unless new evidence changes their cost. GitHub does not expose the
+running step summary usefully from the workflow overview; keep the existing authoritative dynamic
+step name/live log rather than add a classifier, check-run, or state solely for presentation.
 
 Current sequence: `CP1 COMPLETE`; `CP2 COMPLETE / HOSTED VALIDATED`; `CP3 COMPLETE / HOSTED
 VALIDATED`; `CP4A COMPLETE — BEHAVIORAL EXECUTION AUDITED`; `CP4B.1 COMPLETE / HOSTED VALIDATED`;

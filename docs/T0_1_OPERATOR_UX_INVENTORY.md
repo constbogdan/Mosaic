@@ -7,6 +7,7 @@ Committed-only publication follow-up: **HOSTED VALIDATED (PR #64)**
 Release / Diagnostic UX batch: **COMPLETE / HOSTED VALIDATED (PR #74)**
 V01: **KEEP / COMPLETE**
 CP5: **COMPLETE / NO MIGRATION JUSTIFIED**
+CP7 audit: **COMPLETE / IMPLEMENTATION NOT STARTED**
 Next: **CP7 — Performance**
 
 Current sequence: **CP1 COMPLETE; CP2 COMPLETE / HOSTED VALIDATED; CP3 COMPLETE / HOSTED
@@ -1682,6 +1683,14 @@ external action, and owner checkpoint.
 | H06 — KEEP least privilege / COMPLETE for T0-1 | Workflow-file candidates exceed current Upstream Sync publication authority | Keep least privilege and manual handling; reconsider only through a T0-2 permission/threat-model decision | Completed permission-boundary audit | CP5 complete; T0-2 if revisited |
 
 ### PERFORMANCE (6)
+
+The comprehensive evidence model and ranked plan are recorded in
+[the CP7 performance audit](T0_1_CP7_PERFORMANCE_AUDIT.md). The audit replaces the early estimates
+below where newer measurements differ: current hosted offline cost is 115-156 seconds and is
+dominated by `test_prepare_pr.py`; current Android Full is about 7m12s-7m20s after setup; exact-tree
+main reuse remains about 9-12 seconds. CP7 implementation has not started. The first recommended
+bounded checkpoint is timing output plus immutable fixture-seed reuse with private mutable state per
+test; any parallel execution requires a subsequent explicit approval.
 
 | ID | Source / current problem | Target and dependency/risk | Validation / external action | CP |
 |---|---|---|---|---|
