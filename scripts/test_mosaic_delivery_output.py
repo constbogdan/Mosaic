@@ -249,12 +249,13 @@ class DeliveryOutputTests(unittest.TestCase):
         match = re.search(r'^\s*packages:\s*"([^"]+)"\s*$', setup, re.MULTILINE)
         self.assertIsNotNone(match)
         self.assertEqual(
-            'platform-tools platforms;android-37 '
+            'platform-tools platforms;android-37.0 '
             'build-tools;${{ env.BUILD_TOOLS_VERSION }} '
             'ndk;${{ env.NDK_VERSION }}',
             match[1],
         )
-        self.assertIn(f'platforms;android-{compile_sdk[1]}', match[1].split())
+        self.assertIn(f'platforms;android-{compile_sdk[1]}.0', match[1].split())
+        self.assertNotIn(f'platforms;android-{compile_sdk[1]}', match[1].split())
         self.assertNotIn('tools', match[1].split())
         self.assertIn('echo "BUILD_TOOLS_VERSION=36.0.0"', setup)
         self.assertIn('echo "NDK_VERSION=29.0.14206865"', setup)

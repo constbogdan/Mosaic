@@ -111,11 +111,14 @@ next.
 
 C2 adds the official Gradle `9.6.1-bin` SHA-256
 `9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14` to the unchanged wrapper URL
-and explicitly provisions `platforms;android-37` for the existing `compileSdk = 37`. The shared
-setup retains `platform-tools`, Build Tools `36.0.0`, NDK `29.0.14206865`, and no standalone
-`tools`. The existing setup contract test now binds the wrapper URL/checksum and compile SDK to the
-explicit platform package. Local focused checks and Fast pass; authoritative clean-runner
-`ANDROID_FULL` acceptance remains pending. Do not start C3 before that acceptance.
+and explicitly provisions the default-channel base package `platforms;android-37.0` for the existing
+`compileSdk = 37`. The first hosted C2 attempt proved the unversioned `platforms;android-37`
+identifier invalid; prior successful builds used the same runner image's preinstalled
+`android-37.0` platform. The shared setup retains `platform-tools`, Build Tools `36.0.0`, NDK
+`29.0.14206865`, and no standalone `tools`. The existing setup contract test now binds the wrapper
+URL/checksum and compile SDK to the supported explicit platform package. Local focused checks and
+Fast pass; authoritative clean-runner `ANDROID_FULL` acceptance of the corrected package remains
+pending. Do not start C3 before that acceptance.
 
 T0-2 contains no configuration doctor. T0-3 will document the small external GitHub-settings set
 as an operator checklist; automated drift checking requires recurring demonstrated drift and new
@@ -4374,13 +4377,13 @@ The planned formatting-baseline change must remain mechanical and separate from 
 
 ### Historical Android 37 CI setup incident
 
-The first fork CI attempt to request `platforms;android-37` failed before Gradle because that
-package was not available through the configured SDK channel at the time. Later cleanup removed the
-obsolete standalone `tools` request and relied on the hosted runner/Android Gradle Plugin for the
-platform. T0-2 C2 supersedes only that platform omission: the audited current bootstrap now
-explicitly provisions `platforms;android-37` for `compileSdk = 37`, while retaining
-`platform-tools`, Build Tools `36.0.0`, NDK `29.0.14206865`, and no standalone `tools`. Clean-runner
-hosted acceptance must prove the package is currently available and the complete build succeeds.
+The first fork CI attempt and the first hosted T0-2 C2 attempt requested the unversioned
+`platforms;android-37` identifier and failed before Gradle because that package does not exist in the
+SDK Manager catalogue. Successful hosted builds in between used the GitHub runner image's
+preinstalled `android-37.0` platform. C2 now makes that same requirement explicit with the
+default-channel base package `platforms;android-37.0`, while retaining `platform-tools`, Build Tools
+`36.0.0`, NDK `29.0.14206865`, and no standalone `tools`. Clean-runner hosted acceptance must prove
+the corrected package installs and the complete build succeeds.
 
 ### Canonical upstream version tags in fork CI
 

@@ -294,8 +294,8 @@ manual. T0-2 now contains exactly:
    squash/rebase are disabled, so human-reviewed upstream native ancestry cannot be discarded.
    Do not build a configuration doctor; T0-3 will document an operator settings checklist.
 2. **C2 — Explicit build bootstrap — IMPLEMENTED / LOCAL VALIDATED; HOSTED ACCEPTANCE PENDING:**
-   add the official SHA-256 for Gradle 9.6.1 and explicitly provision `platforms;android-37` for
-   `compileSdk = 37`.
+   add the official SHA-256 for Gradle 9.6.1 and explicitly provision the default-channel base
+   package `platforms;android-37.0` for `compileSdk = 37`.
 3. **C3 — Sanitized upstream failure diagnostics:** retain a bounded actionable publication failure
    reason without changing authority, permissions, identity, mutation, retry, or lifecycle state.
 
@@ -311,10 +311,13 @@ administered and belong in the T0-3 operator checklist.
 
 C2 pins the official Gradle `9.6.1-bin` distribution SHA-256
 `9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14` and adds
-`platforms;android-37` to the shared Android setup. Gradle version, distribution type/URL and wrapper
-JAR remain unchanged; Build Tools remain `36.0.0`, NDK remains `29.0.14206865`, and standalone
-`tools` remains absent. Focused setup/bootstrap checks and Fast pass locally. Clean-runner
-`ANDROID_FULL` acceptance is still required before C2 is complete; C3 remains next afterward.
+`platforms;android-37.0` to the shared Android setup. The first hosted C2 attempt proved that the
+unversioned `platforms;android-37` identifier does not exist in the SDK Manager catalogue;
+earlier successful builds used the same runner image's preinstalled `android-37.0` platform. Gradle
+version, distribution type/URL and wrapper JAR remain unchanged; Build Tools remain `36.0.0`, NDK
+remains `29.0.14206865`, and standalone `tools` remains absent. Focused setup/bootstrap checks and
+Fast pass locally. Clean-runner `ANDROID_FULL` acceptance of the corrected package remains required
+before C2 is complete; C3 remains next afterward.
 
 After required acceptance for C1, C2, and C3, mark T0-2 complete and begin T0-3. Do not add another
 T0-2 checkpoint without new concrete evidence and explicit approval. The audit's KEEP, WATCH,

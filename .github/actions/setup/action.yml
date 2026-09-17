@@ -23,7 +23,7 @@ runs:
     - name: Set up Android SDK
       uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
       with:
-        packages: "platform-tools platforms;android-37 build-tools;${{ env.BUILD_TOOLS_VERSION }} ndk;${{ env.NDK_VERSION }}"
+        packages: "platform-tools platforms;android-37.0 build-tools;${{ env.BUILD_TOOLS_VERSION }} ndk;${{ env.NDK_VERSION }}"
     - name: Add NDK tools to PATH
       shell: bash
       run: |
