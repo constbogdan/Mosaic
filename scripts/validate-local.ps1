@@ -71,8 +71,6 @@ function Get-ValidationPlan([string]$Python) {
 }
 
 function Find-PreCommit([string]$Python) {
-    $command = Get-Command pre-commit -ErrorAction SilentlyContinue
-    if ($command) { return [pscustomobject]@{ File = $command.Source; Prefix = @(); Display = 'pre-commit' } }
     $previousErrorAction = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
     & $Python -m pre_commit --version 2>&1 | Out-Null

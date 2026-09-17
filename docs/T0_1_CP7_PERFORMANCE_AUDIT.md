@@ -352,8 +352,8 @@ All top-level third-party Actions are pinned to commit SHAs. Gradle is pinned to
 and NDK are exact. Reliability gaps to address independently of speed are:
 
 - `gradle-wrapper.properties` has no `distributionSha256Sum`;
-- compile SDK 37 is required by the build but the shared setup does not explicitly request
-  `platforms;android-37`, relying on the current runner image;
+- compile SDK 37 is required by the build but the shared setup does not explicitly request its
+  default-channel base package `platforms;android-37.0`, relying on the current runner image;
 - `ubuntu-latest`, Python `3.14`, and Zulu Java `21` can move over time;
 - the pre-commit engine installed by the pinned composite action is not version-pinned;
 - clean-host dependency resolution has one recorded transient variant-resolution failure; one clean

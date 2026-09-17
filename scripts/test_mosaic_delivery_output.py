@@ -243,14 +243,39 @@ class DeliveryOutputTests(unittest.TestCase):
 
     def test_shared_android_setup_requests_only_required_supported_packages(self):
         setup = (ROOT / '.github/actions/setup/action.yml').read_text(encoding='utf-8')
+        versions = (ROOT / 'gradle/libs.versions.toml').read_text(encoding='utf-8')
+        compile_sdk = re.search(r'^compileSdk\s*=\s*"(\d+)"\s*$', versions, re.MULTILINE)
+        self.assertIsNotNone(compile_sdk)
         match = re.search(r'^\s*packages:\s*"([^"]+)"\s*$', setup, re.MULTILINE)
         self.assertIsNotNone(match)
         self.assertEqual(
-            'platform-tools build-tools;${{ env.BUILD_TOOLS_VERSION }} '
+            'platform-tools platforms;android-37.0 '
+            'build-tools;${{ env.BUILD_TOOLS_VERSION }} '
             'ndk;${{ env.NDK_VERSION }}',
             match[1],
         )
+        self.assertIn(f'platforms;android-{compile_sdk[1]}.0', match[1].split())
+        self.assertNotIn(f'platforms;android-{compile_sdk[1]}', match[1].split())
         self.assertNotIn('tools', match[1].split())
+        self.assertIn('echo "BUILD_TOOLS_VERSION=36.0.0"', setup)
+        self.assertIn('echo "NDK_VERSION=29.0.14206865"', setup)
+
+    def test_gradle_wrapper_authenticates_pinned_distribution(self):
+        properties = {}
+        for line in (ROOT / 'gradle/wrapper/gradle-wrapper.properties').read_text(
+                encoding='utf-8').splitlines():
+            if line and not line.startswith('#'):
+                key, value = line.split('=', 1)
+                properties[key] = value
+
+        self.assertEqual(
+            r'https\://services.gradle.org/distributions/gradle-9.6.1-bin.zip',
+            properties['distributionUrl'],
+        )
+        self.assertEqual(
+            '9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14',
+            properties['distributionSha256Sum'],
+        )
 
     def test_lifecycle_run_names_use_best_trigger_time_human_identity(self):
         ci = (ROOT / '.github/workflows/ci.yml').read_text(encoding='utf-8')

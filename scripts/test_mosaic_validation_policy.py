@@ -331,6 +331,16 @@ class ValidationIntegrationContractTest(unittest.TestCase):
         self.assertIn("$path -ne '.vscode/tasks.json'", prepare)
         self.assertIn("[credentials-redacted]", prepare)
 
+    def test_local_validation_uses_resolved_python_module_for_pre_commit(self):
+        validator = (ROOT / "scripts/validate-local.ps1").read_text()
+        resolver = validator.split("function Find-PreCommit", 1)[1].split(
+            "function Invoke-StageCommand", 1
+        )[0]
+        self.assertNotIn("Get-Command pre-commit", resolver)
+        self.assertNotIn("pre-commit.exe", resolver)
+        self.assertIn("& $Python -m pre_commit --version", resolver)
+        self.assertIn("File = $Python; Prefix = @('-m', 'pre_commit')", resolver)
+
     def test_vscode_tasks_are_native_safe_entry_points(self):
         tasks = json.loads((ROOT / ".vscode/tasks.json").read_text())
         labels = {task["label"]: task["command"] for task in tasks["tasks"]}
