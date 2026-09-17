@@ -19,7 +19,8 @@ COMPLETE / HOSTED VALIDATED. Release / Diagnostic UX is COMPLETE / HOSTED VALIDA
 V01 is KEEP / COMPLETE. CP5 is COMPLETE / NO MIGRATION JUSTIFIED. CP7 is COMPLETE / HOSTED
 VALIDATED (PR #77). The upstream waiting-state correction is COMPLETE / HOSTED VALIDATED (PR #79;
 scheduled run #47). CP8 final consistency is COMPLETE. The T0-2 audit is COMPLETE / SCOPE APPROVED;
-C1 is COMPLETE / LIVE VERIFIED; C2 is IMPLEMENTED / LOCAL VALIDATED with hosted acceptance pending.** Baseline T0 is an
+C1 is COMPLETE / LIVE VERIFIED; C2 is COMPLETE / HOSTED VALIDATED (PR #84); C3 is IMPLEMENTED /
+LOCAL VALIDATED with ordinary hosted acceptance pending.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 The CP7 performance phase is **COMPLETE / HOSTED VALIDATED**. CP7.1 replaced the prepare-pr test
@@ -293,11 +294,12 @@ manual. T0-2 now contains exactly:
 1. **C1 — GitHub merge-commit only — COMPLETE / LIVE VERIFIED:** merge commits are enabled and
    squash/rebase are disabled, so human-reviewed upstream native ancestry cannot be discarded.
    Do not build a configuration doctor; T0-3 will document an operator settings checklist.
-2. **C2 — Explicit build bootstrap — IMPLEMENTED / LOCAL VALIDATED; HOSTED ACCEPTANCE PENDING:**
+2. **C2 — Explicit build bootstrap — COMPLETE / HOSTED VALIDATED (PR #84):**
    add the official SHA-256 for Gradle 9.6.1 and explicitly provision the default-channel base
    package `platforms;android-37.0` for `compileSdk = 37`.
-3. **C3 — Sanitized upstream failure diagnostics:** retain a bounded actionable publication failure
-   reason without changing authority, permissions, identity, mutation, retry, or lifecycle state.
+3. **C3 — Sanitized upstream failure diagnostics — IMPLEMENTED / LOCAL VALIDATED; HOSTED
+   ACCEPTANCE PENDING:** retain a bounded actionable publication failure reason without changing
+   authority, permissions, identity, mutation, retry, or lifecycle state.
 
 C1 was verified live on 2026-09-17. Repository settings expose merge commits as the only enabled
 merge method and retain native auto-merge. The unchanged active `main protection` ruleset still
@@ -316,8 +318,24 @@ unversioned `platforms;android-37` identifier does not exist in the SDK Manager 
 earlier successful builds used the same runner image's preinstalled `android-37.0` platform. Gradle
 version, distribution type/URL and wrapper JAR remain unchanged; Build Tools remain `36.0.0`, NDK
 remains `29.0.14206865`, and standalone `tools` remains absent. Focused setup/bootstrap checks and
-Fast pass locally. Clean-runner `ANDROID_FULL` acceptance of the corrected package remains required
-before C2 is complete; C3 remains next afterward.
+Fast passed locally. PR #84 then provided clean-runner `ANDROID_FULL` acceptance: shared setup
+installed `platforms;android-37.0`; the wrapper downloaded and accepted the authenticated Gradle
+9.6.1 distribution; Android setup and Full Debug validation succeeded; and native merge commit
+`7a8f0854c3951010aa20d85429d4cdf71dbd2b6e` preserved the two reviewed parents. Protected-main run
+`35188784503` authenticated and reused that exact PR evidence, then independently classified the
+bootstrap change as release-relevant and successfully built, signed, and published Development
+`v1.0.65` as immutable `downstream-build-65` and rolling `develop`.
+
+C3 keeps the existing outcome schema and red failure semantics. External Git/`gh` failures retain
+one sanitized native excerpt in the existing textual reason: stderr then stdout, normalized to one
+physical line, limited to eight non-empty source lines and 1,200 characters, with visible
+truncation. Operation credentials, credential-bearing URL userinfo, authorization values, GitHub
+token forms, ANSI/OSC and control characters, and line-leading Actions workflow commands are
+redacted or neutralized. Expected REVIEW/conflict/waiting states and internal candidate or state
+authentication refusals remain distinct. A failed push still prevents PR creation and no retry gains
+force or broader credentials. Deterministic adversarial coverage is sufficient for the diagnostic
+contract; ordinary hosted PR CI remains the non-destructive repository-integrity acceptance, while
+a future natural publication failure may provide operational evidence without blocking closure.
 
 After required acceptance for C1, C2, and C3, mark T0-2 complete and begin T0-3. Do not add another
 T0-2 checkpoint without new concrete evidence and explicit approval. The audit's KEEP, WATCH,

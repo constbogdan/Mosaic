@@ -38,9 +38,9 @@
 
 `T0-2 C1 - COMPLETE / LIVE VERIFIED`
 
-`T0-2 C2 - IMPLEMENTED / LOCAL VALIDATED; HOSTED ACCEPTANCE PENDING`
+`T0-2 C2 - COMPLETE / HOSTED VALIDATED (PR #84)`
 
-`Next after C2 hosted acceptance: T0-2 C3 - Sanitized upstream publication diagnostics`
+`T0-2 C3 - IMPLEMENTED / LOCAL VALIDATED; HOSTED ACCEPTANCE PENDING`
 
 The current operator lifecycle is concise: bounded Fast feedback -> prepare-pr scope/tree integrity
 and exact-head publication -> authoritative `NON_ANDROID` or `ANDROID_FULL` PR CI -> native
@@ -115,10 +115,23 @@ and explicitly provisions the default-channel base package `platforms;android-37
 `compileSdk = 37`. The first hosted C2 attempt proved the unversioned `platforms;android-37`
 identifier invalid; prior successful builds used the same runner image's preinstalled
 `android-37.0` platform. The shared setup retains `platform-tools`, Build Tools `36.0.0`, NDK
-`29.0.14206865`, and no standalone `tools`. The existing setup contract test now binds the wrapper
-URL/checksum and compile SDK to the supported explicit platform package. Local focused checks and
-Fast pass; authoritative clean-runner `ANDROID_FULL` acceptance of the corrected package remains
-pending. Do not start C3 before that acceptance.
+`29.0.14206865`, and no standalone `tools`. The existing setup contract test binds the wrapper
+URL/checksum and compile SDK to the supported explicit platform package. PR #84 clean-runner
+`ANDROID_FULL` installed `platforms;android-37.0`, fetched and accepted the authenticated Gradle
+9.6.1 distribution, and passed Android setup and Full Debug validation. Native merge
+`7a8f0854c3951010aa20d85429d4cdf71dbd2b6e` completed; protected-main run `35188784503` reused the
+exact PR evidence, then independently built, signed, and published Development `v1.0.65` as
+`downstream-build-65` and rolling `develop`.
+
+C3 is implemented without a workflow, schema, outcome, permission, credential, mutation, or retry
+change. The shared external-command boundary retains a sanitized native failure excerpt in the
+existing reason field: at most eight non-empty source lines and 1,200 characters after one-line
+normalization, with visible truncation. It redacts operation credentials, URL userinfo,
+authorization values and GitHub token forms; removes ANSI/OSC and control characters; and
+neutralizes line-leading Actions commands. Expected semantic states and internal authentication
+refusals remain separate, and failed push still prevents PR creation. Adversarial local coverage is
+complete; ordinary authoritative PR CI is the remaining non-destructive hosted acceptance. Do not
+manufacture a privileged push failure merely to exercise the presentation.
 
 T0-2 contains no configuration doctor. T0-3 will document the small external GitHub-settings set
 as an operator checklist; automated drift checking requires recurring demonstrated drift and new
