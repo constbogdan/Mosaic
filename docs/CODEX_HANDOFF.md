@@ -40,7 +40,21 @@
 
 `T0-2 C2 - COMPLETE / HOSTED VALIDATED (PR #84)`
 
-`T0-2 C3 - IMPLEMENTED / LOCAL VALIDATED; HOSTED ACCEPTANCE PENDING`
+`T0-2 C3 - COMPLETE / HOSTED VALIDATED (PR #85)`
+
+`T0-2 - COMPLETE`
+
+`T0-3.0 Mosaic identity establishment - DECISIONS APPROVED / R1 NEXT`
+
+The approved [Mosaic identity establishment decision](Wholphin_ROADMAP.md#t0-30-mosaic-identity-establishment-decision) is
+authoritative for the pre-user rename. Mosaic is the downstream product and future repository;
+Wholphin remains the upstream project/source identity. Future releases use only
+`Mosaic-release.apk`, new Mosaic builds target only `constbogdan/Mosaic`, and the public URI scheme
+becomes `mosaic:`; there are no compatibility aliases for a nonexistent installed population.
+`wholphin-pr-policy-v1-*` remains the current evidence protocol: only its authenticated repository
+value transitions. The frozen implementation order is R1 exact old/new repository bridge, R2
+external repository rename/settings, R3 canonical product and distribution identity plus end-to-end
+proof, then R4 removal of old repository authentication. R1 is next; do not collapse the sequence.
 
 The current operator lifecycle is concise: bounded Fast feedback -> prepare-pr scope/tree integrity
 and exact-head publication -> authoritative `NON_ANDROID` or `ANDROID_FULL` PR CI -> native
@@ -93,11 +107,11 @@ The upstream waiting-state correction is also `COMPLETE / HOSTED VALIDATED`. T0-
 I06 and I07 close the infrastructure architecture phase. T0-1 completed the cleanup/operator,
 validation, presentation, performance, and consistency work described in
 [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0). The comprehensive T0-2
-audit is complete and its [approved decision record](Wholphin_ROADMAP.md#t0-2-audit-contract) limits
+audit is complete and its [approved decision record](Wholphin_ROADMAP.md#t0-2-audit-contract) limited
 implementation to C1 merge-commit-only repository settings, C2 explicit Gradle/Android bootstrap,
-then C3 bounded sanitized upstream failure diagnostics. T0-3 follows their required acceptance and
-consolidates current documentation separately from historical evidence. Do not reopen T0-1 KEEP or
-T0-2 audit decisions without concrete contradictory evidence.
+and C3 bounded sanitized upstream failure diagnostics. All three are complete. T0-3.0 now
+establishes the permanent Mosaic identity set before broader T0-3 documentation consolidation. Do
+not reopen T0-1 KEEP or T0-2 audit decisions without concrete contradictory evidence.
 
 C1 is **COMPLETE / LIVE VERIFIED**. On 2026-09-17, GitHub reported merge commits enabled,
 squash/rebase disabled, and auto-merge enabled. The unchanged active `main protection` ruleset
@@ -106,8 +120,8 @@ non-fast-forward updates; and has no bypass actors. Its broader allowed-method l
 while repository-level settings make merge commits the only effective method. Existing
 prepare-pr/reuse/upstream tests already protect native two-parent ancestry, exact head/tree, Draft
 authority, and no-force behavior; no implementation or test change was justified. External merge
-settings remain manually administered and must be included in the T0-3 operator checklist. C2 is
-next.
+settings remain manually administered and must be included in the T0-3 operator checklist. C2 and
+C3 subsequently completed; T0-3.0 R1 is next.
 
 C2 adds the official Gradle `9.6.1-bin` SHA-256
 `9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14` to the unchanged wrapper URL
@@ -130,12 +144,13 @@ normalization, with visible truncation. It redacts operation credentials, URL us
 authorization values and GitHub token forms; removes ANSI/OSC and control characters; and
 neutralizes line-leading Actions commands. Expected semantic states and internal authentication
 refusals remain separate, and failed push still prevents PR creation. Adversarial local coverage is
-complete; ordinary authoritative PR CI is the remaining non-destructive hosted acceptance. Do not
-manufacture a privileged push failure merely to exercise the presentation.
+complete. PR #85 supplied ordinary authoritative hosted acceptance without manufacturing a
+privileged push failure merely to exercise the presentation.
 
-T0-2 contains no configuration doctor. T0-3 will document the small external GitHub-settings set
-as an operator checklist; automated drift checking requires recurring demonstrated drift and new
-approval. Do not add another T0-2 checkpoint without new concrete evidence and explicit approval.
+T0-2 contains no configuration doctor. After T0-3.0, T0-3 will document the small external
+GitHub-settings set as an operator checklist; automated drift checking requires recurring
+demonstrated drift and new approval. Do not add another T0-2 checkpoint without new concrete
+evidence and explicit approval.
 
 Baseline T0 is not an application version. It is declared only when operator UX is understandable,
 the delivery/upstream/recovery architecture is coherent and audited, current documentation is
