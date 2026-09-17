@@ -476,7 +476,14 @@ semantic-conflict Draft remains open with status `Blocked — semantic integrati
 Expected blocked semantic state returns a structured outcome rather than impersonating a
 crashed tool. Trust/provenance uncertainty and permission, rate-limit, not-found, transient
 network or other required-operation failures still fail the job with their category and
-durable evidence where identity permits.
+durable evidence where identity permits. External Git and GitHub CLI failures also retain a
+sanitized native reason in that existing evidence: the excerpt is flattened, bounded to eight
+non-empty source lines and 1,200 characters, and visibly marked if truncated. Operation tokens,
+credential-bearing URL userinfo, authorization values, ANSI/control presentation, and GitHub
+Actions command syntax are removed or neutralized before the reason reaches logs, summaries, or
+the JSON artifact. This diagnostic is never a state-machine input: it cannot turn a failed
+operation green, authorize a retry, broaden credentials, force a push, or permit PR creation after
+a failed candidate push.
 
 Ref and PR checks are repeated immediately before publication, but Git/GitHub do
 not provide an atomic transaction across upstream, downstream, branch and PR state.

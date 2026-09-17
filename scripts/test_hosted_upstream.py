@@ -6,7 +6,7 @@ No test contacts GitHub or mutates the application checkout.
 
 import json
 import io
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 import os
 from pathlib import Path
 import subprocess
@@ -984,10 +984,92 @@ class HostedSyncTests(unittest.TestCase):
             self.assertEqual(run.call_args.kwargs["env"]["GH_TOKEN"], token)
             self.assertNotIn("SYNC_PUBLISH_TOKEN", run.call_args.kwargs["env"])
             self.assertNotIn(token, " ".join(run.call_args.args[0]))
-        failed = subprocess.CompletedProcess(["gh", "api"], 1, "", token)
+        failed = subprocess.CompletedProcess(
+            ["gh", "api"], 1,
+            "remote: permission denied for " + token,
+            "Authorization: Bearer " + token,
+        )
         with patch.object(sync.subprocess, "run", return_value=failed), self.assertRaises(sync.Blocked) as error:
             sync.command(["gh", "api"], env={"GH_TOKEN": token})
         self.assertNotIn(token, str(error.exception))
+        self.assertIn("[credential redacted]", str(error.exception))
+
+    def test_command_failure_preserves_actionable_git_push_rejection(self):
+        failed = subprocess.CompletedProcess(
+            ["git", "push"], 1,
+            "!\trefs/heads/candidate:refs/heads/candidate\t[remote rejected] "
+            "(refusing to allow a GitHub App to create or update workflow "
+            ".github/workflows/release.yml without workflows permission)\nDone",
+            "remote: protected branch hook declined\nerror: failed to push some refs",
+        )
+        with patch.object(sync.subprocess, "run", return_value=failed), \
+                self.assertRaises(sync.OperationError) as error:
+            sync.command(["git", "push", "--porcelain", "origin", "candidate"])
+        diagnostic = str(error.exception)
+        self.assertIn("permission_denied: git push failed (exit 1)", diagnostic)
+        self.assertIn("protected branch hook declined", diagnostic)
+        self.assertIn("[remote rejected]", diagnostic)
+        self.assertIn(".github/workflows/release.yml", diagnostic)
+        self.assertIn("workflows permission", diagnostic)
+
+    def test_command_diagnostic_preserves_safe_native_failure_kinds(self):
+        cases = {
+            "! [rejected] candidate -> candidate (non-fast-forward)": "non-fast-forward",
+            "remote: error: GH006: Protected branch update failed": "Protected branch update failed",
+            "remote: Repository not found.": "Repository not found",
+            "fatal: Authentication failed for 'https://github.com/constbogdan/Wholphin.git/'":
+                "Authentication failed",
+            "fatal: unable to access repository: Could not resolve host: github.com":
+                "Could not resolve host",
+            "HTTP 403: Resource not accessible by integration":
+                "Resource not accessible by integration",
+        }
+        for native, expected in cases.items():
+            with self.subTest(native=native):
+                self.assertIn(expected, sync.sanitize_command_diagnostic("", native))
+
+    def test_command_diagnostic_redacts_url_authorization_and_tokens(self):
+        token = "ghs_exact-operation-token"
+        failed = subprocess.CompletedProcess(
+            ["git", "fetch"], 1,
+            "fatal: unable to access 'https://x-access-token:" + token
+            + "@github.com/constbogdan/Wholphin.git/': authorization failed",
+            "Authorization: Basic c2VjcmV0\nremote repository github.com/constbogdan/Wholphin unavailable",
+        )
+        with patch.dict(os.environ, {"SYNC_PUBLISH_TOKEN": token}), \
+                patch.object(sync.subprocess, "run", return_value=failed), \
+                self.assertRaises(sync.OperationError) as error:
+            sync.command(["git", "fetch", "origin", "main"], env={"GH_TOKEN": token})
+        diagnostic = str(error.exception)
+        self.assertNotIn(token, diagnostic)
+        self.assertNotIn("x-access-token", diagnostic)
+        self.assertNotIn("c2VjcmV0", diagnostic)
+        self.assertIn("https://[credentials-redacted]@github.com/constbogdan/Wholphin.git/", diagnostic)
+        self.assertIn("remote repository github.com/constbogdan/Wholphin unavailable", diagnostic)
+
+    def test_command_diagnostic_neutralizes_presentation_and_workflow_commands(self):
+        diagnostic = sync.sanitize_command_diagnostic(
+            "\x1b[31m::error::forged message\x1b[0m\r\nremote:\x00 denied\x07",
+            "\x1b]8;;https://evil.invalid\x07click\x1b]8;;\x07\n::warning::forged warning",
+        )
+        self.assertNotIn("\x1b", diagnostic)
+        self.assertNotIn("\x00", diagnostic)
+        self.assertNotIn("\x07", diagnostic)
+        self.assertNotIn("::error::", diagnostic)
+        self.assertNotIn("::warning::", diagnostic)
+        self.assertNotIn("\n", diagnostic)
+        self.assertIn(": :error::forged message", diagnostic)
+        self.assertIn(": :warning::forged warning", diagnostic)
+        self.assertIn("remote: denied", diagnostic)
+
+    def test_command_diagnostic_is_deterministically_bounded(self):
+        diagnostic = sync.sanitize_command_diagnostic(
+            "\n".join(f"remote line {index} " + "x" * 300 for index in range(30)), ""
+        )
+        self.assertLessEqual(len(diagnostic), sync.DIAGNOSTIC_MAX_CHARS)
+        self.assertTrue(diagnostic.endswith(sync.DIAGNOSTIC_TRUNCATION))
+        self.assertIn("remote line 0", diagnostic)
+        self.assertNotIn("remote line 29", diagnostic)
 
     def test_production_push_refspec_and_credential_isolation(self):
         git = self.instance()
@@ -1029,6 +1111,49 @@ class HostedSyncTests(unittest.TestCase):
                       summary)
         self.assertIn("inspect the outcome artifact and branch before rerunning", summary)
         self.assertIn("permission_denied: fixture publication failed", summary)
+
+    def test_failed_cli_surfaces_only_sanitized_command_diagnostic(self):
+        output = self.root / "sanitized-failure.json"
+        summary = self.root / "sanitized-summary.md"
+        token = "ghs_operation-secret-value"
+        runtime = {
+            "GITHUB_ACTIONS": "true",
+            "GITHUB_REPOSITORY": sync.ORIGIN,
+            "GITHUB_REF": "refs/heads/main",
+            "GITHUB_EVENT_NAME": "workflow_dispatch",
+            "RUNNER_TEMP": str(self.root),
+            "GITHUB_STEP_SUMMARY": str(summary),
+            "GITHUB_OUTPUT": str(self.root / "sanitized-outputs"),
+            "SYNC_PUBLISH_TOKEN": token,
+        }
+        failed = subprocess.CompletedProcess(
+            ["git", "push"], 1,
+            "::error::forged\n! [remote rejected] workflow update lacks permission "
+            + token + "\n" + "x" * 2000,
+            "\x1b[31mremote: https://x-access-token:" + token
+            + "@github.com/constbogdan/Wholphin.git rejected\x1b[0m",
+        )
+        with patch.dict(os.environ, runtime), patch.object(sync.subprocess, "run", return_value=failed):
+            with self.assertRaises(sync.OperationError) as captured:
+                sync.command(["git", "push", "--porcelain", "origin", "candidate"],
+                             env={"GH_TOKEN": token})
+
+        stderr = io.StringIO()
+        with patch.dict(os.environ, runtime), \
+                patch("sys.argv", ["hosted_upstream", "--publish", "--output", str(output)]), \
+                patch.object(sync, "inspect", side_effect=captured.exception), \
+                redirect_stderr(stderr):
+            self.assertEqual(sync.main(), 1)
+
+        surfaces = output.read_text() + summary.read_text() + stderr.getvalue()
+        self.assertNotIn(token, surfaces)
+        self.assertNotIn("x-access-token", surfaces)
+        self.assertNotIn("::error::", surfaces)
+        self.assertNotIn("\x1b", surfaces)
+        self.assertIn("github.com/constbogdan/Wholphin.git", surfaces)
+        self.assertIn("[remote rejected] workflow update lacks permission", surfaces)
+        self.assertIn(sync.DIAGNOSTIC_TRUNCATION, surfaces)
+        self.assertEqual("publication_error", json.loads(output.read_text())["outcome"])
 
     def test_waiting_cli_exits_green_and_binds_complete_handoff(self):
         blocker_head = "c" * 40

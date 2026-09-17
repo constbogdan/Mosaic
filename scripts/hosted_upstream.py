@@ -15,6 +15,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from urllib.parse import quote
 
 
@@ -29,6 +30,18 @@ BRANCH = re.compile(re.escape(PREFIX) + r"([0-9a-f]{40})-([0-9a-f]{40})$")
 POLICY_PATH = Path(__file__).with_name("upstream_ownership_policy.json")
 OWNERSHIP = {"FOLLOW", "REVIEW", "DOWNSTREAM-OWNED"}
 EPISODE_MARKER = re.compile(r"<!-- wholphin-upstream-episode:([0-9a-f]{64}) -->")
+ANSI_CSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+ANSI_OSC = re.compile(r"\x1b\].*?(?:\x07|\x1b\\)", re.DOTALL)
+CREDENTIAL_URL = re.compile(r"(?i)\b(https?://)[^\s/@]+@")
+AUTHORIZATION_VALUE = re.compile(
+    r"(?i)\b(authorization\s*[:=]\s*)(?:(?:basic|bearer|token)\s+)?[^\s|]+"
+)
+GITHUB_TOKEN = re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9_.-]+|github_pat_[A-Za-z0-9_]+)\b")
+WORKFLOW_COMMAND = re.compile(r"^\s*::")
+DIAGNOSTIC_MAX_LINES = 8
+DIAGNOSTIC_MAX_CHARS = 1200
+DIAGNOSTIC_TRUNCATION = "... diagnostic truncated ..."
+OPERATION_CREDENTIAL_KEYS = {"GH_TOKEN", "GITHUB_TOKEN", "SYNC_PUBLISH_TOKEN"}
 
 
 class Blocked(RuntimeError):
@@ -505,22 +518,80 @@ class OperationError(Blocked):
     """Operational failure reported separately from expected blocked states."""
 
 
+def operation_credentials(env):
+    """Return operation-scoped credential values for exact-match redaction only."""
+    values = set()
+    for source in (os.environ, env or {}):
+        for key in OPERATION_CREDENTIAL_KEYS:
+            value = source.get(key)
+            if value:
+                values.add(str(value))
+    return sorted(values, key=len, reverse=True)
+
+
+def sanitize_command_diagnostic(stdout, stderr, *, credentials=()):
+    """Return bounded native command detail that is safe for logs and evidence."""
+    # Git porcelain rejection detail may be on stdout while remote diagnostics
+    # commonly use stderr. Preserve both, but never preserve their raw framing.
+    text = "\n".join(value for value in (stderr, stdout) if isinstance(value, str) and value)
+    text = ANSI_OSC.sub("", text)
+    text = ANSI_CSI.sub("", text)
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = "".join(
+        character if character in "\n\t" or unicodedata.category(character) not in {"Cc", "Cf"}
+        else " "
+        for character in text
+    )
+    text = CREDENTIAL_URL.sub(r"\1[credentials-redacted]@", text)
+    text = AUTHORIZATION_VALUE.sub(r"\1[credential redacted]", text)
+    for credential in credentials:
+        if credential:
+            text = text.replace(credential, "[credential redacted]")
+    text = GITHUB_TOKEN.sub("[credential redacted]", text)
+
+    lines = []
+    source_lines = text.splitlines()
+    for raw_line in source_lines:
+        line = " ".join(raw_line.split())
+        if not line:
+            continue
+        if WORKFLOW_COMMAND.match(line):
+            line = ": :" + line.lstrip()[2:]
+        lines.append(line)
+
+    truncated = len(lines) > DIAGNOSTIC_MAX_LINES
+    diagnostic = " | ".join(lines[:DIAGNOSTIC_MAX_LINES])
+    if len(diagnostic) > DIAGNOSTIC_MAX_CHARS:
+        truncated = True
+    if truncated:
+        available = DIAGNOSTIC_MAX_CHARS - len(DIAGNOSTIC_TRUNCATION) - 1
+        diagnostic = diagnostic[:max(0, available)].rstrip() + " " + DIAGNOSTIC_TRUNCATION
+    return diagnostic
+
+
 def command(args, *, cwd=None, env=None, check=True, input=None):
     result = subprocess.run(args, cwd=cwd, env=env, input=input,
                             capture_output=True, text=True, encoding="utf-8",
                             errors="replace", timeout=180)
     if check and result.returncode:
-        # Never echo credentials, untrusted command output, or workflow commands.
         operation = args[1:]
         while operation and operation[0] == "-c":
             operation = operation[2:]
-        diagnostic = result.stderr.lower() if isinstance(result.stderr, str) else ""
-        category = ("permission_denied" if "403" in diagnostic or "permission" in diagnostic
-                    else "rate_limited" if "rate limit" in diagnostic or "429" in diagnostic
-                    else "not_found" if "404" in diagnostic or "not found" in diagnostic
-                    else "transient_network" if any(value in diagnostic for value in ("timeout", "timed out", "502", "503", "504"))
+        raw_diagnostic = "\n".join(value for value in (result.stderr, result.stdout)
+                                   if isinstance(value, str)).lower()
+        category = ("permission_denied" if "403" in raw_diagnostic or "permission" in raw_diagnostic
+                    else "rate_limited" if "rate limit" in raw_diagnostic or "429" in raw_diagnostic
+                    else "not_found" if "404" in raw_diagnostic or "not found" in raw_diagnostic
+                    else "transient_network" if any(value in raw_diagnostic for value in ("timeout", "timed out", "502", "503", "504"))
                     else "operation_failed")
-        raise OperationError(f"{category}: {args[0]} {operation[0] if operation else 'operation'} failed (exit {result.returncode}); inspect permissions/connectivity and rerun.")
+        diagnostic = sanitize_command_diagnostic(
+            result.stdout, result.stderr, credentials=operation_credentials(env)
+        )
+        reason = diagnostic or "inspect permissions/connectivity and rerun."
+        raise OperationError(
+            f"{category}: {args[0]} {operation[0] if operation else 'operation'} "
+            f"failed (exit {result.returncode}); {reason}"
+        )
     return result
 
 
