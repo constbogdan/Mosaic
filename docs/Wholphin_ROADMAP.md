@@ -19,8 +19,9 @@ COMPLETE / HOSTED VALIDATED. Release / Diagnostic UX is COMPLETE / HOSTED VALIDA
 V01 is KEEP / COMPLETE. CP5 is COMPLETE / NO MIGRATION JUSTIFIED. CP7 is COMPLETE / HOSTED
 VALIDATED (PR #77). The upstream waiting-state correction is COMPLETE / HOSTED VALIDATED (PR #79;
 scheduled run #47). CP8 final consistency is COMPLETE. The T0-2 audit is COMPLETE / SCOPE APPROVED;
-C1 is COMPLETE / LIVE VERIFIED; C2 is COMPLETE / HOSTED VALIDATED (PR #84); C3 is IMPLEMENTED /
-LOCAL VALIDATED with ordinary hosted acceptance pending.** Baseline T0 is an
+C1 is COMPLETE / LIVE VERIFIED; C2 is COMPLETE / HOSTED VALIDATED (PR #84); C3 is COMPLETE /
+HOSTED VALIDATED (PR #85); T0-2 is COMPLETE. T0-3.0 Mosaic identity decisions are approved and R1
+is next.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 The CP7 performance phase is **COMPLETE / HOSTED VALIDATED**. CP7.1 replaced the prepare-pr test
@@ -52,10 +53,11 @@ CP4B.2 evidence classes: **`ANDROID_FULL` — HOSTED VALIDATED; `NON_ANDROID` �
 1. **T0-1 — Cleanup & Operator Experience:** inventory every human-facing surface and machine
    contract before simplifying validation duplication, workflow/operator presentation, obsolete
    surfaces, performance bottlenecks, and PR/release navigation.
-2. **T0-2 — Engineering / Process Audit and bounded corrections:** the audit is complete and its
-   implementation scope is exactly C1 merge-commit-only settings, C2 explicit build bootstrap, and
-   C3 sanitized upstream failure diagnostics.
-3. **T0-3 — Documentation, Wiki & Roadmap:** consolidate current sources of truth separately from
+2. **T0-2 — Engineering / Process Audit and bounded corrections — COMPLETE:** C1 merge-commit-only
+   settings, C2 explicit build bootstrap, and C3 sanitized upstream failure diagnostics are closed.
+3. **T0-3.0 — Mosaic identity establishment:** execute the approved, bounded R1 → R2 → R3 → R4
+   [Mosaic identity establishment decision](#t0-30-mosaic-identity-establishment-decision).
+4. **T0-3 — Documentation, Wiki & Roadmap:** consolidate current sources of truth separately from
    historical evidence and make the architecture navigable from `docs/README.md`.
 
 Declare **BASELINE T0** only after all three are complete and the repository can state: **No known
@@ -297,8 +299,8 @@ manual. T0-2 now contains exactly:
 2. **C2 — Explicit build bootstrap — COMPLETE / HOSTED VALIDATED (PR #84):**
    add the official SHA-256 for Gradle 9.6.1 and explicitly provision the default-channel base
    package `platforms;android-37.0` for `compileSdk = 37`.
-3. **C3 — Sanitized upstream failure diagnostics — IMPLEMENTED / LOCAL VALIDATED; HOSTED
-   ACCEPTANCE PENDING:** retain a bounded actionable publication failure reason without changing
+3. **C3 — Sanitized upstream failure diagnostics — COMPLETE / HOSTED VALIDATED (PR #85):** retain a
+   bounded actionable publication failure reason without changing
    authority, permissions, identity, mutation, retry, or lifecycle state.
 
 C1 was verified live on 2026-09-17. Repository settings expose merge commits as the only enabled
@@ -337,8 +339,9 @@ force or broader credentials. Deterministic adversarial coverage is sufficient f
 contract; ordinary hosted PR CI remains the non-destructive repository-integrity acceptance, while
 a future natural publication failure may provide operational evidence without blocking closure.
 
-After required acceptance for C1, C2, and C3, mark T0-2 complete and begin T0-3. Do not add another
-T0-2 checkpoint without new concrete evidence and explicit approval. The audit's KEEP, WATCH,
+C1, C2, and C3 have received their required acceptance; T0-2 is complete. T0-3.0 Mosaic identity
+establishment begins with R1. Do not add another T0-2 checkpoint without new concrete evidence and
+explicit approval. The audit's KEEP, WATCH,
 FEATURE, and FUTURE conclusions remain closed; in particular, T0-2 does not authorize application,
 provenance, CI, performance, dependency-hardening, monitoring, or documentation redesign.
 
@@ -361,9 +364,190 @@ dependency-hardening program, configuration doctor, scheduled settings monitor, 
 consolidation, or knowledge graph. The existing architecture was challenged rather than retained by
 default; the surviving mechanisms each protect a reviewed consumer or authority boundary.
 
+### T0-3.0 Mosaic identity establishment decision
+
+Status: **DECISIONS APPROVED / IMPLEMENTATION PENDING — R1 NEXT**
+
+T0-3 begins by establishing the permanent downstream product identity before the broader
+documentation, wiki, and roadmap consolidation. This record preserves the accepted decisions and
+implementation order without duplicating the exploratory audit.
+
+#### Product and upstream distinction
+
+```text
+Mosaic
+  downstream product and repository
+    synchronizes with and derives from
+Wholphin
+  damontecres/Wholphin upstream
+```
+
+`Mosaic` names downstream product state. `Wholphin` remains wherever it truthfully identifies the
+upstream repository, upstream-derived source or dependencies, authenticated upstream synchronization
+state, the stable PR-validation protocol name, or immutable history.
+
+#### Permanent identity decisions
+
+| Identity | Permanent decision | Migration checkpoint |
+|---|---|---|
+| Product/display name | `Mosaic` | R3 |
+| Downstream repository | `constbogdan/Mosaic` | R2, canonicalized after the bridge |
+| Release application ID | `io.github.constbogdan.mosaic` — keep | Already established |
+| Debug application ID | `io.github.constbogdan.mosaic.debug` — keep | Already established |
+| Signing identity | Permanent Mosaic certificate — keep | Already established |
+| Public Release APK | `Mosaic-release.apk` only | R3 |
+| Release manifest | `mosaic-release.json` — keep | Already established |
+| Stable/Development updater endpoints | `constbogdan/Mosaic` | R3 |
+| Custom URI scheme | `mosaic:` | R3 |
+| Root Gradle project and approved downstream-only pre-user identities | Mosaic naming | R3 |
+| PR validation protocol | `wholphin-pr-policy-v1-*` — keep | Repository field only changes |
+| Upstream repository | `damontecres/Wholphin` — keep | Never renamed downstream |
+| Upstream namespace/source tree | `com.github.damontecres.wholphin` and derived source identities — keep | Never renamed downstream |
+| Managed upstream markers | `wholphin-upstream-*` — keep | Never renamed downstream |
+| Historical releases, evidence, commits, and PRs | Preserve unchanged | Historical only |
+
+There are no real installed Mosaic users requiring compatibility with pre-rename downstream
+Development or Stable builds. Future releases therefore publish no `Wholphin-release.apk` alias.
+Existing historical releases and assets remain untouched.
+
+#### Distribution model
+
+These are separate lifecycles:
+
+```text
+Official Wholphin -> Mosaic
+  fresh installation of a different Android application
+
+Mosaic N -> Mosaic N+1
+  normal Android in-place update
+```
+
+Official Wholphin uses a different application ID and signer. Its Play Store flavor does not expose
+the in-app self-update path. Mosaic will not retain a Wholphin-named APK merely to let an
+updater-enabled upstream build act as a downloader for a separate application.
+
+The initial Mosaic distribution may use direct GitHub sideloading. A new user installs Mosaic,
+signs in and verifies server-backed state, then removes Wholphin if it was previously installed.
+Independent store publication remains a future product/distribution decision and is not part of
+T0-3.0.
+
+Once Mosaic is installed, update continuity is:
+
+```text
+repository:   constbogdan/Mosaic
+channel:      Stable or Development
+asset:        Mosaic-release.apk
+package:      io.github.constbogdan.mosaic
+signer:       permanent Mosaic certificate
+versionCode:  monotonically increasing
+result:       Android in-place update
+```
+
+Repository and asset names control discovery; Android package, signer, and version identity control
+installation continuity.
+
+#### PR evidence identity — KEEP
+
+`wholphin-pr-policy-v1-*` is the stable CP4B.2 validation protocol identity, not current product
+branding. T0-3.0 does not change its schema, two validation classes, required outcomes, exact-tree
+authentication, ambiguity refusal, retention, or conservative fallback.
+
+New evidence after the repository rename remains:
+
+```text
+artifact/protocol:        wholphin-pr-policy-v1-...
+authenticated repository: constbogdan/Mosaic
+```
+
+Do not introduce `mosaic-pr-policy-v1-*`, `mosaic-pr-policy-v2-*`, a dual-prefix reader, or a new
+protocol version. CP5's **KEEP / COMPLETE** decision remains authoritative.
+
+#### Frozen implementation sequence
+
+##### R1 — exact-name repository bridge
+
+While the repository is still `constbogdan/Wholphin`:
+
+- accept exactly `constbogdan/Wholphin` and `constbogdan/Mosaic` at live downstream repository
+  authentication boundaries;
+- derive API and GitHub App token targets from that exact authenticated current repository where
+  required;
+- preserve permissions, exact identity checks, ambiguity refusal, conservative fallback, and all
+  other fail-closed behavior;
+- retain `wholphin-pr-policy-v1-*` unchanged while allowing its authenticated repository field to
+  carry either exact transition name;
+- drain ordinary in-flight PR and publication activity before the external rename;
+- leave human-controlled upstream PR #58 and all upstream markers unchanged.
+
+R1 is a technical repository-rename bridge, not client compatibility.
+
+##### R2 — external repository rename
+
+After R1 is hosted validated:
+
+- rename the GitHub repository to `constbogdan/Mosaic`;
+- update the local `origin` remote and explicitly named external operator integrations;
+- verify ruleset, merge settings, Environments, secrets, variables, GitHub App installation, and
+  Actions authority remain attached and correct;
+- run under the new authenticated repository identity while retaining the narrow R1 bridge until
+  end-to-end acceptance is complete.
+
+No product asset alias or old-client compatibility layer is introduced in R2.
+
+##### R3 — canonical Mosaic product and distribution identity
+
+Establish the approved current identities coherently:
+
+- make Mosaic the user-facing product name;
+- publish only `Mosaic-release.apk` and retain `mosaic-release.json`;
+- move Stable/Development update discovery and selection to `constbogdan/Mosaic`;
+- change the downstream custom URI scheme from `wholphin:` to `mosaic:`;
+- rename the root Gradle project and other explicitly approved downstream-only pre-user identities;
+- preserve application IDs, signer, upstream namespace/source identities, upstream markers,
+  `wholphin-pr-policy-v1-*`, and immutable history.
+
+R3 acceptance must prove fresh Mosaic installation; Mosaic N to N+1 in-place update; package,
+signer, and version continuity; prepare-pr; authoritative PR CI; protected-main exact-tree reuse;
+Development Build/Sign/Publish; Stable Promotion; Hold Release; Upstream Synchronization; GitHub App
+token issuance; and retained repository settings and Environment boundaries.
+
+##### R4 — retire the bridge and close T0-3.0
+
+After R3 succeeds:
+
+- remove `constbogdan/Wholphin` from live downstream repository authorization;
+- accept only `constbogdan/Mosaic` for current downstream operation;
+- remove transition-only repository targeting code;
+- preserve historical old repository values and evidence unchanged;
+- record **T0-3.0 — COMPLETE / LIVE VALIDATED**.
+
+The permanent T0-3 documentation/knowledge consolidation begins only after R4.
+
+#### Explicit exclusions
+
+T0-3.0 does not authorize:
+
+- compatibility aliases for nonexistent installed clients;
+- dual APK publication;
+- a global Wholphin-to-Mosaic replacement;
+- Android application ID or signer migration;
+- upstream namespace, source tree, repository, dependency, or marker renames;
+- PR-evidence prefix/version migration;
+- rewriting historical releases or evidence;
+- Repo Intelligence migration;
+- a knowledge graph;
+- store publication.
+
 ### T0-3 documentation contract
 
-After T0-2, create a navigable `docs/README.md` hierarchy separating current source of truth from
+Before the broader documentation consolidation, complete the frozen T0-3.0 Mosaic identity
+migration in the [dedicated decision record](#t0-30-mosaic-identity-establishment-decision): R1 introduces
+the exact old/new repository authentication bridge, R2 performs the external repository rename and
+settings update, R3 establishes canonical Mosaic product/distribution identities and proves them
+end to end, and R4 removes the old repository authentication name. Do not collapse these checkpoints
+or add compatibility aliases for a nonexistent installed population.
+
+After T0-3.0, create a navigable `docs/README.md` hierarchy separating current source of truth from
 historical evidence. Classify every document as current, historical, duplicate, stale/superseded,
 agent-specific, or roadmap/backlog, and give unique material a destination before deletion. Make
 `CODEX_HANDOFF.md` concise current-work continuity. Each major workflow page must describe purpose,
@@ -380,7 +564,8 @@ immediate explanation in Actions, PRs and Releases.
 T0-1 Cleanup & Operator Experience        COMPLETE
 T0-2 Engineering / Process Audit          COMPLETE
 T0-2 blocking findings                    RESOLVED / ACCEPTED
-T0-3 Documentation / Wiki / Roadmap       COMPLETE
+T0-3.0 Mosaic identity establishment      PENDING — R1 NEXT
+T0-3 Documentation / Wiki / Roadmap       PENDING
 I06                                       COMPLETE / LIVE VALIDATED
 I07                                       COMPLETE / LIVE VALIDATED
 No known issue blocks Baseline T0
