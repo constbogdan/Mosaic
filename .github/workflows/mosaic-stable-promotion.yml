@@ -48,7 +48,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python3 -B scripts/mosaic_stable.py prepare --directory "$RUNNER_TEMP/mosaic-stable"
       - name: Verify APK package, version, signer, and provenance
-        run: python3 -B scripts/verify_mosaic_apk.py --apk "$RUNNER_TEMP/mosaic-stable/Wholphin-release.apk" --provenance "$RUNNER_TEMP/mosaic-stable/provenance.json" --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" --output "$RUNNER_TEMP/mosaic-stable/verification.json"
+        run: python3 -B scripts/verify_mosaic_apk.py --apk "$RUNNER_TEMP/mosaic-stable/Mosaic-release.apk" --provenance "$RUNNER_TEMP/mosaic-stable/provenance.json" --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" --output "$RUNNER_TEMP/mosaic-stable/verification.json"
       - name: Confirm exact Development manifest and APK digest
         env:
           GH_TOKEN: ${{ github.token }}

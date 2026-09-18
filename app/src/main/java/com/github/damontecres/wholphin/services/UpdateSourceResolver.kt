@@ -8,16 +8,13 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 
 /** One source for update metadata, its APK assets, and installed-version notes. */
 object UpdateSourceResolver {
-    const val STABLE_URL = "https://github.com/constbogdan/Wholphin/releases/latest"
-    const val DEVELOPMENT_URL = "https://github.com/constbogdan/Wholphin/releases/tags/develop"
-    private const val LEGACY_DEFAULT = "https://api.github.com/repos/damontecres/Wholphin/releases/latest"
+    const val STABLE_URL = "https://github.com/constbogdan/Mosaic/releases/latest"
+    const val DEVELOPMENT_URL = "https://github.com/constbogdan/Mosaic/releases/tags/develop"
 
-    // Stored preferences cannot distinguish the former bundled default from an explicit
-    // choice of that identical value. All other custom endpoints remain untouched.
-    fun migrateDefaultUrl(value: String): String = if (value.isBlank() || value == LEGACY_DEFAULT) STABLE_URL else value
+    fun migrateDefaultUrl(value: String): String = if (value.isBlank()) STABLE_URL else value
 
-    const val STABLE_API_URL = "https://api.github.com/repos/constbogdan/Wholphin/releases/latest"
-    const val DEVELOPMENT_API_URL = "https://api.github.com/repos/constbogdan/Wholphin/releases/tags/develop"
+    const val STABLE_API_URL = "https://api.github.com/repos/constbogdan/Mosaic/releases/latest"
+    const val DEVELOPMENT_API_URL = "https://api.github.com/repos/constbogdan/Mosaic/releases/tags/develop"
 
     fun channel(preferences: AppPreferences): UpdateChannel =
         when (preferences.updateChannel) {
@@ -92,7 +89,7 @@ data class UpdateSource(
             // A rolling/custom endpoint can supply notes only for the matching installed version.
             add(metadataUrl)
             releasesUrl?.let {
-                if (it.toString() == "https://api.github.com/repos/constbogdan/Wholphin/releases") {
+                if (it.toString() == "https://api.github.com/repos/constbogdan/Mosaic/releases") {
                     add(
                         it
                             .newBuilder()

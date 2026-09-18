@@ -65,7 +65,7 @@
                 <action android:name="${applicationId}.PLAYBACK" />
 
                 <category android:name="android.intent.category.DEFAULT" />
-                <data android:scheme="wholphin" />
+                <data android:scheme="mosaic" />
             </intent-filter>
         </activity>
 

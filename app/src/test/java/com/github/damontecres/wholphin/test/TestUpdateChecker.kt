@@ -39,45 +39,50 @@ class TestUpdateChecker {
     fun setup() {
         val resource = javaClass.classLoader?.getResource("release_develop.json")
         Assert.assertNotNull(resource)
-        val fileContents = Paths.get(resource!!.toURI()).readText()
+        val fileContents =
+            Paths
+                .get(resource!!.toURI())
+                .readText()
+                .replace("damontecres/Wholphin", "constbogdan/Mosaic")
+                .replace("Wholphin-", "Mosaic-")
         releaseJson = Json.parseToJsonElement(fileContents).jsonObject
     }
 
     @Test
     fun `Release chooses release`() {
         val url = getDownloadUrl(assetsJson, false, listOf())
-        Assert.assertEquals("https://github.com/damontecres/Wholphin/releases/download/develop/Wholphin-release.apk", url)
+        Assert.assertEquals("https://github.com/constbogdan/Mosaic/releases/download/develop/Mosaic-release.apk", url)
     }
 
     @Test
-    fun `Choose abi`() {
+    fun `Release always chooses canonical universal asset`() {
         val url = getDownloadUrl(assetsJson, false, listOf("arm64-v8a"))
-        Assert.assertEquals("https://github.com/damontecres/Wholphin/releases/download/develop/Wholphin-release-arm64-v8a.apk", url)
+        Assert.assertEquals("https://github.com/constbogdan/Mosaic/releases/download/develop/Mosaic-release.apk", url)
     }
 
     @Test
     fun `Choose unknown abi`() {
         val url = getDownloadUrl(assetsJson, false, listOf("unknown"))
-        Assert.assertEquals("https://github.com/damontecres/Wholphin/releases/download/develop/Wholphin-release.apk", url)
+        Assert.assertEquals("https://github.com/constbogdan/Mosaic/releases/download/develop/Mosaic-release.apk", url)
     }
 
     @Test
     fun `Debug chooses debug`() {
         val url = getDownloadUrl(assetsJson, true, listOf())
-        Assert.assertEquals("https://github.com/damontecres/Wholphin/releases/download/develop/Wholphin-debug.apk", url)
+        Assert.assertEquals("https://github.com/constbogdan/Mosaic/releases/download/develop/Mosaic-debug.apk", url)
     }
 
     @Test
     fun `Choose debug abi`() {
         val url = getDownloadUrl(assetsJson, true, listOf("arm64-v8a"))
-        Assert.assertEquals("https://github.com/damontecres/Wholphin/releases/download/develop/Wholphin-debug-arm64-v8a.apk", url)
+        Assert.assertEquals("https://github.com/constbogdan/Mosaic/releases/download/develop/Mosaic-debug-arm64-v8a.apk", url)
     }
 
     @Test
     fun `Mosaic defaults resolve stable and development metadata`() {
-        Assert.assertEquals("https://github.com/constbogdan/Wholphin/releases/latest", AppPreferencesSerializer().defaultValue.updateUrl)
+        Assert.assertEquals("https://github.com/constbogdan/Mosaic/releases/latest", AppPreferencesSerializer().defaultValue.updateUrl)
         Assert.assertEquals(
-            "https://api.github.com/repos/constbogdan/Wholphin/releases/latest",
+            "https://api.github.com/repos/constbogdan/Mosaic/releases/latest",
             UpdateSourceResolver
                 .resolve(
                     UpdateSourceResolver.configuredUrl(AppPreferencesSerializer().defaultValue),
@@ -85,20 +90,20 @@ class TestUpdateChecker {
                 .toString(),
         )
         Assert.assertEquals(
-            "https://api.github.com/repos/constbogdan/Wholphin/releases/tags/develop",
+            "https://api.github.com/repos/constbogdan/Mosaic/releases/tags/develop",
             UpdateSourceResolver.resolve(UpdateSourceResolver.DEVELOPMENT_URL).metadataUrl.toString(),
         )
     }
 
     @Test
-    fun `stored default migrates but custom endpoints and channel choice survive`() =
+    fun `blank default migrates while explicit endpoints survive`() =
         runBlocking {
             val legacy = "https://api.github.com/repos/damontecres/Wholphin/releases/latest"
             val custom = "https://updates.example.test/mosaic.json?channel=testing"
-            for (value in listOf(legacy, custom, UpdateSourceResolver.DEVELOPMENT_URL, legacy.replace("latest", "tags/develop"))) {
+            for (value in listOf("", legacy, custom, UpdateSourceResolver.DEVELOPMENT_URL, legacy.replace("latest", "tags/develop"))) {
                 val stored = AppPreferences.newBuilder().setUpdateUrl(value).build()
                 val restored = AppPreferencesSerializer().readFrom(stored.toByteArray().inputStream())
-                Assert.assertEquals(if (value == legacy) UpdateSourceResolver.STABLE_URL else value, restored.updateUrl)
+                Assert.assertEquals(if (value.isBlank()) UpdateSourceResolver.STABLE_URL else value, restored.updateUrl)
             }
             Assert.assertEquals(custom, UpdateSourceResolver.resolve(custom).metadataUrl.toString())
         }
@@ -175,7 +180,7 @@ class TestUpdateChecker {
                 .resolve(UpdateSourceResolver.STABLE_API_URL)
                 .releaseNotesUrls(Version.fromString("1.0.5"))
                 .map { it.toString() }
-        Assert.assertEquals("https://api.github.com/repos/constbogdan/Wholphin/releases/tags/mosaic-v1.0.5", urls[1])
+        Assert.assertEquals("https://api.github.com/repos/constbogdan/Mosaic/releases/tags/mosaic-v1.0.5", urls[1])
         Assert.assertFalse(
             UpdateSourceResolver
                 .resolve("https://api.github.com/repos/example/custom/releases/latest")
@@ -210,8 +215,8 @@ class TestUpdateChecker {
     private fun metadata(version: String): String =
         """
         {"name":"$version","body":"notes",
-        "assets":[{"name":"Wholphin-debug.apk",
-        "browser_download_url":"https://github.com/constbogdan/Wholphin/releases/download/develop/Wholphin-debug.apk"}]}
+        "assets":[{"name":"Mosaic-debug.apk",
+        "browser_download_url":"https://github.com/constbogdan/Mosaic/releases/download/develop/Mosaic-debug.apk"}]}
         """.trimIndent()
 
     @Test
@@ -227,7 +232,7 @@ class TestUpdateChecker {
                 val release = checker.getLatestRelease(source)
                 Assert.assertEquals(Version.fromString("1.0.3"), release?.version)
                 Assert.assertEquals(
-                    "https://github.com/constbogdan/Wholphin/releases/download/develop/Wholphin-debug.apk",
+                    "https://github.com/constbogdan/Mosaic/releases/download/develop/Mosaic-debug.apk",
                     release?.downloadUrl,
                 )
                 Assert.assertNotNull(checker.getRelease(Version.fromString("1.0.3"), source))
@@ -265,7 +270,7 @@ class TestUpdateChecker {
         }
 
     @Test
-    fun `downstream aliases win over fallback and versioned artifacts`() {
+    fun `canonical release asset is exact and legacy aliases are rejected`() {
         val json =
             """
             [{"name":"Wholphin.apk",
@@ -279,12 +284,20 @@ class TestUpdateChecker {
             {"name":"Wholphin-release-arm64-v8a.apk",
             "browser_download_url":"release-arm64"},
             {"name":"Wholphin-debug-arm64-v8a.apk",
-            "browser_download_url":"debug-arm64"}]
+            "browser_download_url":"debug-arm64"},
+            {"name":"Mosaic-release.apk",
+            "browser_download_url":"mosaic-release"},
+            {"name":"Mosaic-debug.apk",
+            "browser_download_url":"mosaic-debug"},
+            {"name":"Mosaic-debug-arm64-v8a.apk",
+            "browser_download_url":"mosaic-debug-arm64"}]
             """.trimIndent()
         val assets = Json.parseToJsonElement(json).jsonArray
-        Assert.assertEquals("release", getDownloadUrl(assets, false, emptyList()))
-        Assert.assertEquals("debug", getDownloadUrl(assets, true, emptyList()))
-        Assert.assertEquals("release-arm64", getDownloadUrl(assets, false, listOf("arm64-v8a")))
-        Assert.assertEquals("debug-arm64", getDownloadUrl(assets, true, listOf("arm64-v8a")))
+        Assert.assertEquals("mosaic-release", getDownloadUrl(assets, false, emptyList()))
+        Assert.assertEquals("mosaic-debug", getDownloadUrl(assets, true, emptyList()))
+        Assert.assertEquals("mosaic-release", getDownloadUrl(assets, false, listOf("arm64-v8a")))
+        Assert.assertEquals("mosaic-debug-arm64", getDownloadUrl(assets, true, listOf("arm64-v8a")))
+        val legacyOnly = Json.parseToJsonElement("""[{"name":"Wholphin-release.apk","browser_download_url":"legacy"}]""").jsonArray
+        Assert.assertNull(getDownloadUrl(legacyOnly, false, emptyList()))
     }
 }

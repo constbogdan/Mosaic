@@ -1,6 +1,6 @@
 # Repository and upstream synchronization policy
 
-This document is the authoritative policy for branch use and synchronization of the Wholphin fork.
+This document is the authoritative policy for branch use and synchronization of Mosaic with Wholphin upstream.
 
 ## Remotes and integration baseline
 
@@ -94,7 +94,7 @@ An in-progress merge must first be resolved, staged, semantically reviewed, and 
 
 ## Conflict-resolution policy
 
-Every resolution must preserve both upstream changes that should apply to us and our validated Wholphin behavior. Never mechanically choose `ours` or `theirs` unless inspection proves that one side completely supersedes the other.
+Every resolution must preserve both upstream changes that should apply to us and our validated Mosaic behavior. Never mechanically choose `ours` or `theirs` unless inspection proves that one side completely supersedes the other.
 
 For every conflict:
 
@@ -105,7 +105,7 @@ For every conflict:
 5. Remove local logic only when upstream genuinely supersedes it.
 6. Avoid unrelated refactoring while resolving the merge.
 
-`upstream/main` is the behavioral reference for deciding what Enhanced Wholphin OFF means. OFF removes enhanced capabilities; it does not disable independent upstream behavior, bug fixes, UI improvements, navigation fixes, ordering fixes, or every line that our fork has changed.
+`upstream/main` is the behavioral reference for deciding what Mosaic enhancements OFF means. OFF removes enhanced capabilities; it does not disable independent upstream behavior, bug fixes, UI improvements, navigation fixes, ordering fixes, or every line that our fork has changed.
 
 Conflict-sensitive integration areas currently include:
 
@@ -344,7 +344,7 @@ repository rule is changed. An open candidate is not a validated integration.
 
 Human review must inspect high-risk auto-merges even without textual conflicts:
 Series/Home/Downloads, navigation, Discover requests, preferences/protobuf, shared
-resources, acquisition/integrity and Enhanced Wholphin OFF behavior. Passing CI
+resources, acquisition/integrity and Mosaic enhancements OFF behavior. Passing CI
 does not authorize merge or substitute for this review or necessary device checks.
 Textual conflicts remain blocked but now have a safe Draft workspace. Normal CI may
 validate human/Codex resolution on that branch; changing Draft readiness and merge/reject
@@ -529,7 +529,7 @@ publication, CI handoff, native ancestry, no-delta, candidate reuse, and authent
 
 ## Onboarding another maintained downstream repository
 
-Wholphin defines the workflow and safety guarantees, not a universal build implementation. Use this checklist when adapting the model to Seerr or another independently maintained service:
+Mosaic defines the workflow and safety guarantees, not a universal build implementation. Use this checklist when adapting the model to Seerr or another independently maintained service:
 
 - [ ] Identify and verify `origin` and `upstream`.
 - [ ] Establish and protect the downstream integration branch (one appropriate protected branch, not necessarily `main`).
@@ -546,6 +546,6 @@ Wholphin defines the workflow and safety guarantees, not a universal build imple
 - [ ] Add automated upstream-change detection and sync-PR preparation without automated conflict resolution.
 - [ ] Define downstream build, artifact, versioning, signing, and release ownership.
 
-Seerr standardization remains deferred until `origin/develop` versus `upstream/develop` divergence is deliberately reconciled. Seerr likely retains `develop`, which is part of its upstream integration and development-container lifecycle; it needs pnpm/Node/Docker validation and repository-specific release handling. Wholphin itself needs no permanent staging/develop branch; see the [PR/device validation model](Wholphin_ROADMAP.md#pre-main-validation-model).
+Seerr standardization remains deferred until `origin/develop` versus `upstream/develop` divergence is deliberately reconciled. Seerr likely retains `develop`, which is part of its upstream integration and development-container lifecycle; it needs pnpm/Node/Docker validation and repository-specific release handling. Mosaic itself needs no permanent staging/develop branch; see the [PR/device validation model](Wholphin_ROADMAP.md#pre-main-validation-model).
 
-Do not copy Wholphin's Gradle tasks, Windows prerequisites, CI runner, tag-fetch behavior, or artifact assumptions blindly. Each repository must derive its build toolchain, validation commands, language/runtime requirements, formatting and lint tooling, CI runner, required secrets, artifact and release behavior, upstream tag/versioning requirements, and high-risk merge surfaces. The target is the same workflow and safety guarantees with a repository-specific implementation.
+Do not copy Mosaic's Gradle tasks, Windows prerequisites, CI runner, tag-fetch behavior, or artifact assumptions blindly. Each repository must derive its build toolchain, validation commands, language/runtime requirements, formatting and lint tooling, CI runner, required secrets, artifact and release behavior, upstream tag/versioning requirements, and high-risk merge surfaces. The target is the same workflow and safety guarantees with a repository-specific implementation.

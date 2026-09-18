@@ -16,17 +16,17 @@ from mosaic_signing_exercise import artifact_name, payload, shallow_checkout_ide
 from verify_mosaic_apk import fingerprint
 from mosaic_delivery_output import append_summary, publication_summary, release_body
 from mosaic_repository import (
-    LEGACY_DOWNSTREAM_REPOSITORY,
+    MOSAIC_DOWNSTREAM_REPOSITORY,
     authenticate_downstream_repository,
     authenticate_workflow_repository,
 )
 
-# Compatibility name for historical records/fixtures; live targets use authenticated runtime state.
-REPOSITORY = LEGACY_DOWNSTREAM_REPOSITORY
+# Current publication defaults to the canonical repository; authentication retains the R1 bridge.
+REPOSITORY = MOSAIC_DOWNSTREAM_REPOSITORY
 LEGACY_DEVELOPMENT_WORKFLOW = '.github/workflows/mosaic-development-release.yml'
 CI_WORKFLOW = '.github/workflows/ci.yml'
 CI_JOB = 'Full validation'
-APK_NAME = 'Wholphin-release.apk'
+APK_NAME = 'Mosaic-release.apk'
 MANIFEST_NAME = 'mosaic-release.json'
 
 

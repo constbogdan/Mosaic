@@ -1,4 +1,4 @@
-# Wholphin developer's guide
+# Mosaic developer's guide
 
 See also the [Contributing](CONTRIBUTING.md) guide for general information on contributing to the project.
 
@@ -26,7 +26,7 @@ After forking and cloning your fork, you can import the project into Android Stu
 
 ### Development environment
 
-It is recommended to use a recent version of [Android Studio](https://developer.android.com/studio). Make sure the [version is compatible](https://developer.android.com/build/releases/gradle-plugin#android_gradle_plugin_and_android_studio_compatibility) with Wholphin's AGP version.
+It is recommended to use a recent version of [Android Studio](https://developer.android.com/studio). Make sure the [version is compatible](https://developer.android.com/build/releases/gradle-plugin#android_gradle_plugin_and_android_studio_compatibility) with Mosaic's AGP version.
 
 Code formatting should follow [ktlint's](https://github.com/pinterest/ktlint) rules. Find the `ktlint` version in [`.pre-commit-config.yaml`](./.pre-commit-config.yaml). Optionally, install the [ktlint plugin](https://plugins.jetbrains.com/plugin/15057-ktlint) in Android Studio to run automatically. Configure the version in `Settings->Tools->KtLint->Ruleset Version`.
 
@@ -36,7 +36,7 @@ Also setup [pre-commit](https://github.com/pre-commit/pre-commit) which will run
 
 #### Extensions
 
-Wholphin uses several native components for extra playback compatibility. This includes Media3 ffmpeg/av1 decoders and `libmpv`. These extensions are not required to build the app, but without them some functionality will not work.
+Mosaic uses several native components for extra playback compatibility. This includes Media3 ffmpeg/av1 decoders and `libmpv`. These extensions are not required to build the app, but without them some functionality will not work.
 
 If you want to include these in a local build, see the [instructions here](https://github.com/damontecres/wholphin-extensions?tab=readme-ov-file#usage) for configuring the repository.
 

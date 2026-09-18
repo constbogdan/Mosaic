@@ -48,7 +48,7 @@ build and no signing. Stable promotion is COMPLETE / LIVE VALIDATED and remains 
 ## Exact-byte stable promotion
 
 [Manual promotion workflow](../.github/workflows/mosaic-stable-promotion.yml) runs only
-in constbogdan/Wholphin on protected main. The four former form values remain exact
+in `constbogdan/Mosaic` on protected main. The four former form values remain exact
 authenticated machine facts, but are derived automatically from current protected main
 and the current authenticated rolling/immutable Development state. Current-tooling and
 original-source CI must pass. Original source must be on the current main first-parent
@@ -60,7 +60,7 @@ the mutation but does not replace the authentication and freshness checks below.
 
 The read-only verification job authenticates the annotated development tag, its canonical
 manifest, published development prerelease and exact asset IDs. It downloads the existing
-`Wholphin-release.apk` and `mosaic-release.json`; GitHub asset digests, sizes and downloaded
+`Mosaic-release.apk` and `mosaic-release.json`; GitHub asset digests, sizes and downloaded
 bytes must agree with the ledger and authenticated candidate. Full source/tree/upstream/version
 provenance is checked against Git objects and the original successful build job. Fresh SDK
 apksigner/aapt verification enforces the pinned single signer, non-debuggable
@@ -77,7 +77,7 @@ exists in promotion. Transport archives do not alter the APK file's bytes.
 | Development origin | Existing annotated `downstream-build-N` and its prerelease |
 | Stable tag | Annotated `mosaic-v1.0.N` at the SAME original source commit |
 | Stable release name | `v1.0.N` |
-| Stable assets | Exact `Wholphin-release.apk` and exact `mosaic-release.json` from development |
+| Stable assets | Exact `Mosaic-release.apk` and exact `mosaic-release.json` from Development |
 | Stable visibility | `prerelease: false`; publish with `make_latest: true` |
 | Development | Remains prerelease; `develop` and its assets are not changed |
 
@@ -144,8 +144,8 @@ records migrate deterministically using their existing URL:
 | Any other existing URL | Custom, preserving its value |
 
 An explicit stored channel remains authoritative on subsequent loads. Stable resolves
-`https://api.github.com/repos/constbogdan/Wholphin/releases/latest`; Development resolves
-`https://api.github.com/repos/constbogdan/Wholphin/releases/tags/develop`. Custom uses its
+`https://api.github.com/repos/constbogdan/Mosaic/releases/latest`; Development resolves
+`https://api.github.com/repos/constbogdan/Mosaic/releases/tags/develop`. Custom uses its
 stored release API URL, retaining the existing web-to-API normalization where applicable.
 An invalid/empty explicit Custom URL does not silently switch to Stable. A retained custom
 URL is ignored in Stable/Development and reappears when Custom is selected; there is no

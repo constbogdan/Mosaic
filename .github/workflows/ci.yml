@@ -177,7 +177,7 @@ jobs:
                      if item['type'] == 'UNIVERSAL' and not item['filters']]
           assert len(outputs) == 1, 'Expected exactly one universal Debug APK'
           filename = outputs[0]['outputFile']
-          assert re.fullmatch(r'Wholphin-default-debug-[A-Za-z0-9.-]+\.apk', filename)
+          assert re.fullmatch(r'Mosaic-default-debug-[A-Za-z0-9.-]+\.apk', filename)
           apk = directory / filename
           assert apk.is_file() and apk.stat().st_size > 0, 'Validated APK missing or empty'
           tested_sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
@@ -228,7 +228,7 @@ jobs:
               '## PR test APK ready', '',
               f'[Download the universal Debug APK]({e["ARTIFACT_URL"]})', '',
               'This is the APK produced by successful Full validation; it was not rebuilt.', '',
-              ('Debug installs separately from Release Wholphin. Debug signing keys may differ '
+              ('Debug installs separately from Release Mosaic. Debug signing keys may differ '
                'between builds, so an in-place Debug update is not guaranteed.'), '',
               '<details>', '<summary>Install commands</summary>', '', '```text',
               f'gh run download {e["GITHUB_RUN_ID"]} --repo {e["GITHUB_REPOSITORY"]} --name {name}',

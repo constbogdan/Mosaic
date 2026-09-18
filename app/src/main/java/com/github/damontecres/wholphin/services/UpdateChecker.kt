@@ -57,8 +57,9 @@ class UpdateChecker
         @param:StandardOkHttpClient private val okHttpClient: OkHttpClient,
     ) {
         companion object {
-            const val ASSET_NAME = "Wholphin"
+            const val ASSET_NAME = "Mosaic"
             const val APK_NAME = "$ASSET_NAME.apk"
+            const val RELEASE_APK_NAME = "$ASSET_NAME-release.apk"
 
             private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
 
@@ -417,12 +418,11 @@ fun getDownloadUrl(
     supportedABIs: List<String> = Build.SUPPORTED_ABIS.toList(),
 ): String? {
     val abiSuffix = supportedABIs.firstOrNull().let { if (it != null) "-$it" else "" }
-    val releaseSuffix = if (debug) "-debug" else "-release"
     val preferredNames =
-        buildList {
-            add("$ASSET_NAME${releaseSuffix}$abiSuffix.apk")
-            add("$ASSET_NAME$releaseSuffix.apk")
-            if (!debug) add("$ASSET_NAME.apk")
+        if (debug) {
+            listOf("$ASSET_NAME-debug$abiSuffix.apk", "$ASSET_NAME-debug.apk")
+        } else {
+            listOf(UpdateChecker.RELEASE_APK_NAME)
         }
     var preferredAsset: JsonObject? = null
     outer@ for (name in preferredNames) {

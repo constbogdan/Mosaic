@@ -1,6 +1,6 @@
-# Wholphin Roadmap
+# Mosaic Roadmap
 
-> Living roadmap for the Wholphin fork: completed work, current direction, and future backlog.
+> Living roadmap for Mosaic, derived from Wholphin: completed work, current direction, and future backlog.
 
 ## Current engineering program: Baseline T0
 
@@ -22,7 +22,8 @@ scheduled run #47). CP8 final consistency is COMPLETE. The T0-2 audit is COMPLET
 C1 is COMPLETE / LIVE VERIFIED; C2 is COMPLETE / HOSTED VALIDATED (PR #84); C3 is COMPLETE /
 HOSTED VALIDATED (PR #85); T0-2 is COMPLETE. T0-3.0 R1 is COMPLETE / BOTH-NAME HOSTED VALIDATED
 (old-name PR #87; new-name PR #89). R2's external repository rename is COMPLETE / VERIFIED; the
-canonical Mosaic identity migration is next. The external contribution lifecycle is KEEP /
+[canonical Mosaic identity migration](T0_3_R2_MOSAIC_IDENTITY.md) is IMPLEMENTED / LOCAL VALIDATED;
+HOSTED + DEVICE ACCEPTANCE PENDING. The external contribution lifecycle is KEEP /
 DOCUMENTED.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
@@ -369,7 +370,8 @@ default; the surviving mechanisms each protect a reviewed consumer or authority 
 ### T0-3.0 Mosaic identity establishment decision
 
 Status: **R1 — COMPLETE / BOTH-NAME HOSTED VALIDATED. R2 repository rename — COMPLETE / VERIFIED.
-Canonical Mosaic identity migration — NEXT.**
+R2 canonical Mosaic identity migration — IMPLEMENTED / LOCAL VALIDATED; HOSTED + DEVICE
+ACCEPTANCE PENDING.**
 
 T0-3 begins by establishing the permanent downstream product identity before the broader
 documentation, wiki, and roadmap consolidation. This record preserves the accepted decisions and
@@ -393,16 +395,16 @@ state, the stable PR-validation protocol name, or immutable history.
 
 | Identity | Permanent decision | Migration checkpoint |
 |---|---|---|
-| Product/display name | `Mosaic` | R3 |
+| Product/display name | `Mosaic` | R2 |
 | Downstream repository | `constbogdan/Mosaic` | R2, canonicalized after the bridge |
 | Release application ID | `io.github.constbogdan.mosaic` — keep | Already established |
 | Debug application ID | `io.github.constbogdan.mosaic.debug` — keep | Already established |
 | Signing identity | Permanent Mosaic certificate — keep | Already established |
-| Public Release APK | `Mosaic-release.apk` only | R3 |
+| Public Release APK | `Mosaic-release.apk` only | R2 |
 | Release manifest | `mosaic-release.json` — keep | Already established |
-| Stable/Development updater endpoints | `constbogdan/Mosaic` | R3 |
-| Custom URI scheme | `mosaic:` | R3 |
-| Root Gradle project and approved downstream-only pre-user identities | Mosaic naming | R3 |
+| Stable/Development updater endpoints | `constbogdan/Mosaic` | R2 |
+| Custom URI scheme | `mosaic:` | R2 |
+| Root Gradle project and approved downstream-only pre-user identities | Mosaic naming | R2 |
 | PR validation protocol | `wholphin-pr-policy-v1-*` — keep | Repository field only changes |
 | Upstream repository | `damontecres/Wholphin` — keep | Never renamed downstream |
 | Upstream namespace/source tree | `com.github.damontecres.wholphin` and derived source identities — keep | Never renamed downstream |
@@ -650,7 +652,7 @@ R1 is therefore **COMPLETE / BOTH-NAME HOSTED VALIDATED**. Its exact two-name br
 installed intentionally until R4; do not remove `constbogdan/Wholphin` authorization during the
 next canonical product migration.
 
-##### R3 — canonical Mosaic product and distribution identity
+##### R2 — canonical Mosaic product and distribution identity
 
 Establish the approved current identities coherently:
 
@@ -662,10 +664,16 @@ Establish the approved current identities coherently:
 - preserve application IDs, signer, upstream namespace/source identities, upstream markers,
   `wholphin-pr-policy-v1-*`, and immutable history.
 
-R3 acceptance must prove fresh Mosaic installation; Mosaic N to N+1 in-place update; package,
-signer, and version continuity; prepare-pr; authoritative PR CI; protected-main exact-tree reuse;
-Development Build/Sign/Publish; Stable Promotion; Hold Release; Upstream Synchronization; GitHub App
-token issuance; and retained repository settings and Environment boundaries.
+R2 hosted acceptance must prove prepare-pr, authoritative PR CI, protected-main exact-tree reuse,
+Development Build/Sign/Publish, and the exact canonical release inventory. Stable and Hold retain
+the same fail-closed consumer contract and do not require artificial live dispatches.
+
+##### R3 — real-device Mosaic acceptance
+
+R3 must prove fresh Mosaic installation; Mosaic N to N+1 in-place update; package, signer, and
+version continuity; launcher identity; `mosaic:` routing; Development and Stable discovery where
+applicable; and preservation of local Mosaic state. It must inspect the actual signed R2 release,
+not infer device compatibility from repository tests.
 
 ##### R4 — retire the bridge and close T0-3.0
 
@@ -699,8 +707,8 @@ T0-3.0 does not authorize:
 Before the broader documentation consolidation, complete the frozen T0-3.0 Mosaic identity
 migration in the [dedicated decision record](#t0-30-mosaic-identity-establishment-decision): R1 introduces
 the exact old/new repository authentication bridge, R2 performs the external repository rename and
-settings update, R3 establishes canonical Mosaic product/distribution identities and proves them
-end to end, and R4 removes the old repository authentication name. Do not collapse these checkpoints
+canonical product/distribution implementation plus hosted proof, R3 proves the real-device lifecycle,
+and R4 removes the old repository authentication name. Do not collapse these checkpoints
 or add compatibility aliases for a nonexistent installed population.
 
 After T0-3.0, create a navigable `docs/README.md` hierarchy separating current source of truth from
@@ -1484,9 +1492,9 @@ and relevant open-source projects rather than treating them as exclusive. Add us
 version badges, a compact label taxonomy and historical PR label backfill. Backfill meaningful
 completed Issues linked to PRs and create actionable roadmap Issues. Establish one Mosaic
 GitHub Project, meaningful product/release milestones (not every iteration), and useful
-Issue ? PR ? Project automation. Rename Wholphin-release.apk to Mosaic-release.apk only
-atomically with updater compatibility; retain the legacy alias temporarily for older Mosaic
-versions if required. No README, assets, labels, Issues, Project or GitHub changes occur here.
+Issue ? PR ? Project automation. R2 atomically established `Mosaic-release.apk` with its updater
+consumer and deliberately introduced no legacy alias because no supported installed population
+requires one. No labels, Issues, Project, or unrelated GitHub changes occur here.
 
 
 ### Historical upstream publication blocker correction (superseded by completed I06)

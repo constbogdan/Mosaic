@@ -14,7 +14,7 @@ $policyScript = Join-Path $PSScriptRoot 'mosaic_validation_policy.py'
 . (Join-Path $PSScriptRoot 'mosaic_output.ps1')
 
 $output = New-MosaicRunOutput -RepositoryRoot $repoRoot -Kind validation -LegacyLogPath $legacyLogPath
-Write-MosaicRunLog $output "Wholphin local validation ($Level)"
+Write-MosaicRunLog $output "Mosaic local validation ($Level)"
 
 function Find-Python {
     $python = Get-Command python -ErrorAction SilentlyContinue
@@ -116,7 +116,7 @@ try {
     if ($env:MOSAIC_OUTPUT_COMPACT -eq '1') {
         Write-Host ((Get-MosaicConsolePrefix) + "Validation: $Level $([char]0xB7) $effectiveMode")
     } else {
-        Write-Host 'Wholphin validation'
+        Write-Host 'Mosaic validation'
         Write-Host "Requested level: $Level"
         Write-Host "Release relevance: $($plan.releaseRelevance)"
         Write-Host "Validation risk: $($plan.validationRisk)"

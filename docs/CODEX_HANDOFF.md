@@ -1,4 +1,4 @@
-# Codex handoff: Wholphin ecosystem
+# Codex handoff: Mosaic
 
 ## Current checkpoint: Baseline T0
 
@@ -48,11 +48,12 @@
 
 `T0-3.0 R2 repository rename - COMPLETE / VERIFIED`
 
-`T0-3.0 canonical Mosaic identity migration - NEXT`
+`T0-3.0 R2 canonical Mosaic identity migration - IMPLEMENTED / LOCAL VALIDATED; HOSTED + DEVICE ACCEPTANCE PENDING`
 
 `External contribution lifecycle - KEEP / DOCUMENTED`
 
-The approved [Mosaic identity establishment decision](Wholphin_ROADMAP.md#t0-30-mosaic-identity-establishment-decision) is
+The approved [Mosaic identity establishment decision](Wholphin_ROADMAP.md#t0-30-mosaic-identity-establishment-decision) and
+[R2 implementation/acceptance contract](T0_3_R2_MOSAIC_IDENTITY.md) are
 authoritative for the pre-user rename. Mosaic is the downstream product and future repository;
 Wholphin remains the upstream project/source identity. Future releases use only
 `Mosaic-release.apk`, new Mosaic builds target only `constbogdan/Mosaic`, and the public URI scheme
@@ -71,8 +72,9 @@ retained its tested tree; protected-main run `35312694402` authenticated and reu
 independently built, signed, and published Development `v1.0.68` / `downstream-build-68` /
 `develop`. This proves `constbogdan/Wholphin`. R2 then renamed the live repository to
 `constbogdan/Mosaic`; PR #89 and protected-main run `35324869750` supplied the new-name hosted proof
-described below. The frozen order is now R3 canonical product and distribution identity plus
-end-to-end proof, then R4 removal of old repository authentication; do not collapse the sequence.
+described below. The frozen order is now R2 canonical product/distribution implementation and
+hosted proof, R3 real-device lifecycle proof, then R4 removal of old repository authentication; do
+not collapse the sequence.
 
 R2's external repository rename is **VERIFIED**. `constbogdan/Wholphin` became the canonical
 `constbogdan/Mosaic` while repository ID `1351255476`, `main` and Git history, public fork relation
@@ -97,9 +99,10 @@ fallback. Development classified the complete range `docs-only / low`, `releaseR
 reported `No build required`, and skipped Release Build, Sign and Publish.
 
 R1 is **COMPLETE / BOTH-NAME HOSTED VALIDATED**. The exact two-name bridge remains installed until
-R4. R2's repository rename is **COMPLETE / VERIFIED**. R3 canonical Mosaic identity migration is
-next; historical old-name evidence remains correct. Do not remove old-name authorization or begin
-product/updater/APK/URI/Gradle/database/App display-name changes in this closure checkpoint.
+R4. R2's repository rename is **COMPLETE / VERIFIED**. The R2 canonical Mosaic identity migration
+is **IMPLEMENTED / LOCAL VALIDATED; HOSTED + DEVICE ACCEPTANCE PENDING**; R3 owns the real-device
+lifecycle proof after hosted R2 acceptance. Historical old-name evidence remains correct, and the
+old-name authorization remains installed until R4.
 
 The external contribution lifecycle is **KEEP / NO SECURITY OR PROVENANCE DEFECT**. A fork PR may
 run approved unprivileged authoritative CI and upload a correctly named policy artifact, but receives

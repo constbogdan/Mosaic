@@ -62,7 +62,7 @@ class StableTests(unittest.TestCase):
         bodies = [release['body'] for release in api.releases.values()]
         self.assertTrue(all('github.com/constbogdan/Mosaic/' in body for body in bodies))
         self.assertTrue(any(item['name'] == stable.APK_NAME for item in api.uploads.values()))
-        self.assertEqual('Wholphin-release.apk', stable.APK_NAME)
+        self.assertEqual('Mosaic-release.apk', stable.APK_NAME)
 
     def test_foreign_repository_cannot_reach_asset_download_target(self):
         with patch.object(stable.subprocess, 'run') as run:
@@ -89,7 +89,7 @@ class StableTests(unittest.TestCase):
     def test_source_requires_exact_build_source_hash_and_annotated_ledger(self):
         m, items = stable.source_assets(self.api, 'downstream-build-5', self.m['sourceSha'], self.m['signedApkSha256'])
         self.assertEqual(m, self.m)
-        self.assertEqual(set(items), {'Wholphin-release.apk', 'mosaic-release.json'})
+        self.assertEqual(set(items), {'Mosaic-release.apk', 'mosaic-release.json'})
         for source, digest in [('f' * 40, self.m['signedApkSha256']), (self.m['sourceSha'], '0' * 64)]:
             with self.assertRaises(ValueError):
                 stable.source_assets(self.api, 'downstream-build-5', source, digest)
@@ -104,12 +104,12 @@ class StableTests(unittest.TestCase):
         self.assertEqual(self.identity['sourceSha'], manifest['sourceSha'])
         self.assertEqual(self.identity['sourceTree'], manifest['sourceTree'])
         self.assertEqual(digest(self.apk), manifest['signedApkSha256'])
-        self.assertEqual({'Wholphin-release.apk', 'mosaic-release.json'}, set(inventory))
+        self.assertEqual({'Mosaic-release.apk', 'mosaic-release.json'}, set(inventory))
         self.assertEqual(1, evidence['immutableReleaseId'])
         self.assertEqual(2, evidence['rollingReleaseId'])
         self.assertEqual(
             f'https://github.com/{stable.REPOSITORY}/releases/download/'
-            'downstream-build-5/Wholphin-release.apk',
+            'downstream-build-5/Mosaic-release.apk',
             evidence['apkUrl'],
         )
 
