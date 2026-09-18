@@ -94,10 +94,13 @@ Prepare-pr uses the shared classifier only to select useful local Fast feedback.
 
 Selected pre-commit hooks may apply autofixes. The normal Fast path uses changed-scope checks; explicit Full uses the repository-wide baseline and complete local graph. If any local check changes a file, prepare-pr stops without staging, reports the dirty paths, and requires review followed by a new Audit/Validate pass. Formatter changes are never silently included.
 
-On managed Windows systems, the pinned EOF and trailing-whitespace hooks invoke their exact
-`pre_commit_hooks` modules through the hook environment's Python interpreter. This preserves the
-same pinned autofix implementation used by hosted pre-commit while avoiding unsigned generated
-console-script launchers that Windows Application Control may refuse.
+On managed Windows systems, local validation launches pre-commit through the selected trusted Python
+interpreter with `-m pre_commit` rather than the generated `pre-commit.exe`. The pinned EOF and
+trailing-whitespace hooks likewise invoke their exact `pre_commit_hooks` v6.0.0 modules through the
+hook environment's Python interpreter. This preserves the same pinned configuration, autofix and
+failure semantics used by hosted pre-commit while avoiding generated console-script launchers that
+Windows Application Control may refuse. Machine policy is not weakened and cache executables are not
+allowlisted.
 
 ## Publishing and GitHub CLI
 
@@ -123,7 +126,7 @@ then independently reported `No build required` and skipped Development Build/Si
 For an ordinary PR, prepare-pr requires one unambiguous open non-Draft PR and authenticates its repository, base branch, head repository/branch, exact reviewed head SHA, and current auto-merge state. It confirms that repository auto-merge and merge commits are enabled, rereads the PR immediately before mutation, and invokes:
 
 ``` powershell
-gh pr merge <number> --repo constbogdan/Wholphin --auto --merge --match-head-commit <reviewed-head>
+gh pr merge <number> --repo <exact-authenticated-repository> --auto --merge --match-head-commit <reviewed-head>
 ```
 
 The expected-head guard binds authority to the reviewed commit. A changed, foreign, stale, Draft,
@@ -140,6 +143,15 @@ cannot be authenticated, protected main retains its complete fail-safe validatio
 Preserved upstream REVIEW/conflict publication is deliberately excluded. Prepare-pr reauthenticates
 and updates the same Draft but neither enables auto-merge nor changes Draft readiness. Human semantic
 review and merge/reject authority remain mandatory for that path.
+
+Public fork PRs are also outside prepare-pr's auto-merge authority. The script requires an exact
+downstream-owned PR head, so a foreign/fork head cannot pass authentication and Mosaic automation
+does not arm it. A contributor without repository write permission cannot independently enable
+GitHub-native auto-merge; a maintainer may deliberately enable or perform merge subject to repository
+protection. Fork PR CI remains unprivileged and its policy artifact is not reusable protected-main
+authority, even when correctly named. After a maintainer accepts the contribution into protected
+`main`, complete main validation runs before normal Development eligibility; Stable authorization
+remains separate.
 
 Prepare-pr does not wait or poll, bypass checks, rewrite a failed PR, or delete branches/worktrees.
 

@@ -44,7 +44,9 @@
 
 `T0-2 - COMPLETE`
 
-`T0-3.0 R1 - IMPLEMENTED / LOCAL VALIDATED; OLD-NAME HOSTED ACCEPTANCE PENDING`
+`T0-3.0 R1 - COMPLETE / OLD-NAME HOSTED VALIDATED (PR #87)`
+
+`External contribution lifecycle - KEEP / DOCUMENTED`
 
 The approved [Mosaic identity establishment decision](Wholphin_ROADMAP.md#t0-30-mosaic-identity-establishment-decision) is
 authoritative for the pre-user rename. Mosaic is the downstream product and future repository;
@@ -58,10 +60,15 @@ Development, version/signing, Stable, Hold, hosted upstream, and resolver bounda
 API, release-navigation, and App-token repository targets derive only from that authenticated
 identity; foreign/lookalike/malformed identities fail before credentials or mutation. Workflow
 permissions, Environment authority, App-token outcome allowlist, updater/APK identity, upstream
-identity and stable `wholphin-*` protocol markers are unchanged. The frozen order remains R2
+identity and stable `wholphin-*` protocol markers are unchanged. PR #87 supplied the old-name
+hosted proof: PR run `35311963364` passed `ANDROID_FULL` and emitted exact-tree
+`wholphin-pr-policy-v1-*` evidence; native merge `3d33fe3510785620a7b32ad34df18feeb37639a7`
+retained its tested tree; protected-main run `35312694402` authenticated and reused it, then
+independently built, signed, and published Development `v1.0.68` / `downstream-build-68` /
+`develop`. This proves only `constbogdan/Wholphin`. The `constbogdan/Mosaic` side remains
+offline-tested until R2 changes the live repository identity. The frozen order remains R2
 external repository rename/settings, R3 canonical product and distribution identity plus end-to-end
-proof, then R4 removal of old repository authentication. First obtain old-name hosted acceptance for
-R1; do not collapse the sequence.
+proof, then R4 removal of old repository authentication; do not collapse the sequence.
 
 Before R2, drain ordinary PR/auto-merge and all delivery, promotion, hold, diagnostic, upstream,
 resolver, and prepare-pr activity. Record repository ID `1351255476`, main/ruleset/required-check and
@@ -69,6 +76,25 @@ merge settings, Environments, secrets/variables, App installation access, releas
 visibility/default branch and fork relationship. Preserve Draft PR #58 if GitHub retains its
 identity. After the rename, update `origin` and external operator targets and verify the same
 repository ID and recorded controls before resuming mutation.
+
+The external contribution lifecycle is **KEEP / NO SECURITY OR PROVENANCE DEFECT**. A fork PR may
+run approved unprivileged authoritative CI and upload a correctly named policy artifact, but receives
+no repository/Environment secrets or App token and has no PR-CI mutation authority. Fork evidence is
+not reusable: reuse authenticates downstream PR-head/run/artifact ownership and falls back to complete
+protected-main validation. Prepare-pr likewise requires a downstream-owned head, so Mosaic automation
+does not arm auto-merge for forks. A maintainer may deliberately merge under protection; that exact
+content then becomes trusted-main code, receives complete main validation, and enters normal
+Development eligibility. APK-relevant accepted contributions may be delivered to Development;
+Stable still requires manual dispatch plus `release-promote`. Sensitive external changes therefore
+require meaningful maintainer review. R1 changed only the exact downstream base-name allowlist and
+did not widen fork trust, secrets, App/Environment authority, reuse, auto-merge, or post-merge checks.
+
+Windows Application Control continuity: local validation uses the selected Python interpreter with
+`-m pre_commit` because the generated `pre-commit.exe` launcher is blocked. The pinned
+`pre-commit-hooks` v6.0.0 EOF and trailing-whitespace modules likewise run with Python `-m` because
+their generated launchers are blocked. Machine policy and hook semantics were not weakened; no cache
+allowlist was added, local/hosted configuration remains shared, and autofix/failure behavior is
+tested. This is a portability note, not another T0-3 checkpoint.
 
 The current operator lifecycle is concise: bounded Fast feedback -> prepare-pr scope/tree integrity
 and exact-head publication -> authoritative `NON_ANDROID` or `ANDROID_FULL` PR CI -> native
@@ -123,8 +149,8 @@ validation, presentation, performance, and consistency work described in
 [the roadmap](Wholphin_ROADMAP.md#current-engineering-program-baseline-t0). The comprehensive T0-2
 audit is complete and its [approved decision record](Wholphin_ROADMAP.md#t0-2-audit-contract) limited
 implementation to C1 merge-commit-only repository settings, C2 explicit Gradle/Android bootstrap,
-and C3 bounded sanitized upstream failure diagnostics. All three are complete. T0-3.0 now
-establishes the permanent Mosaic identity set before broader T0-3 documentation consolidation. Do
+and C3 bounded sanitized upstream failure diagnostics. All three are complete. T0-3.0 R1 is complete
+on the old live repository identity; R2 preflight and the external repository rename are next. Do
 not reopen T0-1 KEEP or T0-2 audit decisions without concrete contradictory evidence.
 
 C1 is **COMPLETE / LIVE VERIFIED**. On 2026-09-17, GitHub reported merge commits enabled,
@@ -135,7 +161,7 @@ while repository-level settings make merge commits the only effective method. Ex
 prepare-pr/reuse/upstream tests already protect native two-parent ancestry, exact head/tree, Draft
 authority, and no-force behavior; no implementation or test change was justified. External merge
 settings remain manually administered and must be included in the T0-3 operator checklist. C2 and
-C3 subsequently completed; T0-3.0 R1 is next.
+C3 subsequently completed; R1 is complete and R2 preflight is next.
 
 C2 adds the official Gradle `9.6.1-bin` SHA-256
 `9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14` to the unchanged wrapper URL
