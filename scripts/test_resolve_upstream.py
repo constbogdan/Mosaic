@@ -48,6 +48,10 @@ class FakeRunner:
         self.calls = []
         self.root = None
 
+    @property
+    def repository(self):
+        return resolve.slug(self.origin)
+
     def pr(self):
         body = ("<details><summary>Technical evidence</summary>\n\n```json\n" +
                 json.dumps(self.observation()) + "\n```\n</details>\n" +
@@ -55,12 +59,12 @@ class FakeRunner:
         return {"number": 33, "state": self.state, "draft": True, "body": body,
                 "html_url": "https://github.com/constbogdan/Wholphin/pull/33",
                 "head": {"ref": BRANCH if self.candidate else "feature/ordinary", "sha": CANDIDATE,
-                         "repo": {"full_name": resolve.REPOSITORY}},
-                "base": {"ref": "main", "repo": {"full_name": resolve.REPOSITORY}}}
+                         "repo": {"full_name": self.repository}},
+                "base": {"ref": "main", "repo": {"full_name": self.repository}}}
 
     def observation(self):
         return {"schema_version": 2, "episode_id": EPISODE,
-                "downstream_repo": resolve.REPOSITORY, "branch": BRANCH,
+                "downstream_repo": self.repository, "branch": BRANCH,
                 "run_id": "456", "run_attempt": "1", "candidate_sha": CANDIDATE,
                 "upstream_sha": UPSTREAM, "downstream_sha": DOWNSTREAM,
                 "candidate_tree": "f" * 40, "ownership_policy_version": 1,
@@ -97,16 +101,16 @@ class FakeRunner:
             return resolve.Result(self.current_branch + "\n", "", 0)
         if args[:3] == ["gh", "auth", "status"]:
             return resolve.Result("authenticated", "", 0)
-        if args[:3] == ["gh", "api", f"repos/{resolve.REPOSITORY}/pulls/33"]:
+        if args[:3] == ["gh", "api", f"repos/{self.repository}/pulls/33"]:
             return resolve.Result(json.dumps(self.pr()), "", 0)
         if args[:3] == ["gh", "api", "--paginate"]:
             return resolve.Result(json.dumps([[self.pr()]]), "", 0)
-        if args[:3] == ["gh", "api", f"repos/{resolve.REPOSITORY}/git/ref/heads/main"]:
+        if args[:3] == ["gh", "api", f"repos/{self.repository}/git/ref/heads/main"]:
             return resolve.Result(json.dumps({"object": {"sha": self.main_sha}}), "", 0)
         if args[:2] == ["gh", "api"] and "/compare/" in args[2]:
             comparison = args[2].split("/compare/", 1)[1]
             return resolve.Result(json.dumps({"status": self.compare_map.get(comparison, "diverged")}), "", 0)
-        if args[:3] == ["gh", "api", f"repos/{resolve.REPOSITORY}/actions/runs/456"]:
+        if args[:3] == ["gh", "api", f"repos/{self.repository}/actions/runs/456"]:
             return resolve.Result(json.dumps({"run_attempt": 1}), "", 0)
         if args[:3] == ["gh", "run", "download"]:
             if not self.artifact:
@@ -321,6 +325,14 @@ class ResolveUpstreamTests(unittest.TestCase):
         with self.assertRaisesRegex(resolve.Refusal, "Expected origin"):
             self.execute(runner)
         self.assertFalse(any(call[:2] == ["git", "switch"] for call in runner.calls))
+
+    def test_mosaic_repository_is_authenticated_and_targets_matching_api(self):
+        runner = FakeRunner(origin="https://github.com/constbogdan/Mosaic.git")
+        self.execute(runner)
+        commands = [" ".join(call) for call in runner.calls]
+        self.assertTrue(any("repos/constbogdan/Mosaic/pulls/33" in call for call in commands))
+        self.assertTrue(any("--repo constbogdan/Mosaic" in call for call in commands))
+        self.assertFalse(any("repos/constbogdan/Wholphin/" in call for call in commands))
 
     def test_dirty_tree_including_untracked_refuses_before_github_query(self):
         runner = FakeRunner(dirty=True)

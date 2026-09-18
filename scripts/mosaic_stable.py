@@ -10,29 +10,32 @@ from mosaic_development_release import (GitHub, REPOSITORY, APK_NAME, MANIFEST_N
     _release_assets, check_asset, assets, find_release, historical_identity, trusted_ci,
     published_development_source, validate_original_source, verified_manifest)
 from mosaic_delivery_output import append_summary, publication_summary, release_body
+from mosaic_repository import authenticate_downstream_repository, authenticate_workflow_repository
 
 WORKFLOW = '.github/workflows/mosaic-stable-promotion.yml'
 EVIDENCE_NAME = 'stable-promotion.json'
 
 
 def authorization(env):
-    for key, value in dict(GITHUB_ACTIONS='true', GITHUB_REPOSITORY=REPOSITORY,
+    authenticate_workflow_repository(env, WORKFLOW)
+    for key, value in dict(GITHUB_ACTIONS='true',
                           GITHUB_REF='refs/heads/main', GITHUB_REF_PROTECTED='true',
                           GITHUB_EVENT_NAME='workflow_dispatch').items():
         if env.get(key) != value:
             raise ValueError('Stable promotion requires protected-main manual authorization')
     sha = env.get('GITHUB_SHA', '')
     if (not re.fullmatch('[0-9a-f]{40}', sha)
-            or env.get('GITHUB_WORKFLOW_REF') != f'{REPOSITORY}/{WORKFLOW}@refs/heads/main'):
+            ):
         raise ValueError('Stable promotion requires exact protected-main tooling')
     return sha
 
 
-def download_asset(asset_id):
+def download_asset(asset_id, repository=REPOSITORY):
     # gh handles authenticated API asset redirects; never log response/error bodies or token.
     if type(asset_id) is not int or asset_id < 1:
         raise ValueError('Invalid immutable asset ID')
-    result = subprocess.run(['gh', 'api', '--hostname', 'github.com', f'repos/{REPOSITORY}/releases/assets/{asset_id}',
+    repository = authenticate_downstream_repository(repository)
+    result = subprocess.run(['gh', 'api', '--hostname', 'github.com', f'repos/{repository}/releases/assets/{asset_id}',
                              '-H', 'Accept: application/octet-stream'], capture_output=True, timeout=180)
     if result.returncode:
         raise ValueError('Signed release asset download failed')
@@ -74,10 +77,11 @@ def source_assets(api, tag, source, expected_hash):
     return m, {a['name']: a for a in inventory}
 
 
-def apk_url(inventory):
+def apk_url(inventory, repository=REPOSITORY):
+    repository = authenticate_downstream_repository(repository)
     url = inventory.get(APK_NAME, {}).get('browser_download_url', '')
     if not re.fullmatch(
-            rf'https://github\.com/{re.escape(REPOSITORY)}/releases/download/'
+            rf'https://github\.com/{re.escape(repository)}/releases/download/'
             rf'downstream-build-[1-9][0-9]*/{APK_NAME}', str(url)):
         raise ValueError('Authenticated Development APK URL is missing or malformed')
     return url
@@ -108,7 +112,7 @@ def current_development_candidate(api):
         'rollingReleaseId': rolling['id'],
         'immutableReleaseId': immutable['id'],
         'tagObjectSha': ref['object']['sha'],
-        'apkUrl': apk_url(inventory),
+        'apkUrl': apk_url(inventory, api.repository),
     }
 
 
@@ -150,7 +154,7 @@ def prepare(api, root, env, directory):
     validate_original_source(api, manifest['source'], identity)
     directory.mkdir(parents=True, exist_ok=False)
     for name, item in inventory.items():
-        data = download_asset(item['id'])
+        data = download_asset(item['id'], api.repository)
         check_asset(item, name, data)
         if name == MANIFEST_NAME and data != canonical(manifest):
             raise ValueError('Downloaded Development manifest differs from immutable provenance')
@@ -206,7 +210,8 @@ def publish_prepared(api, root, env, directory):
     if current_manifest != manifest:
         raise ValueError('Current Development provenance changed after authentication')
     compare_from = promote(api, manifest, apk)
-    append_summary(publication_summary(manifest, 'promote', env, compare_from=compare_from), env)
+    append_summary(publication_summary(
+        manifest, 'promote', env, compare_from=compare_from, repository=api.repository), env)
 
 
 def authenticated_stable_release(api, release):
@@ -251,10 +256,11 @@ def verify_manifest(m, apk, acceptance, identity, policy):
         raise ValueError('Stable input differs from verified development manifest')
 
 
-def fields(m, draft, compare_from=None):
+def fields(m, draft, compare_from=None, repository=REPOSITORY):
     return dict(name='v' + m['versionName'], draft=draft, prerelease=False,
                 make_latest='false' if draft else 'true',
-                body=release_body(m, 'Stable', compare_from=compare_from))
+                body=release_body(
+                    m, 'Stable', compare_from=compare_from, repository=repository))
 
 
 def previous_stable_compare(api, candidates):
@@ -298,12 +304,24 @@ def promote(api, m, apk, releases=None):
         obj = api.call('POST', 'git/tags', dict(tag=tag, message=canonical(m).decode(), object=m['sourceSha'], type='commit'))
         api.call('POST', 'git/refs', dict(ref='refs/tags/' + tag, sha=obj['sha']))
     if stable is None:
-        stable = api.call('POST', 'releases', dict(tag_name=tag, target_commitish=m['sourceSha'], **fields(m, True, compare_from)))
+        stable = api.call(
+            'POST',
+            'releases',
+            dict(
+                tag_name=tag,
+                target_commitish=m['sourceSha'],
+                **fields(m, True, compare_from, api.repository),
+            ),
+        )
     if stable.get('prerelease') is not False or stable.get('name') != 'v' + m['versionName']:
         raise ValueError('Stable release metadata conflict')
     assets(api, stable, {APK_NAME: apk, MANIFEST_NAME: canonical(m)}, allow_upload=stable['draft'])
     if stable['draft']:
-        api.call('PATCH', f"releases/{stable['id']}", fields(m, False, compare_from))
+        api.call(
+            'PATCH',
+            f"releases/{stable['id']}",
+            fields(m, False, compare_from, api.repository),
+        )
     # An already published stable is never edited or re-uploaded on retry.
     latest = api.call('GET', 'releases/latest')
     if latest.get('id') != stable['id'] or latest.get('draft') or latest.get('prerelease') or latest.get('tag_name') != tag:
@@ -319,7 +337,8 @@ def main():
     try:
         env = os.environ
         root = Path(__file__).resolve().parent.parent
-        api = GitHub()
+        repository = authenticate_workflow_repository(env, WORKFLOW)
+        api = GitHub(repository)
         directory = args.directory
         if args.mode == 'prepare':
             prepare(api, root, env, directory)

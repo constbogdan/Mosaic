@@ -15,9 +15,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import mosaic_validation_policy
+from mosaic_repository import (
+    LEGACY_DOWNSTREAM_REPOSITORY,
+    UPSTREAM_REPOSITORY,
+    authenticate_downstream_repository,
+)
 
 
-REPOSITORY = "constbogdan/Wholphin"
+REPOSITORY = LEGACY_DOWNSTREAM_REPOSITORY
+UPSTREAM = UPSTREAM_REPOSITORY
 BASE_BRANCH = "main"
 BRANCH_PREFIX = "chore/sync-upstream-"
 EPISODE = re.compile(r"<!-- wholphin-upstream-episode:([0-9a-f]{64}) -->")
@@ -99,10 +105,11 @@ def flatten_pages(value) -> list[dict]:
 
 
 def validate_observation(observation: dict, pr: dict, episode: str, *, runner=None, root=None,
-                         run_id=None, attempt=None) -> None:
+                         run_id=None, attempt=None, repository=REPOSITORY) -> None:
+    repository = authenticate_downstream_repository(repository)
     expected = {
         "episode_id": episode,
-        "downstream_repo": REPOSITORY,
+        "downstream_repo": repository,
         "branch": pr["head"]["ref"],
     }
     if run_id is not None:
@@ -129,19 +136,22 @@ def validate_observation(observation: dict, pr: dict, episode: str, *, runner=No
     anchor = observation.get("candidate_sha")
     head = pr["head"]["sha"]
     if anchor and anchor != head:
-        if runner is None or root is None or not is_ancestor(runner, root, REPOSITORY, anchor, head):
+        if runner is None or root is None or not is_ancestor(runner, root, repository, anchor, head):
             raise Refusal("PR head is not a proven descendant of the machine-evidence candidate SHA.")
 
 
-def load_observation(runner: Runner, root: Path, pr: dict, episode: str) -> tuple[dict, str | None]:
+def load_observation(runner: Runner, root: Path, pr: dict, episode: str,
+                     repository=REPOSITORY) -> tuple[dict, str | None]:
+    repository = authenticate_downstream_repository(repository)
     fallback = technical_evidence(pr.get("body", ""))
     run_url = fallback.get("run_url")
     match = RUN_ID.search(run_url or "")
     if not match:
-        validate_observation(fallback, pr, episode, runner=runner, root=root)
+        validate_observation(fallback, pr, episode, runner=runner, root=root,
+                             repository=repository)
         return fallback, run_url
     run_id = match.group(1)
-    run = json_output(runner, ["gh", "api", f"repos/{REPOSITORY}/actions/runs/{run_id}"], root)
+    run = json_output(runner, ["gh", "api", f"repos/{repository}/actions/runs/{run_id}"], root)
     attempt = int(run.get("run_attempt") or 0)
     if not attempt:
         raise Refusal("Latest Upstream Sync run did not expose a valid attempt number.")
@@ -149,29 +159,31 @@ def load_observation(runner: Runner, root: Path, pr: dict, episode: str) -> tupl
         destination = Path(directory)
         artifact_name = f"upstream-outcome-{attempt}"
         downloaded = runner.run([
-            "gh", "run", "download", run_id, "--repo", REPOSITORY,
+            "gh", "run", "download", run_id, "--repo", repository,
             "--name", artifact_name, "--dir", str(destination),
         ], cwd=root, check=False)
         if downloaded.returncode:
             artifact_name = f"upstream-observation-{attempt}"
             downloaded = runner.run([
-                "gh", "run", "download", run_id, "--repo", REPOSITORY,
+                "gh", "run", "download", run_id, "--repo", repository,
                 "--name", artifact_name, "--dir", str(destination),
             ], cwd=root, check=False)
         evidence_file = next(destination.rglob("*.json"), None) if downloaded.returncode == 0 else None
         if not evidence_file:
             fallback["evidence_warning"] = "Machine observation artifact was unavailable or expired."
-            validate_observation(fallback, pr, episode, runner=runner, root=root)
+            validate_observation(fallback, pr, episode, runner=runner, root=root,
+                                 repository=repository)
             return fallback, run_url
         observation = json.loads(evidence_file.read_text(encoding="utf-8"))
     validate_observation(observation, pr, episode, runner=runner, root=root,
-                         run_id=run_id, attempt=attempt)
+                         run_id=run_id, attempt=attempt, repository=repository)
     return observation, run_url
 
 
-def checks(runner: Runner, root: Path, number: int) -> dict:
+def checks(runner: Runner, root: Path, number: int, repository=REPOSITORY) -> dict:
+    repository = authenticate_downstream_repository(repository)
     result = runner.run([
-        "gh", "pr", "checks", str(number), "--repo", REPOSITORY,
+        "gh", "pr", "checks", str(number), "--repo", repository,
         "--json", "name,state,link,bucket,workflow",
     ], cwd=root, check=False)
     if result.returncode and not result.stdout.strip():
@@ -199,11 +211,16 @@ def assert_preflight(runner: Runner, root: Path, *, allow_dirty=False) -> tuple[
     if Path(top).resolve() != root.resolve():
         raise Refusal(f"Expected repository root {root}, but Git reported {top}.")
     origin = runner.run(["git", "remote", "get-url", "origin"], cwd=root).stdout.strip()
-    if slug(origin) != REPOSITORY:
-        raise Refusal(f"Expected origin {REPOSITORY}; found {slug(origin) or origin}.")
+    try:
+        authenticate_downstream_repository(slug(origin))
+    except ValueError as error:
+        raise Refusal(
+            "Expected origin constbogdan/Wholphin or constbogdan/Mosaic; "
+            f"found {slug(origin) or origin}."
+        ) from error
     upstream = runner.run(["git", "remote", "get-url", "upstream"], cwd=root).stdout.strip()
-    if slug(upstream) != "damontecres/Wholphin":
-        raise Refusal(f"Expected upstream damontecres/Wholphin; found {slug(upstream) or upstream}.")
+    if slug(upstream) != UPSTREAM:
+        raise Refusal(f"Expected upstream {UPSTREAM}; found {slug(upstream) or upstream}.")
     dirty = runner.run(["git", "status", "--porcelain=v1", "--untracked-files=all"], cwd=root).stdout.strip()
     branch = runner.run(["git", "branch", "--show-current"], cwd=root).stdout.strip()
     if dirty and not allow_dirty:
@@ -214,17 +231,29 @@ def assert_preflight(runner: Runner, root: Path, *, allow_dirty=False) -> tuple[
     return branch, dirty
 
 
-def validate_pr(pr: dict, number: int) -> str:
+def authenticated_origin(runner: Runner, root: Path) -> str:
+    origin = runner.run(["git", "remote", "get-url", "origin"], cwd=root).stdout.strip()
+    try:
+        return authenticate_downstream_repository(slug(origin))
+    except ValueError as error:
+        raise Refusal(
+            "Expected origin constbogdan/Wholphin or constbogdan/Mosaic; "
+            f"found {slug(origin) or origin}."
+        ) from error
+
+
+def validate_pr(pr: dict, number: int, repository=REPOSITORY) -> str:
+    repository = authenticate_downstream_repository(repository)
     if int(pr.get("number") or 0) != number:
         raise Refusal("GitHub returned metadata for a different PR.")
-    if pr.get("base", {}).get("repo", {}).get("full_name") != REPOSITORY:
-        raise Refusal(f"PR #{number} does not belong to {REPOSITORY}.")
+    if pr.get("base", {}).get("repo", {}).get("full_name") != repository:
+        raise Refusal(f"PR #{number} does not belong to {repository}.")
     if pr.get("base", {}).get("ref") != BASE_BRANCH:
         raise Refusal(f"PR #{number} does not target {BASE_BRANCH}.")
     if pr.get("state") != "open":
         raise Refusal(f"PR #{number} is {pr.get('state', 'not open')}; closed decisions are not reopened.")
     branch = pr.get("head", {}).get("ref") or ""
-    if pr.get("head", {}).get("repo", {}).get("full_name") != REPOSITORY:
+    if pr.get("head", {}).get("repo", {}).get("full_name") != repository:
         raise Refusal("PR head is not the maintained downstream repository.")
     episode = marker(pr.get("body", ""))
     if not episode or not branch.startswith(BRANCH_PREFIX):
@@ -232,19 +261,22 @@ def validate_pr(pr: dict, number: int) -> str:
     return episode
 
 
-def open_candidates(runner: Runner, root: Path) -> list[Candidate]:
+def open_candidates(runner: Runner, root: Path, repository=REPOSITORY) -> list[Candidate]:
+    repository = authenticate_downstream_repository(repository)
     pulls = flatten_pages(json_output(runner, [
         "gh", "api", "--paginate", "--slurp",
-        f"repos/{REPOSITORY}/pulls?state=open&base={BASE_BRANCH}&per_page=100",
+        f"repos/{repository}/pulls?state=open&base={BASE_BRANCH}&per_page=100",
     ], root))
     candidates = []
     for pr in pulls:
         episode = marker(pr.get("body", ""))
-        if (not episode or pr.get("head", {}).get("repo", {}).get("full_name") != REPOSITORY
+        if (not episode or pr.get("head", {}).get("repo", {}).get("full_name") != repository
                 or not str(pr.get("head", {}).get("ref") or "").startswith(BRANCH_PREFIX)):
             continue
-        observation, _ = load_observation(runner, root, pr, episode)
-        candidates.append(Candidate(pr, observation, checks(runner, root, int(pr["number"]))))
+        observation, _ = load_observation(runner, root, pr, episode, repository)
+        candidates.append(Candidate(
+            pr, observation, checks(runner, root, int(pr["number"]), repository)
+        ))
     return sorted(candidates, key=lambda candidate: int(candidate.pr["number"]))
 
 
@@ -272,14 +304,16 @@ def is_ancestor(runner: Runner, root: Path, repository: str, older: str, newer: 
     return compare_status(runner, root, repository, older, newer) in {"ahead", "identical"}
 
 
-def classify_dependencies(runner: Runner, root: Path, candidates: list[Candidate]) -> list[Candidate]:
-    main = json_output(runner, ["gh", "api", f"repos/{REPOSITORY}/git/ref/heads/{BASE_BRANCH}"], root)
+def classify_dependencies(runner: Runner, root: Path, candidates: list[Candidate],
+                          repository=REPOSITORY) -> list[Candidate]:
+    repository = authenticate_downstream_repository(repository)
+    main = json_output(runner, ["gh", "api", f"repos/{repository}/git/ref/heads/{BASE_BRANCH}"], root)
     main_sha = main.get("object", {}).get("sha")
     if not main_sha:
         raise Refusal("Could not determine authoritative downstream main SHA.")
     active = [candidate for candidate in candidates if candidate.state != "Superseded"]
     for candidate in active:
-        if is_ancestor(runner, root, REPOSITORY, candidate.pr["head"]["sha"], main_sha):
+        if is_ancestor(runner, root, repository, candidate.pr["head"]["sha"], main_sha):
             candidate.state = "Superseded"
             continue
         observed_main = candidate.observation.get("downstream_sha")
@@ -300,10 +334,10 @@ def classify_dependencies(runner: Runner, root: Path, candidates: list[Candidate
                 left.state = right.state = "Dependency ambiguous"
                 left.overlaps = right.overlaps = tuple(overlap)
                 continue
-            left_first = (is_ancestor(runner, root, "damontecres/Wholphin", left_up, right_up)
-                          and is_ancestor(runner, root, REPOSITORY, left_down, right_down))
-            right_first = (is_ancestor(runner, root, "damontecres/Wholphin", right_up, left_up)
-                           and is_ancestor(runner, root, REPOSITORY, right_down, left_down))
+            left_first = (is_ancestor(runner, root, UPSTREAM, left_up, right_up)
+                          and is_ancestor(runner, root, repository, left_down, right_down))
+            right_first = (is_ancestor(runner, root, UPSTREAM, right_up, left_up)
+                           and is_ancestor(runner, root, repository, right_down, left_down))
             if left_first == right_first:
                 left.state = right.state = "Dependency ambiguous"
                 left.overlaps = right.overlaps = tuple(overlap)
@@ -632,7 +666,9 @@ def select_candidate(candidates: list[Candidate], requested: int | None, input_f
     return chosen
 
 
-def publication_phase(root: Path, runner: Runner, candidate: Candidate, input_fn=input) -> None:
+def publication_phase(root: Path, runner: Runner, candidate: Candidate, input_fn=input,
+                      repository=REPOSITORY) -> None:
+    repository = authenticate_downstream_repository(repository)
     if candidate.state.startswith("Waiting on") or candidate.state in {"Superseded", "Dependency ambiguous"}:
         raise Refusal(f"Candidate is {candidate.state}; semantic publication is not currently actionable.")
     verify_local_descendant(runner, root, candidate)
@@ -661,7 +697,9 @@ def publication_phase(root: Path, runner: Runner, candidate: Candidate, input_fn
         print("Publication cancelled; nothing was committed or pushed.")
         return
 
-    refreshed = classify_dependencies(runner, root, open_candidates(runner, root))
+    refreshed = classify_dependencies(
+        runner, root, open_candidates(runner, root, repository), repository
+    )
     matches = [item for item in refreshed if int(item.pr["number"]) == int(candidate.pr["number"])]
     if len(matches) != 1 or marker(matches[0].pr.get("body", "")) != marker(candidate.pr.get("body", "")):
         raise Refusal("Candidate PR/episode changed immediately before publication.")
@@ -809,10 +847,13 @@ def selected_output(number: int, root: Path, candidate: Candidate, runner: Runne
 
 def execute(number: int, root: Path, runner: Runner) -> tuple[str, Path]:
     assert_preflight(runner, root)
-    pr = json_output(runner, ["gh", "api", f"repos/{REPOSITORY}/pulls/{number}"], root)
-    episode = validate_pr(pr, number)
-    observation, _ = load_observation(runner, root, pr, episode)
-    candidate = Candidate(pr, observation, checks(runner, root, number), state="Ready for resolution")
+    repository = authenticated_origin(runner, root)
+    pr = json_output(runner, ["gh", "api", f"repos/{repository}/pulls/{number}"], root)
+    episode = validate_pr(pr, number, repository)
+    observation, _ = load_observation(runner, root, pr, episode, repository)
+    candidate = Candidate(
+        pr, observation, checks(runner, root, number, repository), state="Ready for resolution"
+    )
     return selected_output(number, root, candidate, runner)
 
 
@@ -824,12 +865,15 @@ def main() -> int:
     try:
         runner = Runner()
         branch, dirty = assert_preflight(runner, root, allow_dirty=True)
-        candidates = classify_dependencies(runner, root, open_candidates(runner, root))
+        repository = authenticated_origin(runner, root)
+        candidates = classify_dependencies(
+            runner, root, open_candidates(runner, root, repository), repository
+        )
         current = [candidate for candidate in candidates if candidate.pr["head"]["ref"] == branch]
         if current:
             if args.pr is not None and int(current[0].pr["number"]) != args.pr:
                 raise Refusal(f"Current candidate branch belongs to PR #{current[0].pr['number']}, not PR #{args.pr}.")
-            publication_phase(root, runner, current[0])
+            publication_phase(root, runner, current[0], repository=repository)
             return 0
         if dirty:
             raise Refusal("Working tree is not clean. Preserve local work separately before selecting another candidate.")

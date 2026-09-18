@@ -21,6 +21,40 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class DeliveryOutputTests(unittest.TestCase):
+    def test_transition_workflow_guards_are_exact_and_machine_names_remain_stable(self):
+        root = Path(__file__).resolve().parent.parent
+        workflows = (
+            'ci.yml',
+            'mosaic-signing-exercise.yml',
+            'mosaic-stable-promotion.yml',
+            'hold-release.yml',
+            'upstream-sync.yml',
+        )
+        for name in workflows:
+            text = (root / '.github/workflows' / name).read_text(encoding='utf-8-sig')
+            with self.subTest(workflow=name):
+                self.assertIn("github.repository == 'constbogdan/Wholphin'", text)
+                self.assertIn("github.repository == 'constbogdan/Mosaic'", text)
+                self.assertNotIn('startsWith(github.repository', text)
+                self.assertNotIn('contains(github.repository', text)
+        ci = (root / '.github/workflows/ci.yml').read_text(encoding='utf-8-sig')
+        for contract in (
+            'name: Full validation',
+            'name: Build Development Release',
+            'name: Sign Development',
+            'name: Publish Development',
+        ):
+            self.assertIn(contract, ci)
+        reuse = (root / 'scripts/mosaic_validation_reuse.py').read_text(encoding='utf-8')
+        self.assertIn('CONTRACT = "pr-policy-v1"', reuse)
+        self.assertIn('f"wholphin-{CONTRACT}', reuse)
+
+    def test_release_navigation_uses_authenticated_current_repository(self):
+        link = output.compare_link('a' * 40, 'b' * 40, 'constbogdan/Mosaic')
+        self.assertIn('github.com/constbogdan/Mosaic/compare/', link)
+        with self.assertRaises(ValueError):
+            output.compare_link('a' * 40, 'b' * 40, 'other/Mosaic')
+
     def setUp(self):
         fixture = fixtures.PublisherTests()
         fixture.setUp()
@@ -140,7 +174,14 @@ class DeliveryOutputTests(unittest.TestCase):
                       validationRisk='high', baselineSha='a' * 40, currentSha='b' * 40,
                       paths=[dict(path=f'scripts/fixture{i}.py') for i in range(24)], reason='fixture')
         with tempfile.TemporaryDirectory() as temp:
-            env = dict(GITHUB_OUTPUT=str(Path(temp) / 'outputs'), GITHUB_STEP_SUMMARY=str(Path(temp) / 'summary'))
+            env = dict(
+                GITHUB_OUTPUT=str(Path(temp) / 'outputs'),
+                GITHUB_STEP_SUMMARY=str(Path(temp) / 'summary'),
+                GITHUB_REPOSITORY=development.REPOSITORY,
+                GITHUB_WORKFLOW_REF=(
+                    f'{development.REPOSITORY}/{development.CI_WORKFLOW}@refs/heads/main'
+                ),
+            )
             development.record_eligibility(result, None, env)
             values = dict(line.split('=', 1) for line in Path(env['GITHUB_OUTPUT']).read_text().splitlines())
             summary = Path(env['GITHUB_STEP_SUMMARY']).read_text(encoding='utf-8')

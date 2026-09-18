@@ -66,10 +66,25 @@ class HoldReleaseTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.directory = Path(self.temp.name) / 'hold'
 
+    def test_authorization_accepts_only_transition_repositories(self):
+        self.assertEqual(self.env['GITHUB_SHA'], hold.authorization(self.env))
+        mosaic = dict(
+            self.env,
+            GITHUB_REPOSITORY='constbogdan/Mosaic',
+            GITHUB_WORKFLOW_REF=f'constbogdan/Mosaic/{hold.WORKFLOW}@refs/heads/main',
+        )
+        self.assertEqual(self.env['GITHUB_SHA'], hold.authorization(mosaic))
+        for repository in ('constbogdan/Mosaic2', 'other/Mosaic', ''):
+            with self.subTest(repository=repository), self.assertRaises(ValueError):
+                hold.authorization(dict(
+                    self.env,
+                    GITHUB_REPOSITORY=repository,
+                    GITHUB_WORKFLOW_REF=f'{repository}/{hold.WORKFLOW}@refs/heads/main',
+                ))
     def tearDown(self):
         self.temp.cleanup()
 
-    def content(self, asset_id):
+    def content(self, asset_id, repository=hold.REPOSITORY):
         item = self.api.uploads[asset_id]
         return self.apk if item['name'] == hold.APK_NAME else canonical(self.m)
 

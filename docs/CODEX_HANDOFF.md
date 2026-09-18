@@ -44,7 +44,7 @@
 
 `T0-2 - COMPLETE`
 
-`T0-3.0 Mosaic identity establishment - DECISIONS APPROVED / R1 NEXT`
+`T0-3.0 R1 - IMPLEMENTED / LOCAL VALIDATED; OLD-NAME HOSTED ACCEPTANCE PENDING`
 
 The approved [Mosaic identity establishment decision](Wholphin_ROADMAP.md#t0-30-mosaic-identity-establishment-decision) is
 authoritative for the pre-user rename. Mosaic is the downstream product and future repository;
@@ -52,9 +52,23 @@ Wholphin remains the upstream project/source identity. Future releases use only
 `Mosaic-release.apk`, new Mosaic builds target only `constbogdan/Mosaic`, and the public URI scheme
 becomes `mosaic:`; there are no compatibility aliases for a nonexistent installed population.
 `wholphin-pr-policy-v1-*` remains the current evidence protocol: only its authenticated repository
-value transitions. The frozen implementation order is R1 exact old/new repository bridge, R2
+value transitions. R1 now implements the exact, case-sensitive closed transition set
+`constbogdan/Wholphin` / `constbogdan/Mosaic` across prepare-pr, validation/evidence reuse,
+Development, version/signing, Stable, Hold, hosted upstream, and resolver boundaries. Runtime Git,
+API, release-navigation, and App-token repository targets derive only from that authenticated
+identity; foreign/lookalike/malformed identities fail before credentials or mutation. Workflow
+permissions, Environment authority, App-token outcome allowlist, updater/APK identity, upstream
+identity and stable `wholphin-*` protocol markers are unchanged. The frozen order remains R2
 external repository rename/settings, R3 canonical product and distribution identity plus end-to-end
-proof, then R4 removal of old repository authentication. R1 is next; do not collapse the sequence.
+proof, then R4 removal of old repository authentication. First obtain old-name hosted acceptance for
+R1; do not collapse the sequence.
+
+Before R2, drain ordinary PR/auto-merge and all delivery, promotion, hold, diagnostic, upstream,
+resolver, and prepare-pr activity. Record repository ID `1351255476`, main/ruleset/required-check and
+merge settings, Environments, secrets/variables, App installation access, releases/tags, branches,
+visibility/default branch and fork relationship. Preserve Draft PR #58 if GitHub retains its
+identity. After the rename, update `origin` and external operator targets and verify the same
+repository ID and recorded controls before resuming mutation.
 
 The current operator lifecycle is concise: bounded Fast feedback -> prepare-pr scope/tree integrity
 and exact-head publication -> authoritative `NON_ANDROID` or `ANDROID_FULL` PR CI -> native

@@ -32,7 +32,7 @@ class StableGitHub(FakeGitHub):
             release = self.releases[int(path.split('/')[1])]
             for item in result:
                 item['browser_download_url'] = (
-                    f'https://github.com/{stable.REPOSITORY}/releases/download/'
+                    f'https://github.com/{self.repository}/releases/download/'
                     f"{release['tag_name']}/{item['name']}"
                 )
         return result
@@ -55,6 +55,21 @@ class StableTests(unittest.TestCase):
         self.api = StableGitHub()
         publish(self.api, self.m, self.apk)
 
+    def test_mosaic_repository_targets_release_navigation_without_identity_rename(self):
+        api = StableGitHub('constbogdan/Mosaic')
+        publish(api, self.m, self.apk)
+        stable.promote(api, self.m, self.apk)
+        bodies = [release['body'] for release in api.releases.values()]
+        self.assertTrue(all('github.com/constbogdan/Mosaic/' in body for body in bodies))
+        self.assertTrue(any(item['name'] == stable.APK_NAME for item in api.uploads.values()))
+        self.assertEqual('Wholphin-release.apk', stable.APK_NAME)
+
+    def test_foreign_repository_cannot_reach_asset_download_target(self):
+        with patch.object(stable.subprocess, 'run') as run:
+            with self.assertRaises(ValueError):
+                stable.download_asset(1, 'other/Mosaic')
+        run.assert_not_called()
+
     def stable_env(self, **changed):
         return {
             'GITHUB_ACTIONS': 'true',
@@ -67,7 +82,7 @@ class StableTests(unittest.TestCase):
             **changed,
         }
 
-    def downloaded_asset(self, asset_id):
+    def downloaded_asset(self, asset_id, repository=stable.REPOSITORY):
         item = self.api.uploads[asset_id]
         return self.apk if item['name'] == stable.APK_NAME else canonical(self.m)
 
@@ -280,6 +295,7 @@ class StableTests(unittest.TestCase):
                    repository=dict(full_name=stable.REPOSITORY),
                    head_repository=dict(full_name=stable.REPOSITORY))
         api = Mock()
+        api.repository = stable.REPOSITORY
         api.call.return_value = run
         api.pages.return_value = [job]
         self.assertEqual(CI_WORKFLOW, validate_original_source(api, record, self.identity))
@@ -296,6 +312,7 @@ class StableTests(unittest.TestCase):
 
     def test_stable_ci_trust_requires_protected_main_exact_run_and_full_job(self):
         api = Mock()
+        api.repository = stable.REPOSITORY
         branch = dict(protected=True, commit=dict(sha='a' * 40))
         run = dict(id=100, run_attempt=2, head_sha='a' * 40, head_branch='main', event='push',
                    workflow_id=42, head_repository=dict(full_name=stable.REPOSITORY),
@@ -304,6 +321,15 @@ class StableTests(unittest.TestCase):
         api.call.side_effect = [branch, dict(id=42)]
         api.pages.side_effect = [[run], [job]]
         self.assertEqual('2', trusted_ci(api, 'a' * 40)['runAttempt'])
+        mosaic_api = Mock()
+        mosaic_api.repository = 'constbogdan/Mosaic'
+        mosaic_run = dict(
+            run,
+            head_repository=dict(full_name='constbogdan/Mosaic'),
+        )
+        mosaic_api.call.side_effect = [branch, dict(id=42)]
+        mosaic_api.pages.side_effect = [[mosaic_run], [job]]
+        self.assertEqual('2', trusted_ci(mosaic_api, 'a' * 40)['runAttempt'])
         for field, value in [('head_branch', 'feature'), ('event', 'pull_request'),
                              ('head_sha', 'f' * 40), ('status', 'in_progress'),
                              ('conclusion', 'failure')]:
@@ -315,11 +341,26 @@ class StableTests(unittest.TestCase):
     def test_zero_input_authorization_and_workflow_isolation(self):
         env = self.stable_env()
         self.assertEqual(env['GITHUB_SHA'], stable.authorization(env))
+        mosaic = dict(
+            env,
+            GITHUB_REPOSITORY='constbogdan/Mosaic',
+            GITHUB_WORKFLOW_REF=(
+                f'constbogdan/Mosaic/{stable.WORKFLOW}@refs/heads/main'
+            ),
+        )
+        self.assertEqual(env['GITHUB_SHA'], stable.authorization(mosaic))
         for field, value in [('GITHUB_EVENT_NAME', 'pull_request'), ('GITHUB_REF', 'refs/heads/feature'),
                              ('GITHUB_REPOSITORY', 'fork/Wholphin'), ('GITHUB_SHA', 'not-a-sha'),
                              ('GITHUB_WORKFLOW_REF', 'other')]:
             with self.subTest(field=field), self.assertRaises(ValueError):
                 stable.authorization(dict(env, **{field: value}))
+        for repository in ('constbogdan/Mosaic2', 'other/Mosaic', ''):
+            with self.subTest(repository=repository), self.assertRaises(ValueError):
+                stable.authorization(dict(
+                    env,
+                    GITHUB_REPOSITORY=repository,
+                    GITHUB_WORKFLOW_REF=f'{repository}/{stable.WORKFLOW}@refs/heads/main',
+                ))
         workflow = (ROOT / stable.WORKFLOW).read_text(encoding='utf-8')
         verify, publisher = workflow.split('\n  publish:\n')
         for forbidden in ('gradlew', 'mosaic-sign-apk', 'secrets.', 'SYNC_BOT', 'push:', 'pull_request:', 'schedule:'):

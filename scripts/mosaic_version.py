@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 import subprocess
 
+from mosaic_repository import authenticate_downstream_repository
+
 EPOCH = "bc13bf8fdb360c90b44ca0cc85802fa796d3bd08"
 UPSTREAM_BASELINE = "1778bdb34caa699c0590232a7de709a889839765"
 
@@ -33,8 +35,8 @@ def allocate(root, publication=False, epoch=EPOCH):
         raise ValueError("Mosaic versionCode exhausted")
     dirty = bool(git(root, "status", "--porcelain", "--untracked-files=normal"))
     if publication:
-        expected = {"GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": "constbogdan/Wholphin",
-                    "GITHUB_REF": "refs/heads/main",
+        authenticate_downstream_repository(os.environ.get("GITHUB_REPOSITORY"))
+        expected = {"GITHUB_ACTIONS": "true", "GITHUB_REF": "refs/heads/main",
                     "GITHUB_SHA": source}
         event = os.environ.get("GITHUB_EVENT_NAME")
         allowed_event = event == "push" or (

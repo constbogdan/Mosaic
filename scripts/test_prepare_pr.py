@@ -261,6 +261,13 @@ $global:LASTEXITCODE = 0
     def branch_name(self):
         return self.git("branch", "--show-current").stdout.strip()
 
+    def use_downstream_repository(self, repository):
+        owner, name = repository.split("/", 1)
+        destination = self.fixture_root / "github.com" / owner / f"{name}.git"
+        self.origin.rename(destination)
+        self.origin = destination
+        self.git("remote", "set-url", "origin", self.origin.as_posix())
+
     def remote_head(self, branch=None):
         branch = branch or self.branch_name()
         result = self.origin_git(
@@ -321,6 +328,7 @@ armed = state_dir / \"armed\"
 list_count_path = state_dir / \"list-count\"
 view_count_path = state_dir / \"view-count\"
 mode = os.environ.get(\"FAKE_PR_MODE\", \"create\")
+repository = os.environ[\"FAKE_REPOSITORY\"]
 
 
 def bump(path):
@@ -373,7 +381,7 @@ def view():
     if mode == \"merged\":
         state = \"MERGED\"
         merged_at = \"2026-09-14T00:00:00Z\"
-    head_repository = \"constbogdan/Wholphin\"
+    head_repository = repository
     if mode == \"wrong_repo\":
         head_repository = \"someone/Wholphin\"
     return {
@@ -418,7 +426,7 @@ if args[:2] == [\"pr\", \"view\"]:
     raise SystemExit(0)
 if args and args[0] == \"api\":
     print(json.dumps({
-        \"full_name\": \"constbogdan/Wholphin\",
+        \"full_name\": repository,
         \"allow_auto_merge\": mode != \"settings_disabled\",
         \"allow_merge_commit\": mode != \"merge_disabled\",
         \"allow_squash_merge\": True,
@@ -460,6 +468,7 @@ raise SystemExit(2)
             "FAKE_HEAD": self.git("rev-parse", "HEAD").stdout.strip(),
             "FAKE_BRANCH": self.branch_name(),
             "FAKE_LIST_HEAD_BEFORE": list_head_before,
+            "FAKE_REPOSITORY": "/".join(self.origin.parts[-2:]).removesuffix(".git"),
         }
 
     def fake_trace(self, name, scenario="default"):
@@ -883,6 +892,35 @@ raise SystemExit(2)
                 self.assertNotEqual(0, result.returncode)
                 self.assertIn(expected, normalized_native_output(result))
                 self.assertEqual([], self.auto_merge_commands(mode))
+
+    def test_mosaic_repository_is_authenticated_and_used_for_github_targets(self):
+        self.use_downstream_repository("constbogdan/Mosaic")
+        (self.root / "file.txt").write_text("mosaic transition\n", encoding="utf-8")
+        result = self.prepare("Guided", env=self.fake_publish_env(), check=False)
+        self.assertEqual(0, result.returncode, normalized_native_output(result))
+        commands = self.fake_trace("gh")
+        targeted = [
+            args[index + 1]
+            for args in commands
+            for index, value in enumerate(args[:-1])
+            if value == "--repo"
+        ]
+        self.assertTrue(targeted)
+        self.assertEqual({"constbogdan/Mosaic"}, set(targeted))
+        self.assertFalse(any("constbogdan/Wholphin" in " ".join(args) for args in commands))
+
+    def test_repository_transition_allowlist_is_case_sensitive_and_closed(self):
+        for repository in ("constbogdan/Mosaic2", "other/Mosaic", "constbogdan/mosaic"):
+            with self.subTest(repository=repository):
+                self.git(
+                    "remote",
+                    "set-url",
+                    "origin",
+                    f"https://github.com/{repository}.git",
+                )
+                result = self.prepare("Audit", check=False)
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn("unexpected repository", normalized_native_output(result))
 
     def test_closed_merged_or_ambiguous_pr_refuses(self):
         reviewed_head = self.commit_current_worktree()

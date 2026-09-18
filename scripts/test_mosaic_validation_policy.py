@@ -74,6 +74,7 @@ class ValidationPolicyTest(unittest.TestCase):
         cases = (
             ("scripts/test_mosaic_change_classification.py", ["test_mosaic_change_classification.py"]),
             ("scripts/mosaic_validation_policy.py", ["test_mosaic_validation_policy.py"]),
+            ("scripts/mosaic_repository.py", ["test_mosaic_repository.py"]),
             ("scripts/resolve_upstream.py", ["test_resolve_upstream.py"]),
             ("scripts/test_prepare_pr.py", []),
             ("scripts/hosted_upstream.py", []),
@@ -96,6 +97,14 @@ class ValidationPolicyTest(unittest.TestCase):
             ["test_mosaic_validation_policy.py"],
             mixed["localFastOfflinePatterns"],
         )
+
+    def test_repository_authentication_helper_requires_full_hosted_validation(self):
+        plan = policy.plan_paths(["scripts/mosaic_repository.py"])
+        self.assertEqual("tooling-only", plan["releaseRelevance"])
+        self.assertEqual("high", plan["validationRisk"])
+        self.assertFalse(plan["releaseRequired"])
+        self.assertEqual(policy.FULL, plan["validationMode"])
+        self.assertEqual("test_mosaic_repository.py", plan["offlineTestPattern"])
 
     def test_upstream_automation_uses_explicit_release_and_offline_boundaries(self):
         ownership = policy.plan_paths(["scripts/upstream_ownership_policy.json"])
@@ -340,6 +349,21 @@ class ValidationIntegrationContractTest(unittest.TestCase):
         self.assertNotIn("pre-commit.exe", resolver)
         self.assertIn("& $Python -m pre_commit --version", resolver)
         self.assertIn("File = $Python; Prefix = @('-m', 'pre_commit')", resolver)
+
+    def test_python_autofix_hooks_use_modules_not_generated_console_launchers(self):
+        config = (ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
+        self.assertIn("rev: v6.0.0", config)
+        expected = {
+            "end-of-file-fixer": "python -m pre_commit_hooks.end_of_file_fixer",
+            "trailing-whitespace": "python -m pre_commit_hooks.trailing_whitespace_fixer",
+        }
+        for hook_id, entry in expected.items():
+            with self.subTest(hook=hook_id):
+                block = config.split(f"- id: {hook_id}", 1)[1].split("- id:", 1)[0]
+                self.assertIn(f"entry: {entry}", block)
+                self.assertNotIn(".exe", block.lower())
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        self.assertIn("uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd", workflow)
 
     def test_vscode_tasks_are_native_safe_entry_points(self):
         tasks = json.loads((ROOT / ".vscode/tasks.json").read_text())

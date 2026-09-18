@@ -2,7 +2,7 @@
     BaseBranch = 'main'
     OriginRemote = 'origin'
     UpstreamRemote = 'upstream'
-    ExpectedOriginRepositories = @('constbogdan/Wholphin')
+    ExpectedOriginRepositories = @('constbogdan/Wholphin', 'constbogdan/Mosaic')
     ExpectedUpstreamRepositories = @('damontecres/Wholphin')
     ValidationScript = 'scripts/validate-local.ps1'
     PullRequestTemplate = '.github/pull_request_template.md'

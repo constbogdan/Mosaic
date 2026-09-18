@@ -20,8 +20,8 @@ V01 is KEEP / COMPLETE. CP5 is COMPLETE / NO MIGRATION JUSTIFIED. CP7 is COMPLET
 VALIDATED (PR #77). The upstream waiting-state correction is COMPLETE / HOSTED VALIDATED (PR #79;
 scheduled run #47). CP8 final consistency is COMPLETE. The T0-2 audit is COMPLETE / SCOPE APPROVED;
 C1 is COMPLETE / LIVE VERIFIED; C2 is COMPLETE / HOSTED VALIDATED (PR #84); C3 is COMPLETE /
-HOSTED VALIDATED (PR #85); T0-2 is COMPLETE. T0-3.0 Mosaic identity decisions are approved and R1
-is next.** Baseline T0 is an
+HOSTED VALIDATED (PR #85); T0-2 is COMPLETE. T0-3.0 R1 is IMPLEMENTED / LOCAL VALIDATED, with
+old-name hosted acceptance pending.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 The CP7 performance phase is **COMPLETE / HOSTED VALIDATED**. CP7.1 replaced the prepare-pr test
@@ -366,7 +366,7 @@ default; the surviving mechanisms each protect a reviewed consumer or authority 
 
 ### T0-3.0 Mosaic identity establishment decision
 
-Status: **DECISIONS APPROVED / IMPLEMENTATION PENDING — R1 NEXT**
+Status: **R1 — IMPLEMENTED / LOCAL VALIDATED; OLD-NAME HOSTED ACCEPTANCE PENDING**
 
 T0-3 begins by establishing the permanent downstream product identity before the broader
 documentation, wiki, and roadmap consolidation. This record preserves the accepted decisions and
@@ -481,6 +481,16 @@ While the repository is still `constbogdan/Wholphin`:
 
 R1 is a technical repository-rename bridge, not client compatibility.
 
+The implementation centralizes exact downstream authentication as the closed set
+`constbogdan/Wholphin` / `constbogdan/Mosaic`. Prepare-pr, PR evidence/reuse, protected-main and
+Development delivery, version/signing diagnostics, Stable, Hold, hosted upstream synchronization,
+and the resolver accept only those identities. API, Git remote, release-navigation, and GitHub App
+repository targets follow the already authenticated current identity. Lookalikes, foreign owners,
+fork identities, malformed values, and workflow/repository mismatches fail before privileged
+mutation or credential acquisition. Workflow permissions, Environment authority, App-token state
+allowlist, validation semantics, force-push refusal, updater/APK identity, upstream identity,
+`wholphin-upstream-*`, and `wholphin-pr-policy-v1-*` are unchanged.
+
 ##### R2 — external repository rename
 
 After R1 is hosted validated:
@@ -493,6 +503,19 @@ After R1 is hosted validated:
   end-to-end acceptance is complete.
 
 No product asset alias or old-client compatibility layer is introduced in R2.
+
+R2 operator preflight must be completed immediately before the external rename:
+
+- drain ordinary PRs and pending native auto-merge, protected-main delivery, Development
+  Build/Sign/Publish, Stable Promotion, Hold, Signing Diagnostic, Upstream Synchronization, resolver,
+  and prepare-pr publication activity;
+- record repository ID `1351255476`, visibility/default branch, fork relationship, branches,
+  Releases/tags, required `Full validation`, main ruleset/protection, merge-commit-only settings,
+  native auto-merge, Environments, secrets/variables, and GitHub App repository access;
+- confirm human-controlled upstream Draft PR #58 and its exact head remain preserved (it may remain
+  open if GitHub retains identity through the rename);
+- rename the repository, update local `origin` and explicitly named operator integrations, then
+  verify the same repository ID and every recorded setting before allowing new publication work.
 
 ##### R3 — canonical Mosaic product and distribution identity
 
