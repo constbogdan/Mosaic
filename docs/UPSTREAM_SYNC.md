@@ -5,8 +5,9 @@ This document is the authoritative policy for branch use and synchronization of 
 ## Remotes and integration baseline
 
 - During T0-3.0 R1, `origin` is authenticated as exactly `constbogdan/Wholphin` or
-  `constbogdan/Mosaic`; no other owner/name is trusted. Before R2 it remains
-  `constbogdan/Wholphin`, our maintained fork.
+  `constbogdan/Mosaic`; no other owner/name is trusted. R2 renamed the maintained fork to the
+  canonical `constbogdan/Mosaic`; the old name remains temporarily authorized only by the R1
+  transition bridge.
 - `upstream` is `damontecres/Wholphin`, the original Wholphin project.
 - `origin/main` is the known-good integration branch: upstream Wholphin plus our validated enhancements.
 
@@ -254,7 +255,7 @@ outside the integration checkout. Both canonical fetch and push identities are
 validated exactly before publication:
 
 ```text
-origin   https://github.com/constbogdan/Wholphin.git
+origin   https://github.com/constbogdan/Mosaic.git
 upstream https://github.com/damontecres/Wholphin.git
 ```
 
@@ -431,19 +432,19 @@ GitHub documents approval-required PR workflow runs for token-created PRs, while
 App installation tokens allow the normal unattended trigger path:
 [GITHUB_TOKEN behavior](https://docs.github.com/en/actions/concepts/security/github_token).
 
-The user confirmed external setup complete on 2026-09-09: **Wholphin Sync Bot**
-is installed only on `constbogdan/Wholphin`, with Contents read/write, Pull requests
-read/write and Metadata read. Repository variable `SYNC_BOT_CLIENT_ID` and secret
-`SYNC_BOT_PRIVATE_KEY` are configured. The earlier empty-secret result is historical.
-No credentials or settings were changed by this implementation task.
+The user confirmed external setup complete on 2026-09-09: **Wholphin Sync Bot** was installed on
+the downstream repository with Contents read/write, Pull requests read/write and Metadata read.
+After R2, the same installation follows repository ID `1351255476` and selects
+`constbogdan/Mosaic`; no App configuration or permission changed. Repository variable
+`SYNC_BOT_CLIENT_ID` and secret `SYNC_BOT_PRIVATE_KEY` remain configured. The earlier empty-secret
+result is historical.
 
-The pinned official `actions/create-github-app-token` v3 action uses `client-id`
-and `private-key`, explicitly restricts `owner`/`repositories` to
-`constbogdan/Wholphin`, and requests only Contents/PR write. The key is supplied
-only to the token action and only when ready, REVIEW or semantic-conflict state
-requires a branch/PR mutation. Excluded and no-delta paths never mint it. Default
-job-completion token revocation remains enabled. No PAT fallback or additional
-App permissions are introduced.
+The pinned official `actions/create-github-app-token` v3 action uses `client-id` and `private-key`,
+restricts `owner`/`repositories` to the current downstream identity only after it authenticates as
+one of the two exact R1 names, and requests only Contents/PR write. The key is supplied only to the
+token action and only when ready, REVIEW or semantic-conflict state requires a branch/PR mutation.
+Excluded and no-delta paths never mint it. Default job-completion token revocation remains enabled.
+No PAT fallback or additional App permissions are introduced.
 
 The v1 workflow's first authorized manual detection smoke test and the native FOLLOW lifecycle
 through PR #55 succeeded as recorded historically. I06's ownership-aware native candidate model
@@ -453,7 +454,7 @@ authority.
 For a separately authorized follow-up dispatch when a genuine upstream delta exists:
 
 ``` powershell
-gh workflow run upstream-sync.yml --repo constbogdan/Wholphin --ref main
+gh workflow run upstream-sync.yml --repo constbogdan/Mosaic --ref main
 ```
 
 Inspect exact candidate branch/PR identities and required PR Full CI; an authorized

@@ -21,7 +21,9 @@ VALIDATED (PR #77). The upstream waiting-state correction is COMPLETE / HOSTED V
 scheduled run #47). CP8 final consistency is COMPLETE. The T0-2 audit is COMPLETE / SCOPE APPROVED;
 C1 is COMPLETE / LIVE VERIFIED; C2 is COMPLETE / HOSTED VALIDATED (PR #84); C3 is COMPLETE /
 HOSTED VALIDATED (PR #85); T0-2 is COMPLETE. T0-3.0 R1 is COMPLETE / OLD-NAME HOSTED VALIDATED
-(PR #87). The external contribution lifecycle is KEEP / DOCUMENTED.** Baseline T0 is an
+(PR #87); its `constbogdan/Mosaic` side is LIVE / READ-ONLY VERIFIED with hosted acceptance pending.
+R2's external repository rename is VERIFIED. The external contribution lifecycle is KEEP /
+DOCUMENTED.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
 The CP7 performance phase is **COMPLETE / HOSTED VALIDATED**. CP7.1 replaced the prepare-pr test
@@ -366,7 +368,8 @@ default; the surviving mechanisms each protect a reviewed consumer or authority 
 
 ### T0-3.0 Mosaic identity establishment decision
 
-Status: **R1 — COMPLETE / OLD-NAME HOSTED VALIDATED**
+Status: **R1 old-name side — HOSTED VALIDATED; new-name side — LIVE / READ-ONLY VERIFIED, HOSTED
+ACCEPTANCE PENDING. R2 repository rename — VERIFIED.**
 
 T0-3 begins by establishing the permanent downstream product identity before the broader
 documentation, wiki, and roadmap consolidation. This record preserves the accepted decisions and
@@ -518,13 +521,13 @@ from the exact merge source/tree. Both releases contain `Wholphin-release.apk` w
 SHA-256 `ac71c4d3d10004068643f3874705f6d27e595aa5111f2631b9f8eb723e818787` and
 `mosaic-release.json`.
 
-This proves the `constbogdan/Wholphin` side only. The live repository has not been renamed, and no
-hosted claim is made for `constbogdan/Mosaic`: that side is offline-tested but cannot be naturally
-hosted-validated until R2 changes the live identity. Every other downstream repository identity
-continues to fail closed. Runtime Git/API/`gh`/App-token targets may follow the current repository
-only after exact authentication. GitHub App permissions and its token-state allowlist, validation,
-release, signing, Stable and Hold authority, upstream `damontecres/Wholphin`,
-`wholphin-upstream-*`, `wholphin-pr-policy-v1-*`, and updater/APK/product branding remain unchanged.
+This proves the `constbogdan/Wholphin` side only. R2 has since changed the live identity to
+`constbogdan/Mosaic`; that side is live/read-only verified but remains hosted-acceptance pending.
+Every other downstream repository identity continues to fail closed. Runtime
+Git/API/`gh`/App-token targets may follow the current repository only after exact authentication.
+GitHub App permissions and its token-state allowlist, validation, release, signing, Stable and Hold
+authority, upstream `damontecres/Wholphin`, `wholphin-upstream-*`,
+`wholphin-pr-policy-v1-*`, and updater/APK/product branding remain unchanged.
 
 R1 publication also exposed two Windows Application Control portability constraints, not R1
 semantic defects. The generated `pre-commit.exe` launcher was blocked, so local validation invokes
@@ -602,6 +605,29 @@ R2 operator preflight must be completed immediately before the external rename:
   open if GitHub retains identity through the rename);
 - rename the repository, update local `origin` and explicitly named operator integrations, then
   verify the same repository ID and every recorded setting before allowing new publication work.
+
+R2's external rename is **VERIFIED**. GitHub renamed `constbogdan/Wholphin` to the canonical
+`constbogdan/Mosaic` while retaining repository ID `1351255476`, unchanged `main` and Git history,
+and the fork relationship to `damontecres/Wholphin`. The ruleset, merge and Actions settings,
+Environments, named secrets/variables, Releases, tags, and branches survived unchanged. The same
+installed Wholphin Sync Bot followed the repository object, now selects `constbogdan/Mosaic`, and
+retains its existing permissions. Human-controlled Draft PR #58 and its managed
+`wholphin-upstream-*` identity survived unchanged. Old GitHub repository URLs redirect, while
+`constbogdan/Mosaic` is canonical and the local `origin` now targets it. Historical evidence that
+correctly names `constbogdan/Wholphin` remains unchanged.
+
+The next natural proof is the documentation-only branch
+`chore/t0-3-r2-mosaic-hosted-proof`. Before that PR runs, R1 status is:
+
+```text
+constbogdan/Wholphin  -> HOSTED VALIDATED
+constbogdan/Mosaic    -> LIVE / READ-ONLY VERIFIED; HOSTED ACCEPTANCE PENDING
+```
+
+Acceptance requires prepare-pr authentication under `constbogdan/Mosaic`, authoritative
+`NON_ANDROID` PR CI, unchanged `wholphin-pr-policy-v1-*` evidence, native auto-merge, protected-main
+exact-tree reuse, and an independent Development `No build required` result. Do not claim
+**R1 — COMPLETE / BOTH-NAME HOSTED VALIDATED** until that hosted lifecycle has completed.
 
 ##### R3 — canonical Mosaic product and distribution identity
 
