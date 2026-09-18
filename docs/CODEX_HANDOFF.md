@@ -44,11 +44,11 @@
 
 `T0-2 - COMPLETE`
 
-`T0-3.0 R1 - COMPLETE / OLD-NAME HOSTED VALIDATED (PR #87)`
+`T0-3.0 R1 - COMPLETE / BOTH-NAME HOSTED VALIDATED (PR #87 old name; PR #89 new name)`
 
-`T0-3.0 R1 new-name side - LIVE / READ-ONLY VERIFIED; HOSTED ACCEPTANCE PENDING`
+`T0-3.0 R2 repository rename - COMPLETE / VERIFIED`
 
-`T0-3.0 R2 repository rename - VERIFIED`
+`T0-3.0 canonical Mosaic identity migration - NEXT`
 
 `External contribution lifecycle - KEEP / DOCUMENTED`
 
@@ -69,11 +69,10 @@ hosted proof: PR run `35311963364` passed `ANDROID_FULL` and emitted exact-tree
 `wholphin-pr-policy-v1-*` evidence; native merge `3d33fe3510785620a7b32ad34df18feeb37639a7`
 retained its tested tree; protected-main run `35312694402` authenticated and reused it, then
 independently built, signed, and published Development `v1.0.68` / `downstream-build-68` /
-`develop`. This proves only `constbogdan/Wholphin`. R2 has now renamed the live repository to
-`constbogdan/Mosaic`; the new-name side is live/read-only verified but remains hosted-acceptance
-pending. The frozen order remains Mosaic-side hosted proof, R3 canonical product and distribution
-identity plus end-to-end proof, then R4 removal of old repository authentication; do not collapse
-the sequence.
+`develop`. This proves `constbogdan/Wholphin`. R2 then renamed the live repository to
+`constbogdan/Mosaic`; PR #89 and protected-main run `35324869750` supplied the new-name hosted proof
+described below. The frozen order is now R3 canonical product and distribution identity plus
+end-to-end proof, then R4 removal of old repository authentication; do not collapse the sequence.
 
 R2's external repository rename is **VERIFIED**. `constbogdan/Wholphin` became the canonical
 `constbogdan/Mosaic` while repository ID `1351255476`, `main` and Git history, public fork relation
@@ -84,13 +83,23 @@ permissions. PR #58 remains the unchanged human-controlled upstream Draft. Old r
 redirect; `constbogdan/Mosaic` is canonical and local `origin` targets it. Historical evidence
 continues to retain truthful `constbogdan/Wholphin` references.
 
-The current branch `chore/t0-3-r2-mosaic-hosted-proof` is a documentation-only natural proof. Its
-expected lifecycle is prepare-pr authentication under `constbogdan/Mosaic` -> authoritative
-`NON_ANDROID` CI -> unchanged `wholphin-pr-policy-v1-*` evidence -> native auto-merge ->
-protected-main exact-tree reuse -> Development `No build required`. Until that evidence exists,
-record `constbogdan/Wholphin` as hosted validated and `constbogdan/Mosaic` as live/read-only verified
-with hosted acceptance pending. Do not begin R3 product, updater, APK, URI, Gradle/database, or App
-display-name changes in this checkpoint.
+The documentation-only `chore/t0-3-r2-mosaic-hosted-proof` branch completed that lifecycle. PR #89
+head `d01f09f547d39ce768e3cbb071d3d711c1026389` ran CI `35324631949`, attempt 1, as
+`NON_ANDROID` under `constbogdan/Mosaic`. Artifact ID `10538281812`, digest
+`sha256:77e70ca6371af00efdbcab4a7d0465cdb6bca7ad9b1cd32363b1955d6832bb5c`, retained the unchanged
+`wholphin-pr-policy-v1-*` protocol and authenticated synthetic merge
+`9636c08f91fe72221de1af44ad8db9651a8633c5` / tree
+`c5dd51cadad76465754bd6680cfb05123ab1dd46`. Native merge
+`1c07599e7e23ed79ac9996a644f72d336721c8c8` has parents
+`017841a5627b87013ca4643a544d9303eb94013d` and the PR head, and the same tree. Protected-main run
+`35324869750`, attempt 1, authenticated and reused that exact `NON_ANDROID` evidence without
+fallback. Development classified the complete range `docs-only / low`, `releaseRequired=false`,
+reported `No build required`, and skipped Release Build, Sign and Publish.
+
+R1 is **COMPLETE / BOTH-NAME HOSTED VALIDATED**. The exact two-name bridge remains installed until
+R4. R2's repository rename is **COMPLETE / VERIFIED**. R3 canonical Mosaic identity migration is
+next; historical old-name evidence remains correct. Do not remove old-name authorization or begin
+product/updater/APK/URI/Gradle/database/App display-name changes in this closure checkpoint.
 
 The external contribution lifecycle is **KEEP / NO SECURITY OR PROVENANCE DEFECT**. A fork PR may
 run approved unprivileged authoritative CI and upload a correctly named policy artifact, but receives
@@ -165,9 +174,9 @@ validation, presentation, performance, and consistency work described in
 audit is complete and its [approved decision record](Wholphin_ROADMAP.md#t0-2-audit-contract) limited
 implementation to C1 merge-commit-only repository settings, C2 explicit Gradle/Android bootstrap,
 and C3 bounded sanitized upstream failure diagnostics. All three are complete. T0-3.0 R1 is hosted
-validated on the old name; R2's external rename is verified; and new-name hosted acceptance is the
-current bounded proof. Do not reopen T0-1 KEEP or T0-2 audit decisions without concrete
-contradictory evidence.
+validated under both exact transition names and R2's external rename is complete/verified. The
+canonical Mosaic identity migration is next. Do not reopen T0-1 KEEP or T0-2 audit decisions
+without concrete contradictory evidence.
 
 C1 is **COMPLETE / LIVE VERIFIED**. On 2026-09-17, GitHub reported merge commits enabled,
 squash/rebase disabled, and auto-merge enabled. The unchanged active `main protection` ruleset
@@ -177,8 +186,8 @@ while repository-level settings make merge commits the only effective method. Ex
 prepare-pr/reuse/upstream tests already protect native two-parent ancestry, exact head/tree, Draft
 authority, and no-force behavior; no implementation or test change was justified. External merge
 settings remain manually administered and must be included in the T0-3 operator checklist. C2 and
-C3 subsequently completed; R1 old-name acceptance and the R2 rename are complete, while R1
-new-name hosted acceptance is pending this documentation-only proof.
+C3 subsequently completed; R1 both-name hosted acceptance and the R2 repository rename are
+complete, and canonical Mosaic identity migration is next.
 
 C2 adds the official Gradle `9.6.1-bin` SHA-256
 `9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14` to the unchanged wrapper URL

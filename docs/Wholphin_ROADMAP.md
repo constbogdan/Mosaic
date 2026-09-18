@@ -20,9 +20,9 @@ V01 is KEEP / COMPLETE. CP5 is COMPLETE / NO MIGRATION JUSTIFIED. CP7 is COMPLET
 VALIDATED (PR #77). The upstream waiting-state correction is COMPLETE / HOSTED VALIDATED (PR #79;
 scheduled run #47). CP8 final consistency is COMPLETE. The T0-2 audit is COMPLETE / SCOPE APPROVED;
 C1 is COMPLETE / LIVE VERIFIED; C2 is COMPLETE / HOSTED VALIDATED (PR #84); C3 is COMPLETE /
-HOSTED VALIDATED (PR #85); T0-2 is COMPLETE. T0-3.0 R1 is COMPLETE / OLD-NAME HOSTED VALIDATED
-(PR #87); its `constbogdan/Mosaic` side is LIVE / READ-ONLY VERIFIED with hosted acceptance pending.
-R2's external repository rename is VERIFIED. The external contribution lifecycle is KEEP /
+HOSTED VALIDATED (PR #85); T0-2 is COMPLETE. T0-3.0 R1 is COMPLETE / BOTH-NAME HOSTED VALIDATED
+(old-name PR #87; new-name PR #89). R2's external repository rename is COMPLETE / VERIFIED; the
+canonical Mosaic identity migration is next. The external contribution lifecycle is KEEP /
 DOCUMENTED.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
@@ -368,8 +368,8 @@ default; the surviving mechanisms each protect a reviewed consumer or authority 
 
 ### T0-3.0 Mosaic identity establishment decision
 
-Status: **R1 old-name side — HOSTED VALIDATED; new-name side — LIVE / READ-ONLY VERIFIED, HOSTED
-ACCEPTANCE PENDING. R2 repository rename — VERIFIED.**
+Status: **R1 — COMPLETE / BOTH-NAME HOSTED VALIDATED. R2 repository rename — COMPLETE / VERIFIED.
+Canonical Mosaic identity migration — NEXT.**
 
 T0-3 begins by establishing the permanent downstream product identity before the broader
 documentation, wiki, and roadmap consolidation. This record preserves the accepted decisions and
@@ -616,18 +616,39 @@ retains its existing permissions. Human-controlled Draft PR #58 and its managed
 `constbogdan/Mosaic` is canonical and the local `origin` now targets it. Historical evidence that
 correctly names `constbogdan/Wholphin` remains unchanged.
 
-The next natural proof is the documentation-only branch
-`chore/t0-3-r2-mosaic-hosted-proof`. Before that PR runs, R1 status is:
+The documentation-only branch `chore/t0-3-r2-mosaic-hosted-proof` supplied the required natural
+new-name proof. Final R1 status is:
 
 ```text
 constbogdan/Wholphin  -> HOSTED VALIDATED
-constbogdan/Mosaic    -> LIVE / READ-ONLY VERIFIED; HOSTED ACCEPTANCE PENDING
+constbogdan/Mosaic    -> HOSTED VALIDATED
 ```
 
-Acceptance requires prepare-pr authentication under `constbogdan/Mosaic`, authoritative
-`NON_ANDROID` PR CI, unchanged `wholphin-pr-policy-v1-*` evidence, native auto-merge, protected-main
-exact-tree reuse, and an independent Development `No build required` result. Do not claim
-**R1 — COMPLETE / BOTH-NAME HOSTED VALIDATED** until that hosted lifecycle has completed.
+PR #89 at head `d01f09f547d39ce768e3cbb071d3d711c1026389` ran authoritative CI run
+`35324631949`, attempt 1, under repository `constbogdan/Mosaic` and selected `NON_ANDROID`. The
+changed-range check and complete offline tooling suite passed; Android setup and Gradle validation
+were correctly not required. The unchanged protocol emitted the single unexpired artifact
+`wholphin-pr-policy-v1-non-android-pr-89-d01f09f547d39ce768e3cbb071d3d711c1026389-tested-9636c08f91fe72221de1af44ad8db9651a8633c5-tree-c5dd51cadad76465754bd6680cfb05123ab1dd46-run-35324631949-attempt-1`,
+artifact ID `10538281812`, archive digest
+`sha256:77e70ca6371af00efdbcab4a7d0465cdb6bca7ad9b1cd32363b1955d6832bb5c`. Its
+`validation-evidence.json` authenticates contract `pr-policy-v1`, workflow
+`.github/workflows/ci.yml`, job `Full validation`, PR/base/head, run/attempt, validation class, and
+tested synthetic merge `9636c08f91fe72221de1af44ad8db9651a8633c5` with tree
+`c5dd51cadad76465754bd6680cfb05123ab1dd46`.
+
+Native auto-merge created `1c07599e7e23ed79ac9996a644f72d336721c8c8` with parents
+`017841a5627b87013ca4643a544d9303eb94013d` and
+`d01f09f547d39ce768e3cbb071d3d711c1026389`; its tree is the exact tested tree. Protected-main run
+`35324869750`, attempt 1, authenticated repository `constbogdan/Mosaic`, PR #89, the evidence
+artifact and the exact final tree, then reused `NON_ANDROID`. It skipped changed-file pre-commit,
+the complete offline suite, Android setup and Gradle rather than running the conservative fallback.
+Development eligibility independently classified the complete unpublished range `docs-only / low`,
+with `releaseRequired=false` and `skipped_non_apk` (`No build required`); Release Build, Sign and
+Publish did not run. The `wholphin-pr-policy-v1-*` protocol was neither renamed nor versioned.
+
+R1 is therefore **COMPLETE / BOTH-NAME HOSTED VALIDATED**. Its exact two-name bridge remains
+installed intentionally until R4; do not remove `constbogdan/Wholphin` authorization during the
+next canonical product migration.
 
 ##### R3 — canonical Mosaic product and distribution identity
 
