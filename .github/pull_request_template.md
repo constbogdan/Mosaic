@@ -1,4 +1,4 @@
-<!-- Downstream Wholphin changes merge through protected main after required CI / Full validation. Describe only testing and runtime checks that were actually performed. -->
+<!-- Mosaic changes merge through protected main after required CI / Full validation. Describe only testing and runtime checks that were actually performed. -->
 
 ## Description
 <!-- Describe the changes in detail -->

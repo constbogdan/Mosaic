@@ -44,7 +44,7 @@ class WholphinApplication :
                         message: String,
                         t: Throwable?,
                     ) {
-                        Log.println(priority, tag ?: "Wholphin", message)
+                        Log.println(priority, tag ?: "Mosaic", message)
                     }
                 },
             )
@@ -97,9 +97,9 @@ class WholphinApplication :
                 )
             dialog {
                 text =
-                    "Wholphin has crashed! Would you like to attempt to " +
+                    "Mosaic has crashed! Would you like to attempt to " +
                     "send a crash report to your Jellyfin server?"
-                title = "Wholphin Crash Report"
+                title = "Mosaic Crash Report"
                 positiveButtonText = "Send"
                 negativeButtonText = "Do not send"
             }

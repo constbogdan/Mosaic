@@ -4,9 +4,9 @@ import os
 from pathlib import Path
 import re
 
-from mosaic_repository import LEGACY_DOWNSTREAM_REPOSITORY, repository_url
+from mosaic_repository import MOSAIC_DOWNSTREAM_REPOSITORY, repository_url
 
-REPOSITORY_URL = repository_url(LEGACY_DOWNSTREAM_REPOSITORY)
+REPOSITORY_URL = repository_url(MOSAIC_DOWNSTREAM_REPOSITORY)
 COMPARE_REF = re.compile(r'(?:[0-9a-f]{40}|mosaic-v1\.0\.[1-9][0-9]*)')
 
 
@@ -17,7 +17,7 @@ def append_summary(text, env=None):
             output.write(text.rstrip() + '\n')
 
 
-def compare_link(start, end, repository=LEGACY_DOWNSTREAM_REPOSITORY):
+def compare_link(start, end, repository=MOSAIC_DOWNSTREAM_REPOSITORY):
     """Return an immutable GitHub comparison only for known source/tag identities."""
     if (not isinstance(start, str) or not isinstance(end, str)
             or not COMPARE_REF.fullmatch(start) or not COMPARE_REF.fullmatch(end) or start == end):
@@ -26,7 +26,7 @@ def compare_link(start, end, repository=LEGACY_DOWNSTREAM_REPOSITORY):
 
 
 def release_body(m, channel, *, archive=False, compare_from=None,
-                 repository=LEGACY_DOWNSTREAM_REPOSITORY):
+                 repository=MOSAIC_DOWNSTREAM_REPOSITORY):
     current_url = repository_url(repository)
     version, build, source = m['versionName'], m['immutableIdentity'], m['sourceSha']
     tag = 'mosaic-v' + version if channel == 'Stable' else build if archive else 'develop'
@@ -45,7 +45,7 @@ def release_body(m, channel, *, archive=False, compare_from=None,
         purpose = 'Latest automatically published validated build.'
         guidance = ('Development preview; may contain recently merged changes. Choose Development in the app '
                     'update channel.')
-    links = [f'[Download APK]({current_url}/releases/download/{tag}/Wholphin-release.apk)']
+    links = [f'[Download APK]({current_url}/releases/download/{tag}/Mosaic-release.apk)']
     if comparison:
         links.append(f'[Compare changes]({comparison})')
     details = [
@@ -61,7 +61,7 @@ def release_body(m, channel, *, archive=False, compare_from=None,
 
 
 def publication_summary(m, operation, env, ci=None, compare_from=None,
-                        repository=LEGACY_DOWNSTREAM_REPOSITORY):
+                        repository=MOSAIC_DOWNSTREAM_REPOSITORY):
     current_url = repository_url(repository)
     version, build, source = m['versionName'], m['immutableIdentity'], m['sourceSha']
     if operation == 'promote':

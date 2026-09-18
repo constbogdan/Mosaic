@@ -67,6 +67,7 @@ app/debug/
 !.vscode/tasks.json
 .kotlin
 docs/*
+!docs/T0_3_R2_MOSAIC_IDENTITY.md
 !docs/AGENTS.md
 !docs/CODEX_HANDOFF.md
 !docs/OBSERVED_MINOR_ISSUES.md

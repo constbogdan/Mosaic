@@ -198,7 +198,7 @@ class PublisherTests(unittest.TestCase):
             self.assertTrue(r['prerelease'])
             self.assertFalse(r['draft'])
             self.assertEqual(r['make_latest'], 'false')
-        self.assertEqual({a['name'] for a in api.uploads.values()}, {'Wholphin-release.apk', 'mosaic-release.json'})
+        self.assertEqual({a['name'] for a in api.uploads.values()}, {'Mosaic-release.apk', 'mosaic-release.json'})
         self.assertEqual(self.m['signedApkSha256'], release.digest(self.apk))
         self.assertEqual(self.m['immutableIdentity'], 'downstream-build-5')
         count = len(api.calls)

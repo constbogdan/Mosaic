@@ -27,6 +27,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Wholphin"
+rootProject.name = "Mosaic"
 include(":app")
 include(":wholphin-mpv-stub")

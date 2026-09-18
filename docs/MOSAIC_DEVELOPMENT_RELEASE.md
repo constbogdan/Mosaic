@@ -59,7 +59,7 @@ exact protected-main push CI
 No contiguous-version promise is introduced; skipped commits may create version-code gaps
 because the existing deterministic commit-derived allocator is unchanged. Exact-main and
 superseded-main guards, signing/provenance isolation, recovery, Stable exact-byte
-promotion, `Wholphin-release.apk`, `mosaic-release.json`, and updater version semantics are
+promotion, `Mosaic-release.apk`, `mosaic-release.json`, and updater version semantics are
 also unchanged. See [the Item 6 tracker](ITEM_6_CONSOLIDATION_CHECKLIST.md#implementation-checkpoints)
 for offline evidence and the minimum live acceptance test.
 
@@ -79,7 +79,7 @@ Authenticated production `sign` job names and every artifact prefix remain uncha
 
 Release API titles remain `v1.0.N` because installed clients parse that field. Future body
 headings distinguish rolling Development from immutable Development Build N, retain
-provenance and add channel/install guidance. `Wholphin-release.apk` remains the compatible
+provenance and add channel/install guidance. `Mosaic-release.apk` is the canonical
 installer; no alias or historical release metadata is migrated.
 
 Authoritative main CI also retains its existing Release R8 mapping as a separate compressed
@@ -111,7 +111,7 @@ Rolling develop updated automatically. Preserved Mosaic 1.0.5 discovered v1.0.8,
 correct downstream metadata and Mosaic development build downstream-build-8. The user
 selected Download & Update; Mosaic downloaded the APK and Android updated it in place.
 Installed v1.0.8 was confirmed, with existing application state/settings still present.
-The exact stored URL `https://api.github.com/repos/constbogdan/Wholphin/releases/tags/develop`
+The exact stored URL `https://api.github.com/repos/constbogdan/Mosaic/releases/tags/develop`
 migrated to **Update channel = Development**. Stable / Development / Custom are exposed;
 Custom shows the advanced release-metadata API URL field. Fresh/default Stable remains
 the implemented contract, not a separately reported fresh-install acceptance test.
@@ -167,7 +167,7 @@ No recovery run ID was supplied for this checkpoint; none is inferred.
 | Rolling prerelease | `develop` |
 | Display version / versionCode | `v1.0.5` / `5` |
 | Source SHA | `41f9f83c36b8866211c9680d3b416d5ebede4888` |
-| APK alias | `Wholphin-release.apk` |
+| Public APK | `Mosaic-release.apk` |
 | Manifest | `mosaic-release.json` |
 | Signed APK SHA-256 | `af0dcb7fb1c89800c61e7a7a0558cbb2e6fc65fbf880069dbe08c3c4df8bf578` |
 
@@ -181,7 +181,7 @@ The previously installed signed Mosaic 1.0.3 was preserved until this test. Beca
 predates downstream-routing defaults, its custom Update URL was manually set to:
 
 ```text
-https://api.github.com/repos/constbogdan/Wholphin/releases/tags/develop
+https://api.github.com/repos/constbogdan/Mosaic/releases/tags/develop
 ```
 
 The offered update immediately changed from upstream `v1.0.7` to downstream `v1.0.5`.
@@ -260,7 +260,7 @@ Normal publication needed no dispatch or SHA input: successful protected-main va
 the isolated same-run jobs directly. The manual
 Development fallback, Stable, and exceptional Recovery were explicit operations at this checkpoint.
 
-All jobs require canonical constbogdan/Wholphin, protected refs/heads/main and successful
+All jobs require authenticated `constbogdan/Mosaic`, protected `refs/heads/main` and successful
 push-CI provenance whose head repository/branch/SHA match the publication run's exact SHA.
 The helper checks GitHub's event payload, CI path/ID, run ID and attempt against the API's
 latest successful exact-source push CI and required Full validation job, before artifact
@@ -338,7 +338,7 @@ existing recovery checkpoints. Signed transfer contains
 
 Both development release kinds use `prerelease: true` and `make_latest: false`. The updater parses
 release **name**, not tag: `v1.0.N` satisfies the existing numeric parser. The publisher
-exposes **`Wholphin-release.apk`** as the exact universal alias, plus
+exposes **`Mosaic-release.apk`** as the exact canonical universal APK, plus
 **`mosaic-release.json`**. No Debug/ABI aliases are advertised without corresponding
 builds. Existing updater preference for a supported ABI followed by the universal
 Release alias remains compatible, without generic fallback. No application code changes.
@@ -412,7 +412,7 @@ Historical bootstrap used for the successful **Mosaic 1.0.3 -> 1.0.5** acceptanc
 (the old binary consumed JSON and could not normalize the web URL):
 
 ```text
-https://api.github.com/repos/constbogdan/Wholphin/releases/tags/develop
+https://api.github.com/repos/constbogdan/Mosaic/releases/tags/develop
 ```
 
 The 1.0.3 installation was updated in place through Mosaic, with state and the custom

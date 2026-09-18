@@ -129,7 +129,7 @@ implemented manual publisher, whose delivery was live validated through recovery
 ## Implemented manual hosted exercise
 
 Workflow: [.github/workflows/mosaic-signing-exercise.yml](../.github/workflows/mosaic-signing-exercise.yml).
-It accepts only zero-input `workflow_dispatch` in constbogdan/Wholphin on protected main. The
+It accepts only zero-input `workflow_dispatch` in `constbogdan/Mosaic` on protected main. The
 workflow derives its exact source from the protected-main dispatch `github.sha`; no caller-supplied
 SHA/ref/artifact/run can select a different build. This checkpoint supersedes future-only signing-job
 statements in the original architecture below.
@@ -167,7 +167,7 @@ Artifacts (7 days):
   signed SHA-256 hashes, package/version and certificate SHA-256.
 
 The job summary links the signed artifact using the upload action's generated URL.
-Download with `gh run download <run-id> --repo constbogdan/Wholphin --name <signed-artifact-name>`;
+Download with `gh run download <run-id> --repo constbogdan/Mosaic --name <signed-artifact-name>`;
 install the extracted Release APK with `adb install -r Mosaic-release.apk` for a
 separately authorized device test. This is the permanent Mosaic Release identity,
 not Debug; record any installed exercise version before later release testing.
@@ -180,7 +180,7 @@ the run attempt and deliberately rejects artifacts from an earlier attempt.
 For any future exercise, select protected `main` and run:
 
 ```powershell
-gh workflow run mosaic-signing-exercise.yml --repo constbogdan/Wholphin --ref main
+gh workflow run mosaic-signing-exercise.yml --repo constbogdan/Mosaic --ref main
 ```
 
 The run binds the source selected by GitHub for that protected-main dispatch. Review the source/run
@@ -251,7 +251,7 @@ fingerprint fails verification; there is no trust-on-first-use. Never paste the 
 Validation/build: Contents read, no signing Environment or secrets. Signing: Contents
 read and artifact access only, no release-writing token. A future independent publisher
 may use GITHUB_TOKEN Contents write after verification, without the signing key.
-Do not reuse Wholphin Sync Bot, add a PAT or create a release App without demonstrated
+Do not reuse the upstream synchronization App, add a PAT or create a release App without demonstrated
 need. Only the shared isolated signer step consumes these Environment secrets.
 
 ## Historical architecture before publication implementation
@@ -374,24 +374,24 @@ This historical record grants no live-operation authority.
 
 ## Updater routing contract
 
-Stable default: `https://github.com/constbogdan/Wholphin/releases/latest`.
-Development selection: `https://github.com/constbogdan/Wholphin/releases/tags/develop`.
+Stable default: `https://github.com/constbogdan/Mosaic/releases/latest`.
+Development selection: `https://github.com/constbogdan/Mosaic/releases/tags/develop`.
 The existing editable Update URL chooses the channel or custom endpoint; there is no
 new channel toggle. One resolver converts GitHub web URLs to API metadata requests
 for update checks, the installer APK selection and installed-version notes. Legacy
 bundled stable defaults migrate; other custom URLs remain overrides. See the
 [migration and lookup details](CODEX_HANDOFF.md#mosaic-updater-routing-implemented---pending-live-release-validation).
 
-Preserve publication aliases `Wholphin-release.apk` / `Wholphin-release-<ABI>.apk`
-and `Wholphin-debug.apk` / `Wholphin-debug-<ABI>.apk` when publishing that variant.
+New downstream publication exposes only the canonical universal `Mosaic-release.apk` plus
+`mosaic-release.json`; ABI/debug Gradle outputs are not public updater aliases.
 The first supported ABI alias is preferred, then the same build-type universal alias;
-do not rely on legacy Wholphin.apk fallback. Numeric Release names `1.0.N` and `v1.0.N`
+do not rely on legacy APK-name fallbacks. Numeric Release names `1.0.N` and `v1.0.N`
 are accepted on either channel. Installed-version notes require matching metadata;
 version tags may use v1.0.N or 1.0.N. A develop release that has advanced beyond the
 installed version cannot supply its old notes unless matching version metadata remains.
 
 The old 1.0.3 binary consumed the JSON API URL
-`https://api.github.com/repos/constbogdan/Wholphin/releases/tags/develop` for its successful
+`https://api.github.com/repos/constbogdan/Mosaic/releases/tags/develop` for its successful
 bootstrap to 1.0.5. Discovery changed from upstream v1.0.7 to downstream v1.0.5; Mosaic
 displayed the downstream metadata and downloaded the expected Release alias. The API
 custom URL persisted after the in-place update. Retain the accepted 1.0.5 installation;

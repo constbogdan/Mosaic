@@ -145,7 +145,7 @@ def record(root, env):
     if validation_class == ANDROID_FULL:
         apk = Path(apk_path)
         if not apk.is_file() or not re.fullmatch(
-            r"Wholphin-default-debug-[A-Za-z0-9.-]+\.apk", apk.name
+            r"Mosaic-default-debug-[A-Za-z0-9.-]+\.apk", apk.name
         ):
             raise ValueError("ANDROID_FULL evidence requires the validated universal Debug APK")
         shutil.copy2(apk, evidence_path / apk.name)

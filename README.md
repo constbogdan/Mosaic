@@ -1,27 +1,22 @@
-# Wholphin - an OSS Android TV client for Jellyfin
+# Mosaic — an Android TV client for Jellyfin
 
-> "Never half-phin two jellies. Always wholphin one jelly."
+Mosaic is a downstream Android TV client derived from
+[Wholphin](https://github.com/damontecres/Wholphin). It keeps Wholphin's playback and television
+interface foundation while adding Mosaic's independently validated application and release
+lifecycle.
 
-Wholphin is an open-source Android TV client for Jellyfin. It aims to provide a different app UI that's inspired by Plex for users interested in migrating to Jellyfin.
-
-This is not a fork of the [official client](https://github.com/jellyfin/jellyfin-androidtv). Wholphin's user interface and controls have been written completely from scratch. Wholphin supports playing media using either ExoPlayer or MPV.
+Mosaic is separate from the
+[official Jellyfin Android TV client](https://github.com/jellyfin/jellyfin-androidtv) and from the
+upstream Wholphin application. Mosaic's Android package is `io.github.constbogdan.mosaic`.
 
 <p align="center">
-<a href="https://github.com/damontecres/Wholphin/releases">
-<img alt="Current Release" src="https://img.shields.io/github/release/damontecres/wholphin.svg"/>
+<a href="https://github.com/constbogdan/Mosaic/releases/latest">
+<img alt="Current Mosaic Release" src="https://img.shields.io/github/release/constbogdan/Mosaic.svg"/>
 </a>
 <a href="https://translate.codeberg.org/engage/wholphin/">
 <img src="https://translate.codeberg.org/widget/wholphin/wholphin/svg-badge.svg" alt="Translation status" />
 </a>
 <br/>
-<a href="https://play.google.com/store/apps/details?id=com.github.damontecres.wholphin">
-<img width="180" alt="Get Wholphin on Google Play" src="https://github.com/user-attachments/assets/2550a4cb-ce46-47a1-ae24-f33a169234b7"/>
-</a>
-<a href="https://www.amazon.com/gp/product/B0G8RQQR9T/ref=mas_pm_wholphin">
-<img width="180" alt="Get Wholphin on Amazon AppStore" src="https://github.com/user-attachments/assets/1f3a3b26-4b4f-44b1-9741-f4c895c8a53b"/>
-</a>
-
-
 </p>
 
 ![v0_5_1_home](https://github.com/user-attachments/assets/62bb1703-abdf-4154-9054-e00b6ceb57b5)
@@ -37,7 +32,7 @@ This is not a fork of the [official client](https://github.com/jellyfin/jellyfin
     - Remove series from next up
 - A navigation drawer for quick access to libraries, favorites, search, and settings from almost anywhere in the app
 - Integration with [Seerr](https://github.com/seerr-team/seerr) to discover new movies and TV shows
-    - Note: only available when installed from [GitHub](https://github.com/damontecres/Wholphin/releases/latest) or the [Play store](https://play.google.com/store/apps/details?id=com.github.damontecres.wholphin)
+    - Included in the Mosaic GitHub distribution
 - Customize library display
   - Option to show Movie/TV Show titles
   - Choose image types & size
@@ -69,13 +64,14 @@ This is not a fork of the [official client](https://github.com/jellyfin/jellyfin
 
 ### Roadmap
 
-See [here for the roadmap](https://github.com/damontecres/Wholphin/wiki#roadmap)
+See the [Mosaic roadmap](docs/Wholphin_ROADMAP.md).
 
 ## Installation
 
-Using [Google Play](https://play.google.com/store/apps/details?id=com.github.damontecres.wholphin) or [Amazon appstore](https://www.amazon.com/gp/product/B0G8RQQR9T/ref=mas_pm_wholphin) are the fastest way to install. But you can follow these instructions to install without needing an app store
-
-Downloader Code: `8668671`
+Mosaic is currently distributed directly through GitHub Releases. Download
+[`Mosaic-release.apk`](https://github.com/constbogdan/Mosaic/releases/latest/download/Mosaic-release.apk)
+from the current Stable release. Development builds are available from the
+[`develop` release](https://github.com/constbogdan/Mosaic/releases/tag/develop) for explicit testing.
 
 1. Enable side-loading "unknown" apps
     - https://androidtvnews.com/unknown-sources-chromecast-google-tv/
@@ -83,8 +79,7 @@ Downloader Code: `8668671`
     - https://developer.android.com/distribute/marketing-tools/alternative-distribution#unknown-sources
     - https://www.aftvnews.com/how-to-enable-apps-from-unknown-sources-on-an-amazon-fire-tv-or-fire-tv-stick/
 2. Install the APK on your Android TV device with one of these options:
-    - Install a browser program such as [Downloader](https://www.aftvnews.com/downloader/), use it to get the latest apk with short code `8668671` or URL: http://aftv.news/8668671
-    - Download the latest APK release from the [releases page](https://github.com/damontecres/Wholphin/releases/latest) or http://aftv.news/8668671
+    - Download the canonical APK from the [Mosaic releases page](https://github.com/constbogdan/Mosaic/releases/latest).
         - Put the APK on an SD Card/USB stick/network share and use a file manager app from the Google Play Store / Amazon AppStore (e.g. `FX File Explorer`). Android's preinstalled file manager probably will not work!
         - Use `Send files to TV` from the Google Play Store on your phone & TV
         - (Expert) Use [ADB](https://developer.android.com/studio/command-line/adb) to install the APK from your computer ([guide](https://fossbytes.com/side-load-apps-android-tv/#h-how-to-sideload-apps-on-your-android-tv-using-adb))
@@ -95,7 +90,7 @@ After the initial install above, the app will automatically check for updates. T
 
 The first time you attempt an update, the OS should guide you through enabling the required additional permissions for the app to install updates.
 
-Note: if installed via an app store, the app store will handle updates.
+Mosaic is not currently distributed through an app store.
 
 ## Compatibility
 
@@ -111,7 +106,8 @@ Issues and pull requests are always welcome! Please check before submitting that
 
 If you plan to contribute, please read the [contributing guide](CONTRIBUTING.md)!
 
-You can [help translate Wholphin](https://translate.codeberg.org/engage/wholphin/)!
+Mosaic currently inherits upstream Wholphin translations. Translation contributions belong in
+the [upstream translation project](https://translate.codeberg.org/engage/wholphin/).
 
 ## Acknowledgements
 

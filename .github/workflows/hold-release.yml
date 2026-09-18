@@ -54,7 +54,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python3 -B scripts/verify_mosaic_apk.py --apk "$RUNNER_TEMP/mosaic-hold/Wholphin-release.apk" --provenance "$RUNNER_TEMP/mosaic-hold/provenance.json" --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" --output "$RUNNER_TEMP/mosaic-hold/verification.json"
+          python3 -B scripts/verify_mosaic_apk.py --apk "$RUNNER_TEMP/mosaic-hold/Mosaic-release.apk" --provenance "$RUNNER_TEMP/mosaic-hold/provenance.json" --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" --output "$RUNNER_TEMP/mosaic-hold/verification.json"
           python3 -B scripts/mosaic_hold_release.py verify --directory "$RUNNER_TEMP/mosaic-hold"
       - name: Show hold approval request
         env:

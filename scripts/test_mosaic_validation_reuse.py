@@ -400,7 +400,7 @@ class ValidationReuseTests(unittest.TestCase):
     def test_record_binds_android_full_and_carries_validated_apk(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "output"
-            apk = Path(temporary) / "Wholphin-default-debug-1.0.apk"
+            apk = Path(temporary) / "Mosaic-default-debug-1.0.apk"
             apk.write_bytes(b"debug apk")
             env = self.record_environment(temporary, output, reuse.ANDROID_FULL)
             env["PR_APK_PATH"] = str(apk)

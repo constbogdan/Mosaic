@@ -65,16 +65,41 @@ class DeliveryOutputTests(unittest.TestCase):
         version = (ROOT / 'app/src/main/java/com/github/damontecres/wholphin/util/Version.kt').read_text(encoding='utf-8')
         self.assertIn('result.jsonObject["name"]', checker)
         self.assertIn('Version.tryFromString(name)', checker)
-        self.assertIn('const val ASSET_NAME = "Wholphin"', checker)
-        self.assertIn('add("$ASSET_NAME$releaseSuffix.apk")', checker)
+        self.assertIn('const val ASSET_NAME = "Mosaic"', checker)
+        self.assertIn('const val RELEASE_APK_NAME = "$ASSET_NAME-release.apk"', checker)
+        self.assertIn('listOf(UpdateChecker.RELEASE_APK_NAME)', checker)
+        self.assertNotIn('Wholphin-release.apk', checker)
         pattern = re.search(r'VERSION_REGEX = Regex\("(.+)"\)', version)[1].replace('\\\\', '\\')
         for fields in (development.release_fields(self.m, False),
                        development.release_fields(self.m, False, archive=True), stable.fields(self.m, False)):
             self.assertEqual('v1.0.5', fields['name'])
             self.assertIsNotNone(re.fullmatch(pattern, fields['name']))
         self.assertIsNone(re.fullmatch(pattern, 'Mosaic v1.0.5 — Development'))
-        self.assertEqual('Wholphin-release.apk', development.APK_NAME)
-        self.assertEqual('Wholphin-release.apk', self.m['assetName'])
+        self.assertEqual('Mosaic-release.apk', development.APK_NAME)
+        self.assertEqual('Mosaic-release.apk', self.m['assetName'])
+
+    def test_current_mosaic_product_identity_is_canonical_without_protocol_churn(self):
+        manifest = (ROOT / 'app/src/main/AndroidManifest.xml').read_text(encoding='utf-8')
+        gradle = (ROOT / 'app/build.gradle.kts').read_text(encoding='utf-8')
+        settings = (ROOT / 'settings.gradle.kts').read_text(encoding='utf-8')
+        database = (ROOT / 'app/src/main/java/com/github/damontecres/wholphin/services/hilt/DatabaseModule.kt').read_text(encoding='utf-8')
+        resolver = (ROOT / 'app/src/main/java/com/github/damontecres/wholphin/services/UpdateSourceResolver.kt').read_text(encoding='utf-8')
+        resources = (ROOT / 'app/src/main/res/values/strings.xml').read_text(encoding='utf-8')
+        reuse = (ROOT / 'scripts/mosaic_validation_reuse.py').read_text(encoding='utf-8')
+        upstream = (ROOT / 'scripts/hosted_upstream.py').read_text(encoding='utf-8')
+
+        self.assertIn('applicationId = "io.github.constbogdan.mosaic"', gradle)
+        self.assertIn('"Mosaic-${variant.flavorName}', gradle)
+        self.assertIn('rootProject.name = "Mosaic"', settings)
+        self.assertIn('android:scheme="mosaic"', manifest)
+        self.assertNotIn('android:scheme="wholphin"', manifest)
+        self.assertIn('"mosaic",', database)
+        self.assertNotIn('"wholphin",', database)
+        self.assertIn('>Mosaic</string>', resources)
+        self.assertIn('constbogdan/Mosaic/releases/latest', resolver)
+        self.assertNotIn('constbogdan/Wholphin/releases', resolver)
+        self.assertIn('f"wholphin-{CONTRACT}', reuse)
+        self.assertIn('wholphin-upstream-', upstream)
 
     def test_release_bodies_distinguish_channels_without_changing_identity(self):
         before = copy.deepcopy(self.m)
@@ -84,7 +109,7 @@ class DeliveryOutputTests(unittest.TestCase):
                   stable.fields(self.m, False, 'mosaic-v1.0.4')['body']]
         for body in bodies:
             for value in (self.m['versionName'], self.m['immutableIdentity'], self.m['sourceSha'],
-                          self.m['signedApkSha256'], 'mosaic-release.json', 'Wholphin-release.apk'):
+                          self.m['signedApkSha256'], 'mosaic-release.json', 'Mosaic-release.apk'):
                 self.assertIn(value, body)
             self.assertIn('/commit/' + self.m['sourceSha'], body)
             self.assertIn('<summary>Technical provenance</summary>', body)

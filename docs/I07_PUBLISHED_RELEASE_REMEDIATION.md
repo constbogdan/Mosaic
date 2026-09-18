@@ -34,7 +34,7 @@ Prepare
 Hold
 ```
 
-It resolves `GET /repos/constbogdan/Wholphin/releases/latest`; the operator does not
+It resolves `GET /repos/constbogdan/Mosaic/releases/latest`; the operator does not
 select a version, release, target, reason, or replacement.
 
 ### Prepare
