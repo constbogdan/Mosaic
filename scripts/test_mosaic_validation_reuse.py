@@ -37,6 +37,7 @@ class FakeGitHub:
         run_repository=None,
         tested_tree=TREE,
         tested_parents=None,
+        repository=reuse.REPOSITORY,
     ):
         self.validation_class = validation_class
         self.full = full or (
@@ -51,7 +52,8 @@ class FakeGitHub:
         self.run_attempt = run_attempt
         self.artifact_attempt = artifact_attempt or run_attempt
         self.run_path = run_path or reuse.WORKFLOW
-        self.run_repository = run_repository or reuse.REPOSITORY
+        self.repository = repository
+        self.run_repository = run_repository or repository
         self.tested_tree = tested_tree
         self.tested_parents = tested_parents or [BASE, HEAD]
 
@@ -75,12 +77,12 @@ class FakeGitHub:
                     "base": {
                         "sha": BASE,
                         "ref": "main",
-                        "repo": {"full_name": reuse.REPOSITORY},
+                        "repo": {"full_name": self.repository},
                     },
                     "head": {
                         "sha": HEAD,
                         "ref": "feature",
-                        "repo": {"full_name": reuse.REPOSITORY},
+                        "repo": {"full_name": self.repository},
                     },
                 }
             ]
@@ -156,10 +158,10 @@ class FakeGitHub:
         raise AssertionError(path)
 
 
-def environment():
+def environment(repository=reuse.REPOSITORY):
     return {
         "GITHUB_ACTIONS": "true",
-        "GITHUB_REPOSITORY": reuse.REPOSITORY,
+        "GITHUB_REPOSITORY": repository,
         "GITHUB_EVENT_NAME": "push",
         "GITHUB_REF": "refs/heads/main",
         "GITHUB_REF_PROTECTED": "true",
@@ -193,6 +195,16 @@ class ValidationReuseTests(unittest.TestCase):
         result = self.decide(FakeGitHub(validation_class=reuse.NON_ANDROID))
         self.assertTrue(result["reuseValidation"])
         self.assertEqual(reuse.NON_ANDROID, result["validationClass"])
+
+    def test_mosaic_repository_reuses_only_matching_mosaic_evidence(self):
+        repository = "constbogdan/Mosaic"
+        result = self.decide(
+            FakeGitHub(repository=repository), environment(repository)
+        )
+        self.assertTrue(result["reuseValidation"])
+        self.assertFalse(
+            self.decide(FakeGitHub(), environment(repository))["reuseValidation"]
+        )
 
     def test_actual_ci_workflow_matches_reuse_consumer_contract(self):
         workflow = (ROOT / reuse.WORKFLOW).read_text(encoding="utf-8")
@@ -229,7 +241,8 @@ class ValidationReuseTests(unittest.TestCase):
             reuse.UPLOAD_STEP,
         ):
             self.assertEqual(1, step_names.count(name), name)
-        self.assertIn(f"github.repository == '{reuse.REPOSITORY}'", workflow)
+        self.assertIn("github.repository == 'constbogdan/Wholphin'", workflow)
+        self.assertIn("github.repository == 'constbogdan/Mosaic'", workflow)
         self.assertIn("python -B scripts/run_offline_tests.py --pattern 'test_*.py'", workflow)
         self.assertIn("github.event_name == 'pull_request' || steps.main-validation-reuse.outputs.reuse_validation != 'true'", workflow)
         self.assertIn("steps.pr-validation.outputs.validation_mode != 'non-android'", workflow)
@@ -369,6 +382,20 @@ class ValidationReuseTests(unittest.TestCase):
             self.assertEqual(reuse.NON_ANDROID, record["validationClass"])
             self.assertEqual(BASE, record["baseSha"])
             self.assertEqual(TESTED, record["testedSha"])
+
+    def test_record_binds_current_mosaic_repository_without_protocol_rename(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            env = self.record_environment(
+                temporary, Path(temporary) / "output", reuse.NON_ANDROID
+            )
+            env["GITHUB_REPOSITORY"] = "constbogdan/Mosaic"
+            with mock.patch.object(reuse, "git", side_effect=self.pr_git):
+                result = reuse.record(ROOT, env)
+            record = json.loads(
+                (Path(result["evidencePath"]) / "validation-evidence.json").read_text()
+            )
+            self.assertEqual("constbogdan/Mosaic", record["repository"])
+            self.assertTrue(result["artifactName"].startswith("wholphin-pr-policy-v1-"))
 
     def test_record_binds_android_full_and_carries_validated_apk(self):
         with tempfile.TemporaryDirectory() as temporary:

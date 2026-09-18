@@ -15,8 +15,14 @@ from mosaic_version import EPOCH, UPSTREAM_BASELINE, allocate, git
 from mosaic_signing_exercise import artifact_name, payload, shallow_checkout_identity, validate_record
 from verify_mosaic_apk import fingerprint
 from mosaic_delivery_output import append_summary, publication_summary, release_body
+from mosaic_repository import (
+    LEGACY_DOWNSTREAM_REPOSITORY,
+    authenticate_downstream_repository,
+    authenticate_workflow_repository,
+)
 
-REPOSITORY = 'constbogdan/Wholphin'
+# Compatibility name for historical records/fixtures; live targets use authenticated runtime state.
+REPOSITORY = LEGACY_DOWNSTREAM_REPOSITORY
 LEGACY_DEVELOPMENT_WORKFLOW = '.github/workflows/mosaic-development-release.yml'
 CI_WORKFLOW = '.github/workflows/ci.yml'
 CI_JOB = 'Full validation'
@@ -33,13 +39,13 @@ def digest(data):
 
 
 def ci_guard(env):
-    expected = dict(GITHUB_ACTIONS='true', GITHUB_REPOSITORY=REPOSITORY,
-                    GITHUB_REF='refs/heads/main', GITHUB_REF_PROTECTED='true',
+    authenticate_workflow_repository(env, CI_WORKFLOW)
+    expected = dict(GITHUB_ACTIONS='true', GITHUB_REF='refs/heads/main', GITHUB_REF_PROTECTED='true',
                     GITHUB_EVENT_NAME='push')
     sha = env.get('GITHUB_SHA', '')
     if (any(env.get(k) != v for k, v in expected.items())
             or not re.fullmatch('[0-9a-f]{40}', sha)
-            or env.get('GITHUB_WORKFLOW_REF') != f'{REPOSITORY}/{CI_WORKFLOW}@refs/heads/main'):
+            ):
         raise ValueError('Release classification requires exact protected-main push CI')
     return sha
 
@@ -51,9 +57,12 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 class GitHub:
     """Fixed repository/hosts only; credentials and response bodies never enter errors."""
+    def __init__(self, repository):
+        self.repository = authenticate_downstream_repository(repository)
+
     def call(self, method, path, data=None, missing=False, upload=False):
         host = 'uploads.github.com' if upload else 'api.github.com'
-        url = f'https://{host}/repos/{REPOSITORY}/{path}'
+        url = f'https://{host}/repos/{self.repository}/{path}'
         body = data if upload else (canonical(data) if data is not None else None)
         request = urllib.request.Request(url, data=body, method=method, headers={
             'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
@@ -90,7 +99,7 @@ def trusted_ci(api, sha, *, require_tip=True):
     runs = api.pages(f'actions/workflows/ci.yml/runs?head_sha={sha}&event=push', 'workflow_runs')
     candidates = [r for r in runs if r.get('head_sha') == sha and r.get('head_branch') == 'main'
                   and r.get('event') == 'push' and r.get('workflow_id') == workflow['id']
-                  and r.get('head_repository', {}).get('full_name') == REPOSITORY]
+                  and r.get('head_repository', {}).get('full_name') == api.repository]
     if not candidates:
         raise ValueError('No authoritative push CI for exact main SHA; wait for CI, then authorize again')
     run = max(candidates, key=lambda r: r['id'])
@@ -121,10 +130,11 @@ def historical_identity(root, source, execution_sha):
                 dirty=False, publication=True, epoch=EPOCH, upstreamBaseline=UPSTREAM_BASELINE)
 
 
-def run_identity(run, sha, workflow):
+def run_identity(run, sha, workflow, repository=REPOSITORY):
+    repository = authenticate_downstream_repository(repository)
     allowed_events = ('push',) if workflow == CI_WORKFLOW else ('workflow_dispatch', 'workflow_run')
-    if (run.get('repository', {}).get('full_name') != REPOSITORY
-            or run.get('head_repository', {}).get('full_name') != REPOSITORY
+    if (run.get('repository', {}).get('full_name') != repository
+            or run.get('head_repository', {}).get('full_name') != repository
             or run.get('event') not in allowed_events
             or run.get('head_branch') != 'main'
             or run.get('head_sha') != sha or run.get('path') != workflow
@@ -148,12 +158,12 @@ def validate_original_source(api, record, identity):
     original = api.call('GET', f'actions/runs/{run}')
     workflow = original.get('path')
     if workflow == CI_WORKFLOW:
-        run_identity(original, identity['sourceSha'], CI_WORKFLOW)
+        run_identity(original, identity['sourceSha'], CI_WORKFLOW, api.repository)
         if original.get('conclusion') != 'success':
             raise ValueError('Original main CI did not complete successfully')
         successful_job(api, run, attempt, [CI_JOB])
     elif workflow == LEGACY_DEVELOPMENT_WORKFLOW:
-        run_identity(original, identity['sourceSha'], LEGACY_DEVELOPMENT_WORKFLOW)
+        run_identity(original, identity['sourceSha'], LEGACY_DEVELOPMENT_WORKFLOW, api.repository)
         successful_job(api, run, attempt, ['build'])
     else:
         raise ValueError('Original source provenance is not from an approved build workflow')
@@ -257,9 +267,10 @@ def verified_manifest(record, apk, identity, run, attempt, policy, build_workflo
                 assetName=APK_NAME, source=source)
 
 
-def release_fields(m, draft, *, archive=False, compare_from=None):
+def release_fields(m, draft, *, archive=False, compare_from=None, repository=REPOSITORY):
     return dict(name='v' + m['versionName'], draft=draft, prerelease=True, make_latest='false',
-                body=release_body(m, 'Development', archive=archive, compare_from=compare_from))
+                body=release_body(m, 'Development', archive=archive, compare_from=compare_from,
+                                  repository=repository))
 
 
 def check_asset(asset, name, data):
@@ -366,6 +377,7 @@ def release_eligibility(api, root, sha):
 
 
 def record_eligibility(result, ci, env, artifact=None):
+    repository = authenticate_workflow_repository(env, CI_WORKFLOW)
     output_path = Path(env['GITHUB_OUTPUT'])
     with output_path.open('a', encoding='utf-8') as output:
         values = {
@@ -405,7 +417,10 @@ def record_eligibility(result, ci, env, artifact=None):
         f"Authoritative CI: `{json.dumps(ci, sort_keys=True) if ci else 'current main push run'}`",
     ]
     if result.get('baselineSha'):
-        details.append(f"Compare sources: https://github.com/{REPOSITORY}/compare/{result['baselineSha']}...{result['currentSha']}")
+        details.append(
+            f"Compare sources: https://github.com/{repository}/compare/"
+            f"{result['baselineSha']}...{result['currentSha']}"
+        )
     if artifact:
         details.extend([
             f"Unsigned artifact ID: `{artifact['artifactId']}`",
@@ -497,12 +512,16 @@ def publish(api, m, apk, compare_from=None):
         api.call('POST', 'git/refs', dict(ref='refs/tags/' + tag, sha=annotation['sha']))
     archive = find_release(api, tag, releases)
     if archive is None:
-        archive = api.call('POST', 'releases', dict(tag_name=tag, target_commitish=m['sourceSha'], **release_fields(m, True, archive=True, compare_from=compare_from)))
+        archive = api.call('POST', 'releases', dict(
+            tag_name=tag, target_commitish=m['sourceSha'],
+            **release_fields(m, True, archive=True, compare_from=compare_from,
+                             repository=api.repository)))
     if not archive.get('prerelease') or archive.get('name') != 'v' + m['versionName']:
         raise ValueError('Immutable archive release metadata mismatch')
     assets(api, archive, expected, allow_upload=archive['draft'])
     if archive['draft']:
-        api.call('PATCH', f"releases/{archive['id']}", release_fields(m, False, archive=True, compare_from=compare_from))
+        api.call('PATCH', f"releases/{archive['id']}", release_fields(
+            m, False, archive=True, compare_from=compare_from, repository=api.repository))
     develop_ref = api.call('GET', 'git/ref/tags/develop', missing=True)
     if rolling and rolling['name'] == 'v' + m['versionName'] and not rolling['draft']:
         if not develop_ref or develop_ref['object']['type'] != 'commit' or develop_ref['object']['sha'] != m['sourceSha']:
@@ -519,13 +538,16 @@ def publish(api, m, apk, compare_from=None):
     else:
         api.call('POST', 'git/refs', dict(ref='refs/tags/develop', sha=m['sourceSha']))
     if rolling is None:
-        rolling = api.call('POST', 'releases', dict(tag_name='develop', target_commitish=m['sourceSha'], **release_fields(m, True, compare_from=compare_from)))
+        rolling = api.call('POST', 'releases', dict(
+            tag_name='develop', target_commitish=m['sourceSha'],
+            **release_fields(m, True, compare_from=compare_from, repository=api.repository)))
     for asset in api.pages(f"releases/{rolling['id']}/assets"):
         if asset['name'] not in expected:
             raise ValueError('Unexpected rolling asset; explicit recovery review required')
         api.call('DELETE', f"releases/assets/{asset['id']}")
     assets(api, rolling, expected, allow_upload=True)
-    result = api.call('PATCH', f"releases/{rolling['id']}", release_fields(m, False, compare_from=compare_from))
+    result = api.call('PATCH', f"releases/{rolling['id']}", release_fields(
+        m, False, compare_from=compare_from, repository=api.repository))
     if result.get('draft') or result.get('prerelease') is not True or result.get('tag_name') != 'develop':
         raise ValueError('Rolling release final verification failed')
     return compare_from
@@ -538,9 +560,10 @@ def main():
     args = parser.parse_args()
     try:
         env = os.environ
+        repository = authenticate_workflow_repository(env, CI_WORKFLOW)
         if args.mode == 'ci-eligibility':
             sha = ci_guard(env)
-            api = GitHub()
+            api = GitHub(repository)
             result = release_eligibility(api, Path(__file__).resolve().parent.parent, sha)
             record_eligibility(result, None, env)
             print(json.dumps(result, sort_keys=True))
@@ -562,12 +585,13 @@ def main():
             if args.mode == 'ci-manifest':
                 path.write_bytes(canonical(m))
                 return
-            api = GitHub()
+            api = GitHub(repository)
             require_current_protected_main(api, sha)
             if path.read_bytes() != canonical(m):
                 raise ValueError('Prepared publication manifest changed')
             compare_from = publish(api, m, apk)
-            append_summary(publication_summary(m, 'publish', env, ci, compare_from=compare_from), env)
+            append_summary(publication_summary(
+                m, 'publish', env, ci, compare_from=compare_from, repository=repository), env)
             return
     except (ValueError, OSError, KeyError) as error:
         parser.exit(1, str(error) + '\n')

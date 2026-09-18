@@ -22,7 +22,9 @@ defaults:
 jobs:
   observe:
     name: Observe upstream integration
-    if: github.repository == 'constbogdan/Wholphin' && github.ref == 'refs/heads/main'
+    if: >-
+      (github.repository == 'constbogdan/Wholphin' || github.repository == 'constbogdan/Mosaic') &&
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -59,7 +61,8 @@ jobs:
     name: Publish candidate
     needs: observe
     if: >-
-      github.repository == 'constbogdan/Wholphin' && github.ref == 'refs/heads/main' &&
+      (github.repository == 'constbogdan/Wholphin' || github.repository == 'constbogdan/Mosaic') &&
+      github.ref == 'refs/heads/main' &&
       needs.observe.outputs.outcome != 'no_delta'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -82,8 +85,9 @@ jobs:
         with:
           client-id: ${{ vars.SYNC_BOT_CLIENT_ID }}
           private-key: ${{ secrets.SYNC_BOT_PRIVATE_KEY }}
-          owner: constbogdan
-          repositories: Wholphin
+          # These event fields become targets only after the job's exact two-name repository guard.
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
           permission-contents: write
           permission-pull-requests: write
       - name: Recheck exact inputs and create or update candidate

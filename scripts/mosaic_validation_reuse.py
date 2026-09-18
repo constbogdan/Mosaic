@@ -11,8 +11,13 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from mosaic_repository import (
+    LEGACY_DOWNSTREAM_REPOSITORY,
+    authenticate_downstream_repository,
+)
 
-REPOSITORY = "constbogdan/Wholphin"
+# Compatibility name for historical fixtures; live operations authenticate the runtime identity.
+REPOSITORY = LEGACY_DOWNSTREAM_REPOSITORY
 WORKFLOW = ".github/workflows/ci.yml"
 JOB = "Full validation"
 CONTRACT = "pr-policy-v1"
@@ -47,9 +52,12 @@ def git(root, *args):
 class GitHub:
     """Minimal read-only GitHub client; response bodies and credentials stay out of errors."""
 
+    def __init__(self, repository):
+        self.repository = authenticate_downstream_repository(repository)
+
     def call(self, path):
         request = urllib.request.Request(
-            f"https://api.github.com/repos/{REPOSITORY}/{path}",
+            f"https://api.github.com/repos/{self.repository}/{path}",
             headers={
                 "Authorization": "Bearer " + os.environ["GH_TOKEN"],
                 "Accept": "application/vnd.github+json",
@@ -92,9 +100,9 @@ def artifact_name(validation_class, pr, head, tested, tree, run, attempt):
 
 
 def record(root, env):
+    repository = authenticate_downstream_repository(env.get("GITHUB_REPOSITORY"))
     expected = {
         "GITHUB_ACTIONS": "true",
-        "GITHUB_REPOSITORY": REPOSITORY,
         "GITHUB_EVENT_NAME": "pull_request",
     }
     if any(env.get(key) != value for key, value in expected.items()):
@@ -116,7 +124,7 @@ def record(root, env):
     name = artifact_name(validation_class, pr, head, tested, tree, run, attempt)
     evidence = {
         "contract": CONTRACT,
-        "repository": REPOSITORY,
+        "repository": repository,
         "workflow": WORKFLOW,
         "job": JOB,
         "validationClass": validation_class,
@@ -160,9 +168,9 @@ def _single(items, reason):
 
 
 def reuse_decision(root, api, env):
+    repository = authenticate_downstream_repository(env.get("GITHUB_REPOSITORY"))
     expected = {
         "GITHUB_ACTIONS": "true",
-        "GITHUB_REPOSITORY": REPOSITORY,
         "GITHUB_EVENT_NAME": "push",
         "GITHUB_REF": "refs/heads/main",
         "GITHUB_REF_PROTECTED": "true",
@@ -184,9 +192,9 @@ def reuse_decision(root, api, env):
             for item in pulls
             if item.get("merged_at")
             and item.get("merge_commit_sha") == main_sha
-            and item.get("base", {}).get("repo", {}).get("full_name") == REPOSITORY
+            and item.get("base", {}).get("repo", {}).get("full_name") == repository
             and item.get("base", {}).get("ref") == "main"
-            and item.get("head", {}).get("repo", {}).get("full_name") == REPOSITORY
+            and item.get("head", {}).get("repo", {}).get("full_name") == repository
         ],
         "no unique same-repository merged PR owns the main commit",
     )
@@ -208,7 +216,7 @@ def reuse_decision(root, api, env):
         and run.get("event") == "pull_request"
         and run.get("head_sha") == pull["head"]["sha"]
         and run.get("head_branch") == pull["head"]["ref"]
-        and run.get("head_repository", {}).get("full_name") == REPOSITORY
+        and run.get("head_repository", {}).get("full_name") == repository
         and run.get("status") == "completed"
         and run.get("conclusion") == "success"
     ]
@@ -335,7 +343,8 @@ def main():
         if args.mode == "record":
             print(json.dumps(record(root, os.environ), sort_keys=True))
         else:
-            result = decide(root, GitHub(), os.environ)
+            repository = authenticate_downstream_repository(os.environ.get("GITHUB_REPOSITORY"))
+            result = decide(root, GitHub(repository), os.environ)
             write_decision(result, os.environ)
             print(json.dumps(result, sort_keys=True))
     except (KeyError, OSError, ValueError) as error:

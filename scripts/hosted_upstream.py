@@ -18,9 +18,15 @@ import tempfile
 import unicodedata
 from urllib.parse import quote
 
+from mosaic_repository import (
+    LEGACY_DOWNSTREAM_REPOSITORY,
+    UPSTREAM_REPOSITORY,
+    authenticate_downstream_repository,
+)
 
-ORIGIN = "constbogdan/Wholphin"
-UPSTREAM = "damontecres/Wholphin"
+
+ORIGIN = LEGACY_DOWNSTREAM_REPOSITORY
+UPSTREAM = UPSTREAM_REPOSITORY
 URLS = {"origin": f"https://github.com/{ORIGIN}.git",
         "upstream": f"https://github.com/{UPSTREAM}.git"}
 # Reviewed, already integrated official upstream commit at implementation time.
@@ -234,17 +240,23 @@ def blob_url(repository, sha, path):
     return f"https://github.com/{repository}/blob/{sha}/{quote(path, safe='/')}"
 
 
+def downstream_repository(observation):
+    """Return the exact authenticated downstream identity recorded by this run."""
+    return authenticate_downstream_repository(observation.get("downstream_repo"))
+
+
 def candidate_pr_navigation(observation):
     """Return one canonical downstream PR link, never an upstream-controlled URL."""
     waiting = observation.get("outcome") == "waiting_on_existing_pr"
     number = str(observation.get("blocking_pr_number" if waiting else "pr_number") or "")
     supplied_url = str(observation.get("blocking_pr_url" if waiting else "pr_url") or "").rstrip("/")
     if not number and supplied_url:
-        match = re.fullmatch(rf"https://github\.com/{re.escape(ORIGIN)}/pull/(\d+)", supplied_url)
+        repository = downstream_repository(observation)
+        match = re.fullmatch(rf"https://github\.com/{re.escape(repository)}/pull/(\d+)", supplied_url)
         number = match.group(1) if match else ""
     if not number.isdigit() or int(number) <= 0:
         return ""
-    canonical = f"https://github.com/{ORIGIN}/pull/{number}"
+    canonical = f"https://github.com/{downstream_repository(observation)}/pull/{number}"
     if supplied_url and supplied_url != canonical:
         return ""
     return f"PR #{number}  [open]({canonical})"
@@ -254,7 +266,8 @@ def candidate_branch_navigation(observation):
     branch = str(observation.get("branch") or "")
     if not BRANCH.fullmatch(branch):
         return ""
-    return f"Candidate branch  [inspect](https://github.com/{ORIGIN}/tree/{quote(branch, safe='/')})"
+    repository = downstream_repository(observation)
+    return f"Candidate branch  [inspect](https://github.com/{repository}/tree/{quote(branch, safe='/')})"
 
 
 def ownership_rows(observation, category):
@@ -275,10 +288,10 @@ def attention_evidence(observation, *, rich_upstream=False):
             upstream_side = (f"[Incoming upstream]({blob_url(UPSTREAM, observation.get('upstream_sha'), path)})"
                              if change.get("new_blob") else "incoming upstream absent")
             if change.get("downstream_blob"):
-                downstream_side = f"[Current Mosaic]({blob_url(ORIGIN, observation.get('downstream_sha'), path)})"
+                downstream_side = f"[Current Mosaic]({blob_url(downstream_repository(observation), observation.get('downstream_sha'), path)})"
             elif change.get("downstream_old_blob") and change.get("counterpart"):
                 counterpart = change["counterpart"]
-                downstream_side = (f"[Current Mosaic prior path]({blob_url(ORIGIN, observation.get('downstream_sha'), counterpart)}) "
+                downstream_side = (f"[Current Mosaic prior path]({blob_url(downstream_repository(observation), observation.get('downstream_sha'), counterpart)}) "
                                    f"<code>{display_text(counterpart)}</code>")
             else:
                 downstream_side = "current Mosaic absent"
@@ -596,8 +609,9 @@ def command(args, *, cwd=None, env=None, check=True, input=None):
 
 
 class Git:
-    def __init__(self, path):
+    def __init__(self, path, repository=ORIGIN):
         self.path = Path(path)
+        self.repository = authenticate_downstream_repository(repository)
         self.env = {k: v for k, v in os.environ.items()
                     if not k.startswith("GIT_") and k not in {"GH_TOKEN", "GITHUB_TOKEN", "SYNC_PUBLISH_TOKEN"}}
         self.env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
@@ -607,7 +621,9 @@ class Git:
                         "-c", "maintenance.auto=false", "-c", "gc.auto=0",
                         "-c", "protocol.file.allow=never"]
         self.run("init", "--quiet")
-        for name, url in URLS.items():
+        urls = {"origin": f"https://github.com/{self.repository}.git",
+                "upstream": f"https://github.com/{UPSTREAM}.git"}
+        for name, url in urls.items():
             self.run("remote", "add", name, url)
 
     def run(self, *args, check=True, input=None):
@@ -618,7 +634,9 @@ class Git:
         return self.run(*args).stdout.strip()
 
     def identities(self):
-        for name, expected in URLS.items():
+        urls = {"origin": f"https://github.com/{self.repository}.git",
+                "upstream": f"https://github.com/{UPSTREAM}.git"}
+        for name, expected in urls.items():
             for option in ([], ["--push"]):
                 actual = self.text("remote", "get-url", *option, "--all", name)
                 if actual != expected:
@@ -643,6 +661,9 @@ class Git:
 
 
 class GitHub:
+    def __init__(self, repository=ORIGIN):
+        self.repository = authenticate_downstream_repository(repository)
+
     def environment(self, publish=False):
         env = {k: v for k, v in os.environ.items() if k != "SYNC_PUBLISH_TOKEN"}
         if publish:
@@ -658,22 +679,23 @@ class GitHub:
 
     def pages(self, resource):
         output = command(["gh", "api", "--hostname", "github.com", "--paginate", "--slurp",
-                          f"repos/{ORIGIN}/{resource}"], env=self.environment()).stdout
+                          f"repos/{self.repository}/{resource}"], env=self.environment()).stdout
         return [item for page in json.loads(output) for item in page]
 
     def pulls(self):
         return self.pages("pulls?state=all&base=main&per_page=100")
 
     def create_pr(self, branch, body, *, draft=False, title=None):
-        return self.api(f"repos/{ORIGIN}/pulls", {
+        return self.api(f"repos/{self.repository}/pulls", {
             "head": branch, "base": "main", "title": title or "chore: synchronize official upstream",
             "body": body, "maintainer_can_modify": False, "draft": draft}, publish=True)["html_url"]
 
-def sync_pulls(pulls):
+def sync_pulls(pulls, repository=ORIGIN):
+    repository = authenticate_downstream_repository(repository)
     return [p for p in pulls if p["base"]["ref"] == "main"
-            and p["base"]["repo"]["full_name"] == ORIGIN
+            and p["base"]["repo"]["full_name"] == repository
             and p["head"].get("repo")
-            and p["head"]["repo"]["full_name"] == ORIGIN
+            and p["head"]["repo"]["full_name"] == repository
             and p["head"]["ref"].startswith(PREFIX)]
 
 
@@ -796,7 +818,7 @@ def inspect(git, github, observation, anchor=INITIAL_ANCHOR):
                            incoming_count=0, incoming_commits=[], changed_paths=[], conflict_paths=[])
         observation["ancestry_validated"] = True
         return
-    pulls = sync_pulls(github.pulls())
+    pulls = sync_pulls(github.pulls(), github.repository)
     anchors = {anchor}
     # Also retain an attempted branch if a runner died after push but before PR.
     refs = git.text("ls-remote", "--refs", "origin", "refs/heads/" + PREFIX + "*")
@@ -860,8 +882,9 @@ def inspect(git, github, observation, anchor=INITIAL_ANCHOR):
         path = change["path"]
         counterpart = change.get("counterpart")
         change["upstream_url"] = blob_url(UPSTREAM, up, path) if change.get("new_blob") else None
-        change["downstream_url"] = blob_url(ORIGIN, down, path) if change.get("downstream_blob") else None
-        change["downstream_old_url"] = (blob_url(ORIGIN, down, counterpart)
+        change["downstream_url"] = (blob_url(downstream_repository(observation), down, path)
+                                    if change.get("downstream_blob") else None)
+        change["downstream_old_url"] = (blob_url(downstream_repository(observation), down, counterpart)
                                          if counterpart and change.get("downstream_old_blob") else None)
     observation["changed_paths"] = [row["path"] for row in observation["automation_changes"]]
     observation["incoming_count"] = len(commits)
@@ -975,7 +998,7 @@ def publish(git, github, observation, expected_up, expected_down,
     if current and current[0] != candidate:
         raise Blocked("Sync branch already contains different work; no force push is permitted.")
     # Recheck PR decisions just before publication, including partially completed retries.
-    pulls = sync_pulls(github.pulls())
+    pulls = sync_pulls(github.pulls(), github.repository)
     matching = [p for p in pulls if p["head"]["ref"] == branch]
     if matching:
         if len(matching) == 1 and matching[0]["state"] == "open" and matching[0]["head"]["sha"] == candidate:
@@ -1086,24 +1109,33 @@ def main():
     parser.add_argument("--expected-blocking-head", default="")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    raw_repository = os.environ.get("GITHUB_REPOSITORY", "")
     o = {"schema_version": 1, "upstream_repo": UPSTREAM, "upstream_ref": "refs/heads/main",
-         "downstream_repo": ORIGIN, "downstream_ref": "refs/heads/main",
+         "downstream_repo": raw_repository, "downstream_ref": "refs/heads/main",
          "observed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
          "configured_schedule_utc": os.environ.get("CONFIGURED_SCHEDULE") or "manual",
          "workflow": os.environ.get("GITHUB_WORKFLOW"), "run_id": os.environ.get("GITHUB_RUN_ID"),
          "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
-         "run_url": f"https://github.com/{ORIGIN}/actions/runs/{os.environ.get('GITHUB_RUN_ID', '')}",
+         "run_url": "",
          "outcome": "blocked", "textual_conflicts": None}
-    github = GitHub()
     operation_error = False
     failed = False
     try:
-        if (os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("GITHUB_REPOSITORY") != ORIGIN
+        try:
+            repository = authenticate_downstream_repository(raw_repository)
+        except ValueError as error:
+            raise IdentityError(
+                "Hosted execution requires the canonical downstream repository identity."
+            ) from error
+        o["downstream_repo"] = repository
+        o["run_url"] = f"https://github.com/{repository}/actions/runs/{os.environ.get('GITHUB_RUN_ID', '')}"
+        if (os.environ.get("GITHUB_ACTIONS") != "true"
                 or os.environ.get("GITHUB_REF") != "refs/heads/main"
                 or os.environ.get("GITHUB_EVENT_NAME") not in {"schedule", "workflow_dispatch"}):
             raise IdentityError("Hosted execution requires the canonical downstream, main, and schedule/workflow_dispatch.")
+        github = GitHub(repository)
         with tempfile.TemporaryDirectory(prefix="wholphin-sync-", dir=os.environ["RUNNER_TEMP"]) as work:
-            git = Git(work)
+            git = Git(work, repository)
             git.identities()
             inspect(git, github, o)
             if args.publish:

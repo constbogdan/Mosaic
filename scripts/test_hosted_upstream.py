@@ -19,6 +19,7 @@ import hosted_upstream as sync
 
 class GitHubFake:
     def __init__(self):
+        self.repository = sync.ORIGIN
         self.records = []
         self.created = []
         self.fail_pr = False
@@ -30,7 +31,7 @@ class GitHubFake:
         if self.fail_pr:
             raise sync.Blocked("PR creation failed")
         self.created.append((branch, body, draft, title))
-        return "https://github.com/constbogdan/Wholphin/pull/123"
+        return f"https://github.com/{self.repository}/pull/123"
 
 
 class LocalGit(sync.Git):
@@ -196,7 +197,7 @@ class HostedSyncTests(unittest.TestCase):
         self.g("checkout", "--detach", self.anchor)
         self.commit("base.txt", "downstream\n")
         self.g("push", str(self.remotes["origin"]), "HEAD:refs/heads/main")
-        git, o = self.instance(), {}
+        git, o = self.instance(), {"downstream_repo": sync.ORIGIN}
         sync.inspect(git, self.github, o, self.anchor)
         self.assertEqual(o["outcome"], "semantic_conflict")
         self.assertEqual(o["conflict_paths"], ["base.txt"])
@@ -578,7 +579,9 @@ class HostedSyncTests(unittest.TestCase):
         self.assertNotIn('finalize-merged-episode', workflow)
         self.assertNotIn('--finalize-merged-pr', workflow)
         for part in (observe, publish):
-            self.assertIn("github.repository == 'constbogdan/Wholphin' && github.ref == 'refs/heads/main'", part)
+            self.assertIn("github.repository == 'constbogdan/Wholphin'", part)
+            self.assertIn("github.repository == 'constbogdan/Mosaic'", part)
+            self.assertIn("github.ref == 'refs/heads/main'", part)
         self.assertIn("needs.observe.outputs.outcome != 'no_delta'", publish)
         mint, execution = publish.split('      - name: Recheck exact inputs', 1)
         self.assertIn('contains(fromJSON', mint)
@@ -588,7 +591,9 @@ class HostedSyncTests(unittest.TestCase):
         self.assertIn('id: publication', mint)
         self.assertIn('uses: actions/create-github-app-token@', mint)
         for expected in ('client-id: ${{ vars.SYNC_BOT_CLIENT_ID }}', 'private-key: ${{ secrets.SYNC_BOT_PRIVATE_KEY }}',
-                         'owner: constbogdan', 'repositories: Wholphin', 'permission-contents: write',
+                         'owner: ${{ github.repository_owner }}',
+                         'repositories: ${{ github.event.repository.name }}',
+                         'permission-contents: write',
                          'permission-pull-requests: write'):
             self.assertIn(expected, mint)
         self.assertIn('SYNC_PUBLISH_TOKEN: ${{ steps.publication.outputs.token }}', execution)
@@ -603,6 +608,25 @@ class HostedSyncTests(unittest.TestCase):
         self.assertIn('blocking_head: ${{ steps.observe.outputs.blocking_pr_head_sha }}', observe)
         self.assertIn('if: always()', execution)
         self.assertNotIn('MOSAIC_', workflow)
+
+    def test_transition_repositories_drive_exact_git_and_api_targets(self):
+        for repository in ("constbogdan/Wholphin", "constbogdan/Mosaic"):
+            with self.subTest(repository=repository):
+                path = self.root / repository.rsplit("/", 1)[1]
+                path.mkdir()
+                git = sync.Git(path, repository)
+                self.assertEqual(
+                    f"https://github.com/{repository}.git",
+                    git.text("remote", "get-url", "origin"),
+                )
+                github = sync.GitHub(repository)
+                completed = subprocess.CompletedProcess([], 0, stdout="[[]]", stderr="")
+                with patch.object(sync, "command", return_value=completed) as command:
+                    self.assertEqual([], github.pages("pulls"))
+                self.assertIn(f"repos/{repository}/pulls", command.call_args.args[0])
+        for repository in ("constbogdan/Mosaic2", "other/Mosaic", "forks/Mosaic", ""):
+            with self.subTest(repository=repository), self.assertRaises(ValueError):
+                sync.GitHub(repository)
 
     def test_changed_job_inputs_and_late_ref_drift_block(self):
         self.upstream()
@@ -839,6 +863,7 @@ class HostedSyncTests(unittest.TestCase):
         path = "app/src/SeriesViewModel.kt"
         clean_path = "app/src/RtlControls.kt"
         observation = {"episode_id": "a" * 64, "outcome": "review_required",
+                       "downstream_repo": sync.ORIGIN,
                        "upstream_sha": "b" * 40,
                        "downstream_sha": "c" * 40, "pr_url": "https://github.com/constbogdan/Wholphin/pull/31",
                        "pr_number": 31, "run_url": "https://github.com/constbogdan/Wholphin/actions/runs/9",
@@ -944,6 +969,7 @@ class HostedSyncTests(unittest.TestCase):
         self.assertNotIn("<review>", summary)
         self.assertIn("&lt;review&gt;&#64;team", summary)
         hostile_link = sync.upstream_summary({"outcome": "existing_draft_pr",
+            "downstream_repo": sync.ORIGIN,
             "pr_number": "31", "pr_url": "https://evil.invalid/pull/31",
             "review_paths": ["safe.yml"], "conflict_paths": [],
             "automation_changes": [{"ownership": "REVIEW", "path": "safe.yml",

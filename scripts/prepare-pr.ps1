@@ -400,7 +400,7 @@ function Assert-Preflight([switch]$RefreshBase) {
         if ($remote.ExitCode -ne 0) { throw "Required remote '$remoteName' is missing." }
         $slug = Get-RepositorySlug ($remote.Output -join '')
         $expected = if ($remoteName -eq $config.OriginRemote) { $config.ExpectedOriginRepositories } else { $config.ExpectedUpstreamRepositories }
-        if ($slug -notin $expected) { throw "Remote '$remoteName' points to unexpected repository '$slug'. Expected: $($expected -join ', ')." }
+        if ($expected -cnotcontains $slug) { throw "Remote '$remoteName' points to unexpected repository '$slug'. Expected: $($expected -join ', ')." }
         if (-not $script:conciseMode) { Write-Host "$remoteName -> $slug" }
     }
     foreach ($requiredPath in @($config.ValidationScript, $config.PullRequestTemplate)) {

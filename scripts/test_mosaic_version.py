@@ -34,8 +34,8 @@ class VersionTests(unittest.TestCase):
     def allocate(self, publication=False):
         return version.allocate(self.root, publication, self.epoch)
 
-    def runtime(self):
-        return patch.dict(os.environ, GITHUB_ACTIONS="true", GITHUB_REPOSITORY="constbogdan/Wholphin",
+    def runtime(self, repository="constbogdan/Wholphin"):
+        return patch.dict(os.environ, GITHUB_ACTIONS="true", GITHUB_REPOSITORY=repository,
                           GITHUB_REF="refs/heads/main", GITHUB_EVENT_NAME="push",
                           GITHUB_SHA=self.run_git("rev-parse", "HEAD"))
 
@@ -108,6 +108,12 @@ class VersionTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.allocate(True)
             self.assertTrue(self.allocate()["dirty"])
+        (self.root / "untracked").unlink()
+        with self.runtime("constbogdan/Mosaic"):
+            self.assertTrue(self.allocate(True)["publication"])
+        for repository in ("constbogdan/Mosaic2", "other/Mosaic", ""):
+            with self.runtime(repository), self.assertRaises(ValueError):
+                self.allocate(True)
 
     def test_published_bytes_cannot_change_under_same_identity(self):
         self.commit("next")

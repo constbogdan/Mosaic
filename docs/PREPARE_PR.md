@@ -2,6 +2,11 @@
 
 `scripts/prepare-pr.ps1` is Wholphin's publication command. Codex and repository tooling must not invoke it merely because work appears complete. Running it, or explicitly instructing Codex to run it, is the user's **READY TO PUBLISH** decision. For an ordinary non-Draft PR, that authorization also asks GitHub to merge the exact published head automatically after repository protection succeeds. Upstream attention Drafts retain a separate human **READY TO MERGE** decision.
 
+During the T0-3.0 R1 repository-name transition, prepare-pr accepts exactly
+`constbogdan/Wholphin` or `constbogdan/Mosaic` as `origin`. This is a temporary closed bridge, not a
+configurable trust policy: lookalikes, different owners, forks, malformed identities, and casing
+variants are refused. Every `gh` target is derived from the exact origin identity after that check.
+
 **CURRENT:** Autonomous PR handoff v2 is integrated on `main` through [PR #9](https://github.com/constbogdan/Wholphin/pull/9). Validation and dogfooding evidence is preserved in [the handoff](CODEX_HANDOFF.md).
 
 ## Normal autonomous workflow
@@ -88,6 +93,11 @@ The advanced phase/state interface does not define normal usage and is not a cus
 Prepare-pr uses the shared classifier only to select useful local Fast feedback. It does not claim that feedback is the authoritative PR policy and does not fall back to all offline tests or Android Full merely because local mapping is incomplete. Explicit meaningful filters are supported and required for resolved upstream candidates. Local checks run before real staging and are bound to a read-only, Git-filter-aware identity of each intended working entry, including mode, object type, object ID, and deletion state.
 
 Selected pre-commit hooks may apply autofixes. The normal Fast path uses changed-scope checks; explicit Full uses the repository-wide baseline and complete local graph. If any local check changes a file, prepare-pr stops without staging, reports the dirty paths, and requires review followed by a new Audit/Validate pass. Formatter changes are never silently included.
+
+On managed Windows systems, the pinned EOF and trailing-whitespace hooks invoke their exact
+`pre_commit_hooks` modules through the hook environment's Python interpreter. This preserves the
+same pinned autofix implementation used by hosted pre-commit while avoiding unsigned generated
+console-script launchers that Windows Application Control may refuse.
 
 ## Publishing and GitHub CLI
 

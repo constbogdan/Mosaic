@@ -20,6 +20,7 @@ from mosaic_development_release import (
     validate_original_source,
 )
 from mosaic_stable import authenticated_stable_release, download_asset, verify_manifest
+from mosaic_repository import authenticate_downstream_repository, authenticate_workflow_repository
 
 
 WORKFLOW = '.github/workflows/hold-release.yml'
@@ -29,15 +30,14 @@ EVIDENCE_NAME = 'hold-release.json'
 def authorization(env):
     expected = {
         'GITHUB_ACTIONS': 'true',
-        'GITHUB_REPOSITORY': REPOSITORY,
         'GITHUB_REF': 'refs/heads/main',
         'GITHUB_REF_PROTECTED': 'true',
         'GITHUB_EVENT_NAME': 'workflow_dispatch',
     }
     sha = env.get('GITHUB_SHA', '')
+    authenticate_workflow_repository(env, WORKFLOW)
     if (any(env.get(key) != value for key, value in expected.items())
-            or not re.fullmatch(r'[0-9a-f]{40}', sha)
-            or env.get('GITHUB_WORKFLOW_REF') != f'{REPOSITORY}/{WORKFLOW}@refs/heads/main'):
+            or not re.fullmatch(r'[0-9a-f]{40}', sha)):
         raise ValueError('Hold Release requires a manual run from exact protected main')
     return sha
 
@@ -73,10 +73,11 @@ def _write_outputs(values, env):
             output.write(f'{key}={value}\n')
 
 
-def apk_url(inventory):
+def apk_url(inventory, repository=REPOSITORY):
+    repository = authenticate_downstream_repository(repository)
     url = inventory.get(APK_NAME, {}).get('browser_download_url', '')
     if not re.fullmatch(
-            rf'https://github\.com/{re.escape(REPOSITORY)}/releases/download/[^\s]+/{APK_NAME}',
+            rf'https://github\.com/{re.escape(repository)}/releases/download/[^\s]+/{APK_NAME}',
             str(url)):
         raise ValueError('Authenticated Stable APK URL is missing or malformed')
     return url
@@ -131,7 +132,7 @@ def get_release(api, root, env, directory):
 
     directory.mkdir(parents=True, exist_ok=False)
     for name, item in inventory.items():
-        data = download_asset(item['id'])
+        data = download_asset(item['id'], api.repository)
         check_asset(item, name, data)
         if name == MANIFEST_NAME and data != canonical(manifest):
             raise ValueError('Downloaded Stable manifest differs from its provenance tag')
@@ -145,7 +146,7 @@ def get_release(api, root, env, directory):
         'versionName': manifest['versionName'],
         'sourceSha': manifest['sourceSha'],
         'signedApkSha256': manifest['signedApkSha256'],
-        'apkUrl': apk_url(inventory),
+        'apkUrl': apk_url(inventory, api.repository),
     }
     (directory / EVIDENCE_NAME).write_bytes(canonical(evidence))
     (directory / 'provenance.json').write_bytes(canonical(manifest['source']))
@@ -171,7 +172,8 @@ def hold(api, root, env, directory):
             try:
                 current_manifest, current_inventory = authenticated_stable_release(api, current)
                 current_text = release_link(
-                    'v' + current_manifest['versionName'], apk_url(current_inventory),
+                    'v' + current_manifest['versionName'],
+                    apk_url(current_inventory, api.repository),
                 )
             except (ValueError, KeyError, TypeError):
                 current_text = 'the current Stable identity could not be authenticated'
@@ -223,7 +225,7 @@ def confirm(api, env, directory):
     else:
         current_manifest, inventory = authenticated_stable_release(api, current)
         advertised = 'v' + current_manifest['versionName']
-        current_url = apk_url(inventory)
+        current_url = apk_url(inventory, api.repository)
     _write_outputs({
         'held': held['name'],
         'held_url': evidence['apkUrl'],
@@ -241,7 +243,8 @@ def main():
     try:
         env = os.environ
         root = Path(__file__).resolve().parent.parent
-        api = GitHub()
+        repository = authenticate_workflow_repository(env, WORKFLOW)
+        api = GitHub(repository)
         if args.mode == 'get':
             get_release(api, root, env, args.directory)
         elif args.mode == 'verify':

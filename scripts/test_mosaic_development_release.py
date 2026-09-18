@@ -12,7 +12,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class FakeGitHub:
-    def __init__(self):
+    def __init__(self, repository=release.REPOSITORY):
+        self.repository = repository
         self.refs, self.tags, self.releases, self.uploads = {}, {}, {}, {}
         self.calls = []
         self.fail_upload = False
@@ -318,11 +319,35 @@ class PublisherTests(unittest.TestCase):
                    GITHUB_EVENT_NAME='push', GITHUB_SHA='a' * 40,
                    GITHUB_WORKFLOW_REF=f'{release.REPOSITORY}/{release.CI_WORKFLOW}@refs/heads/main')
         self.assertEqual(release.ci_guard(env), 'a' * 40)
+        mosaic = dict(
+            env,
+            GITHUB_REPOSITORY='constbogdan/Mosaic',
+            GITHUB_WORKFLOW_REF=(
+                f'constbogdan/Mosaic/{release.CI_WORKFLOW}@refs/heads/main'
+            ),
+        )
+        self.assertEqual(release.ci_guard(mosaic), 'a' * 40)
         for field, value in [('GITHUB_REPOSITORY', 'fork/Wholphin'), ('GITHUB_REF', 'refs/heads/feature'),
                              ('GITHUB_REF_PROTECTED', 'false'), ('GITHUB_EVENT_NAME', 'pull_request'),
                              ('GITHUB_SHA', 'main'), ('GITHUB_WORKFLOW_REF', 'other')]:
             with self.subTest(field=field), self.assertRaises(ValueError):
                 release.ci_guard(dict(env, **{field: value}))
+        for repository in ('constbogdan/Mosaic2', 'other/Mosaic', 'constbogdan/mosaic', ''):
+            with self.subTest(repository=repository), self.assertRaises(ValueError):
+                release.ci_guard(dict(
+                    env,
+                    GITHUB_REPOSITORY=repository,
+                    GITHUB_WORKFLOW_REF=(
+                        f'{repository}/{release.CI_WORKFLOW}@refs/heads/main'
+                    ),
+                ))
+
+    def test_github_api_target_requires_authenticated_exact_repository(self):
+        with patch.dict('os.environ', GITHUB_TOKEN='fixture'):
+            self.assertEqual('constbogdan/Mosaic', release.GitHub('constbogdan/Mosaic').repository)
+            for repository in ('constbogdan/Mosaic2', 'other/Mosaic', ''):
+                with self.subTest(repository=repository), self.assertRaises(ValueError):
+                    release.GitHub(repository)
 
     def test_downloaded_ci_artifact_requires_exact_provenance_and_bytes(self):
         import zipfile
