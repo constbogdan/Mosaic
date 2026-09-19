@@ -93,6 +93,28 @@ If hosted validation or publication fails, do not create mixed-name assets manua
 repository named Mosaic, leave historical releases untouched, and use the existing fail-closed
 native-rerun/forward-fix model.
 
+### PR #91 publication incident and corrective recovery
+
+PR #91 passed authoritative `ANDROID_FULL`; protected main authenticated and reused its exact tree,
+and Build and Sign produced the intended canonical payload. Immutable `downstream-build-72` is
+valid and remains untouched. Rolling publication did not complete: attempt 1 discovered the stale
+mutable `Wholphin-release.apk` only after rolling mutation had begun, and the reviewed operator
+recovery removed only that stale rolling asset. Attempt 2 reused the exact authenticated signed
+artifact, but an update that omitted the Release `tag_name` allowed GitHub to detach Release
+`385461835` under `untagged-0d30e3a083c52d7b0ee5`. The authoritative `develop` ref still points to
+source `44fcf58043272ce07b200fab74cb869b21d720d6`; the detached Release contains the exact v72 Mosaic
+assets and body. This is recoverable input, not a successfully published rolling Development.
+
+The bounded publisher correction authenticates every predictable rolling-state refusal before its
+first rolling mutation, recognizes only that exact detached incident, explicitly binds the final
+Release to `develop` and the authenticated source, and re-fetches and verifies the complete final
+Release/ref/asset/provenance state. A correction merge must build and sign its own newer
+protected-main payload; it must not import v72 bytes into a later source identity. The live detached
+state remains untouched until that normal hosted lifecycle performs the authenticated recovery.
+
+Status: **Publisher correction — IMPLEMENTED / LOCAL VALIDATED; HOSTED RECOVERY PENDING. R2 hosted
+and device acceptance remain pending.**
+
 ## R3 real-device acceptance
 
 Repository and hosted evidence cannot close device acceptance. On a fresh Android/Android TV test

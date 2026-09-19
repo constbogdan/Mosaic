@@ -29,6 +29,22 @@ CI_JOB = 'Full validation'
 APK_NAME = 'Mosaic-release.apk'
 MANIFEST_NAME = 'mosaic-release.json'
 
+# One bounded recovery profile for the live R2 interruption.  This is deliberately
+# not a generic "adopt an untagged release" mechanism: every stable identity and
+# byte-level fact observed after run 35361944415 attempt 2 must authenticate.
+R2_DETACHED_RECOVERY = {
+    'releaseId': 385461835,
+    'tagName': 'untagged-0d30e3a083c52d7b0ee5',
+    'targetCommitish': '41f9f83c36b8866211c9680d3b416d5ebede4888',
+    'versionCode': 72,
+    'versionName': '1.0.72',
+    'sourceSha': '44fcf58043272ce07b200fab74cb869b21d720d6',
+    'apkSize': 27821299,
+    'apkDigest': 'sha256:f3e33b7f70488bbd8ac171f3cac69b318046bad9c63eafef928b37eb8b8864a3',
+    'manifestSize': 1347,
+    'manifestDigest': 'sha256:746a975ba919809f420f796e853bd8075d08563d351c53e2fab65edda1b9b8eb',
+}
+
 
 def canonical(value):
     return (json.dumps(value, sort_keys=True, indent=2) + '\n').encode('utf-8')
@@ -303,6 +319,281 @@ def _release_assets(api, release, manifest):
     return {name: (asset['size'], asset['digest']) for name, asset in result.items()}
 
 
+def _expected_asset_identities(expected):
+    return {name: (len(data), 'sha256:' + digest(data)) for name, data in expected.items()}
+
+
+def _inspect_asset_subset(api, release, accepted, *, require_complete, message):
+    """Authenticate a rolling asset set without mutating it.
+
+    Draft replacement may be interrupted after any delete or upload.  Every
+    surviving asset must therefore be an exact old or new byte identity; an
+    unknown name, duplicate, or third digest always refuses before mutation.
+    """
+    actual = api.pages(f"releases/{release['id']}/assets")
+    names = [asset.get('name') for asset in actual]
+    if len(set(names)) != len(names) or any(name not in accepted for name in names):
+        raise ValueError(message)
+    for asset in actual:
+        identity = (asset.get('size'), asset.get('digest'))
+        if asset.get('state') != 'uploaded' or identity not in accepted[asset['name']]:
+            raise ValueError(message)
+    if require_complete and set(names) != set(accepted):
+        raise ValueError(message)
+    return actual
+
+
+def _immutable_version(api, releases, number):
+    """Authenticate one already-published immutable Development identity."""
+    tag = f'downstream-build-{number}'
+    ref = api.call('GET', f'git/ref/tags/{tag}', missing=True)
+    if not ref or ref.get('object', {}).get('type') != 'tag':
+        raise ValueError('Detached rolling recovery immutable provenance is missing')
+    annotation = api.call('GET', 'git/tags/' + ref['object'].get('sha', '')) or {}
+    try:
+        manifest = json.loads(annotation.get('message', ''))
+    except (TypeError, json.JSONDecodeError):
+        raise ValueError('Detached rolling recovery immutable provenance is invalid') from None
+    if (not isinstance(manifest, dict)
+            or annotation.get('tag') != tag
+            or annotation.get('object', {}).get('type') != 'commit'
+            or annotation.get('object', {}).get('sha') != manifest.get('sourceSha')
+            or annotation.get('message', '').rstrip('\n') != canonical(manifest).decode().rstrip('\n')
+            or manifest.get('schemaVersion') != 1
+            or manifest.get('applicationId') != 'io.github.constbogdan.mosaic'
+            or manifest.get('versionCode') != number
+            or manifest.get('versionName') != f'1.0.{number}'
+            or manifest.get('immutableIdentity') != tag
+            or manifest.get('rollingChannel') != 'develop'
+            or manifest.get('assetName') != APK_NAME
+            or not re.fullmatch('[0-9a-f]{40}', str(manifest.get('sourceSha', '')))):
+        raise ValueError('Detached rolling recovery immutable provenance is invalid')
+    immutable = find_release(api, tag, releases)
+    if (immutable is None or immutable.get('draft') or immutable.get('prerelease') is not True
+            or immutable.get('immutable') or immutable.get('name') != 'v' + manifest['versionName']):
+        raise ValueError('Detached rolling recovery immutable release is inconsistent')
+    identities = _release_assets(api, immutable, manifest)
+    return manifest, immutable, identities
+
+
+def _target_archive_preflight(api, releases, m, expected, compare_from):
+    """Read-only validation of the target immutable identity and resumable draft."""
+    tag = m['immutableIdentity']
+    record_bytes = canonical(m)
+    ref = api.call('GET', f'git/ref/tags/{tag}', missing=True)
+    archive = find_release(api, tag, releases)
+    if ref:
+        if ref.get('object', {}).get('type') != 'tag':
+            raise ValueError('Immutable identity is not an annotated provenance tag')
+        annotation = api.call('GET', 'git/tags/' + ref['object'].get('sha', '')) or {}
+        if (annotation.get('tag') != tag
+                or annotation.get('object', {}).get('type') != 'commit'
+                or annotation.get('object', {}).get('sha') != m['sourceSha']):
+            raise ValueError('Immutable tag source mismatch')
+        if annotation.get('message', '').rstrip('\n') != record_bytes.decode().rstrip('\n'):
+            raise ValueError('Build identity already reserved for different bytes/provenance; never overwrite')
+    elif archive is not None:
+        raise ValueError('Release exists without its immutable provenance tag')
+
+    if archive is not None:
+        fields = release_fields(m, archive.get('draft') is True, archive=True,
+                                compare_from=compare_from, repository=api.repository)
+        if (archive.get('name') != fields['name']
+                or not _canonical_historical_body(
+                    m, archive.get('body'), archive=True, repository=api.repository
+                )
+                or archive.get('prerelease') is not True or archive.get('immutable')):
+            raise ValueError('Immutable archive release metadata mismatch')
+        accepted = {name: {_identity} for name, _identity in _expected_asset_identities(expected).items()}
+        _inspect_asset_subset(
+            api, archive, accepted, require_complete=not archive.get('draft'),
+            message='Immutable archive release asset state is inconsistent',
+        )
+    return ref, archive
+
+
+def _canonical_body(manifest, *, archive, compare_from, repository):
+    return release_body(manifest, 'Development', archive=archive, compare_from=compare_from,
+                        repository=repository)
+
+
+def _canonical_historical_body(manifest, body, *, archive, repository):
+    """Accept only a body the canonical renderer could have produced when published."""
+    candidates = [None]
+    comparison = re.findall(
+        r'/compare/([0-9a-f]{40}|mosaic-v1\.0\.[1-9][0-9]*)\.\.\.'
+        + re.escape(manifest['sourceSha']) + r'\)',
+        str(body),
+    )
+    if len(comparison) == 1:
+        candidates.append(comparison[0])
+    return any(body == _canonical_body(
+        manifest, archive=archive, compare_from=start, repository=repository
+    ) for start in candidates)
+
+
+def _authenticate_detached_r2(api, releases, candidates, develop_ref, compare_from):
+    """Authenticate only the exact live R2 detached rolling incident."""
+    profile = R2_DETACHED_RECOVERY
+    if len(candidates) != 1:
+        raise ValueError('Ambiguous detached rolling recovery state')
+    candidate = candidates[0]
+    expected_scalars = {
+        'id': profile['releaseId'],
+        'tag_name': profile['tagName'],
+        'target_commitish': profile['targetCommitish'],
+        'name': 'v' + profile['versionName'],
+        'draft': False,
+        'prerelease': True,
+        'immutable': False,
+    }
+    if any(candidate.get(field) != value for field, value in expected_scalars.items()):
+        raise ValueError('Detached rolling recovery state does not match the authenticated R2 incident')
+    if (not develop_ref or develop_ref.get('object', {}).get('type') != 'commit'
+            or develop_ref.get('object', {}).get('sha') != profile['sourceSha']):
+        raise ValueError('Detached rolling recovery source does not match develop')
+    detached_ref = api.call('GET', f"git/ref/tags/{profile['tagName']}", missing=True)
+    if (not detached_ref or detached_ref.get('object', {}).get('type') != 'commit'
+            or detached_ref.get('object', {}).get('sha') != profile['targetCommitish']):
+        raise ValueError('Detached rolling recovery tag identity mismatch')
+
+    try:
+        manifest, _, immutable_assets = _immutable_version(api, releases, profile['versionCode'])
+        rolling_assets = _release_assets(api, candidate, manifest)
+    except ValueError:
+        raise ValueError('Detached rolling recovery asset/provenance mismatch') from None
+    expected_identities = {
+        APK_NAME: (profile['apkSize'], profile['apkDigest']),
+        MANIFEST_NAME: (profile['manifestSize'], profile['manifestDigest']),
+    }
+    if (manifest.get('sourceSha') != profile['sourceSha']
+            or manifest.get('versionName') != profile['versionName']
+            or immutable_assets != expected_identities or rolling_assets != expected_identities
+            or candidate.get('body') != _canonical_body(
+                manifest, archive=False, compare_from=compare_from, repository=api.repository
+            )):
+        raise ValueError('Detached rolling recovery asset/provenance mismatch')
+    return manifest, immutable_assets
+
+
+def _exact_r2_recovery_ref(recovery_ref):
+    return (recovery_ref
+            and recovery_ref.get('object', {}).get('type') == 'commit'
+            and recovery_ref.get('object', {}).get('sha')
+            == R2_DETACHED_RECOVERY['targetCommitish'])
+
+
+def _rolling_preflight(api, releases, m, expected, compare_from):
+    """Classify rolling state using reads only; unknown or ambiguous always refuses."""
+    rolling = find_release(api, 'develop', releases)
+    detached = [release for release in releases
+                if re.fullmatch(r'untagged-[0-9a-f]+', str(release.get('tag_name', '')))]
+    develop_ref = api.call('GET', 'git/ref/tags/develop', missing=True)
+    recovery_ref = api.call('GET', f"git/ref/tags/{R2_DETACHED_RECOVERY['tagName']}", missing=True)
+    target_identities = _expected_asset_identities(expected)
+
+    if rolling and detached:
+        raise ValueError('Ambiguous detached rolling recovery state')
+    if rolling:
+        if rolling.get('immutable') or rolling.get('prerelease') is not True:
+            raise ValueError('Existing develop is immutable or not a prerelease; no settings changes attempted')
+        match = re.fullmatch(r'v1\.0\.([1-9][0-9]*)', str(rolling.get('name', '')))
+        if not match or int(match[1]) > m['versionCode']:
+            raise ValueError('Unknown or newer rolling release; refusing rollback')
+        number = int(match[1])
+        manifest, immutable, historical_assets = _immutable_version(api, releases, number)
+        if not _canonical_historical_body(
+                manifest, rolling.get('body'), archive=False, repository=api.repository):
+            raise ValueError('Rolling release metadata does not match immutable provenance')
+        source = develop_ref.get('object', {}).get('sha') if develop_ref else None
+        if (not develop_ref or develop_ref.get('object', {}).get('type') != 'commit'
+                or source not in {manifest['sourceSha'], m['sourceSha']}):
+            raise ValueError('Rolling release source relationship is invalid')
+
+        recovery_in_progress = recovery_ref is not None
+        if recovery_in_progress:
+            if (not _exact_r2_recovery_ref(recovery_ref)
+                    or rolling.get('id') != R2_DETACHED_RECOVERY['releaseId']
+                    or number != R2_DETACHED_RECOVERY['versionCode']
+                    or manifest.get('sourceSha') != R2_DETACHED_RECOVERY['sourceSha']
+                    or rolling.get('target_commitish') != m['sourceSha']
+                    or source != m['sourceSha']):
+                raise ValueError('Detached rolling recovery state does not match the authenticated R2 incident')
+
+        if not rolling.get('draft'):
+            if number == m['versionCode']:
+                if source != m['sourceSha']:
+                    raise ValueError('Existing rolling tag/source mismatch')
+                if recovery_ref and (not _exact_r2_recovery_ref(recovery_ref)
+                                     or rolling.get('id') != R2_DETACHED_RECOVERY['releaseId']):
+                    raise ValueError('Detached rolling recovery state does not match the authenticated R2 incident')
+                return dict(state='completed', rolling=rolling, develop_ref=develop_ref,
+                            cleanup_recovery_ref=recovery_ref is not None)
+            if source != manifest['sourceSha']:
+                raise ValueError('Rolling release source relationship is invalid')
+            accepted = {name: {identity} for name, identity in historical_assets.items()}
+            _inspect_asset_subset(
+                api, rolling, accepted, require_complete=True,
+                message='Unexpected rolling asset inventory; explicit recovery review required',
+            )
+        else:
+            accepted = {
+                name: {historical_assets[name], target_identities[name]}
+                for name in target_identities
+            }
+            _inspect_asset_subset(
+                api, rolling, accepted, require_complete=False,
+                message='Unexpected rolling asset inventory; explicit recovery review required',
+            )
+        return dict(state='replace', rolling=rolling, develop_ref=develop_ref,
+                    cleanup_recovery_ref=recovery_in_progress)
+
+    if detached:
+        if m['versionCode'] <= R2_DETACHED_RECOVERY['versionCode']:
+            raise ValueError('Detached rolling recovery requires a newer protected-main build')
+        _authenticate_detached_r2(api, releases, detached, develop_ref, compare_from)
+        return dict(state='detached-r2', rolling=detached[0], develop_ref=develop_ref,
+                    cleanup_recovery_ref=True)
+    if develop_ref:
+        raise ValueError('Orphan develop tag without an authenticated recovery candidate')
+    if recovery_ref:
+        raise ValueError('Detached recovery tag exists without its authenticated Release')
+    return dict(state='initial', rolling=None, develop_ref=None, cleanup_recovery_ref=False)
+
+
+def _verify_final_rolling(api, release_id, m, expected, compare_from, *, allow_recovery_ref):
+    """Re-fetch and authenticate the complete rolling result, never the PATCH echo alone."""
+    result = api.call('GET', f'releases/{release_id}') or {}
+    by_tag = api.call('GET', 'releases/tags/develop', missing=True) or {}
+    ref = api.call('GET', 'git/ref/tags/develop', missing=True)
+    fields = release_fields(m, False, compare_from=compare_from, repository=api.repository)
+    if (result.get('id') != release_id or by_tag.get('id') != release_id
+            or result.get('tag_name') != 'develop' or by_tag.get('tag_name') != 'develop'
+            or result.get('target_commitish') != m['sourceSha']
+            or result.get('draft') or result.get('prerelease') is not True
+            or result.get('immutable') or result.get('name') != fields['name']
+            or result.get('body') != fields['body']):
+        raise ValueError('Final rolling Release association or metadata mismatch')
+    if (not ref or ref.get('object', {}).get('type') != 'commit'
+            or ref.get('object', {}).get('sha') != m['sourceSha']):
+        raise ValueError('Final rolling tag/source authentication failed')
+    try:
+        rolling_assets = _release_assets(api, result, m)
+        releases = api.pages('releases')
+        immutable = find_release(api, m['immutableIdentity'], releases)
+        immutable_assets = _release_assets(api, immutable, m) if immutable else None
+    except ValueError:
+        raise ValueError('Final rolling asset/provenance mismatch') from None
+    if rolling_assets != immutable_assets or rolling_assets != _expected_asset_identities(expected):
+        raise ValueError('Final rolling asset/provenance mismatch')
+    if any(re.fullmatch(r'untagged-[0-9a-f]+', str(item.get('tag_name', ''))) for item in releases):
+        raise ValueError('Final rolling Release has a competing detached identity')
+    recovery_ref = api.call('GET', f"git/ref/tags/{R2_DETACHED_RECOVERY['tagName']}", missing=True)
+    if recovery_ref and not allow_recovery_ref:
+        raise ValueError('Final rolling Release has a competing detached identity')
+    return result
+
+
 def published_development_source(api):
     """Authenticate the latest successfully exposed rolling Development source."""
     releases = api.pages('releases')
@@ -488,50 +779,52 @@ def publish(api, m, apk, compare_from=None):
     expected = {APK_NAME: apk, MANIFEST_NAME: record_bytes}
     releases = api.pages('releases')
     compare_from = stable_compare_tag(api, releases) if compare_from is None else compare_from
-    rolling = find_release(api, 'develop', releases)
-    if rolling:
-        if rolling.get('immutable') or not rolling.get('prerelease'):
-            raise ValueError('Existing develop is immutable or not a prerelease; no settings changes attempted')
-        match = re.fullmatch(r'v1\.0\.([1-9][0-9]*)', rolling.get('name', ''))
-        if not match or int(match[1]) > m['versionCode']:
-            raise ValueError('Unknown or newer rolling release; refusing rollback')
-    ref = api.call('GET', f'git/ref/tags/{tag}', missing=True)
-    if ref:
-        if ref['object']['type'] != 'tag':
-            raise ValueError('Immutable identity is not an annotated provenance tag')
-        annotation = api.call('GET', 'git/tags/' + ref['object']['sha'])
-        if annotation.get('tag') != tag or annotation.get('object', {}).get('type') != 'commit' or annotation.get('object', {}).get('sha') != m['sourceSha']:
-            raise ValueError('Immutable tag source mismatch')
-        if annotation.get('message', '').rstrip('\n') != record_bytes.decode().rstrip('\n'):
-            raise ValueError('Build identity already reserved for different bytes/provenance; never overwrite')
-    else:
-        if find_release(api, tag, releases):
-            raise ValueError('Release exists without its immutable provenance tag')
+    # Refuse all predictable existing-state conflicts before creating an
+    # immutable identity or changing the rolling Release/ref/assets.
+    ref, archive = _target_archive_preflight(api, releases, m, expected, compare_from)
+    plan = _rolling_preflight(api, releases, m, expected, compare_from)
+
+    if plan['state'] == 'completed':
+        _verify_final_rolling(
+            api, plan['rolling']['id'], m, expected, compare_from,
+            allow_recovery_ref=plan['cleanup_recovery_ref'],
+        )
+        if plan['cleanup_recovery_ref']:
+            recovery_ref = api.call(
+                'GET', f"git/ref/tags/{R2_DETACHED_RECOVERY['tagName']}", missing=True
+            )
+            if (not recovery_ref or recovery_ref.get('object', {}).get('type') != 'commit'
+                    or recovery_ref.get('object', {}).get('sha') != R2_DETACHED_RECOVERY['targetCommitish']):
+                raise ValueError('Detached rolling recovery tag identity mismatch')
+            api.call('DELETE', f"git/refs/tags/{R2_DETACHED_RECOVERY['tagName']}")
+            _verify_final_rolling(
+                api, plan['rolling']['id'], m, expected, compare_from,
+                allow_recovery_ref=False,
+            )
+        return compare_from
+
+    if not ref:
         annotation = api.call('POST', 'git/tags', dict(tag=tag, message=record_bytes.decode(), object=m['sourceSha'], type='commit'))
         # Atomic ref creation; conflict fails. Never update/delete downstream-build-N.
         api.call('POST', 'git/refs', dict(ref='refs/tags/' + tag, sha=annotation['sha']))
-    archive = find_release(api, tag, releases)
     if archive is None:
         archive = api.call('POST', 'releases', dict(
             tag_name=tag, target_commitish=m['sourceSha'],
             **release_fields(m, True, archive=True, compare_from=compare_from,
                              repository=api.repository)))
-    if not archive.get('prerelease') or archive.get('name') != 'v' + m['versionName']:
-        raise ValueError('Immutable archive release metadata mismatch')
     assets(api, archive, expected, allow_upload=archive['draft'])
     if archive['draft']:
-        api.call('PATCH', f"releases/{archive['id']}", release_fields(
-            m, False, archive=True, compare_from=compare_from, repository=api.repository))
-    develop_ref = api.call('GET', 'git/ref/tags/develop', missing=True)
-    if rolling and rolling['name'] == 'v' + m['versionName'] and not rolling['draft']:
-        if not develop_ref or develop_ref['object']['type'] != 'commit' or develop_ref['object']['sha'] != m['sourceSha']:
-            raise ValueError('Existing rolling tag/source mismatch')
-        assets(api, rolling, expected, allow_upload=False)
-        return compare_from
+        api.call('PATCH', f"releases/{archive['id']}", dict(
+            tag_name=tag, target_commitish=m['sourceSha'],
+            **release_fields(m, False, archive=True, compare_from=compare_from,
+                             repository=api.repository)))
+
+    rolling = plan['rolling']
+    develop_ref = plan['develop_ref']
     if rolling:
-        api.call('PATCH', f"releases/{rolling['id']}", dict(draft=True, prerelease=True, make_latest='false'))
-    elif develop_ref:
-        raise ValueError('Orphan develop tag; explicit recovery review required')
+        api.call('PATCH', f"releases/{rolling['id']}", dict(
+            tag_name=rolling['tag_name'], target_commitish=rolling.get('target_commitish'),
+            draft=True, prerelease=True, make_latest='false'))
     if develop_ref:
         # This is the ONLY mutable ref. Never push/force protected main or immutable tags.
         api.call('PATCH', 'git/refs/tags/develop', dict(sha=m['sourceSha'], force=True))
@@ -541,15 +834,32 @@ def publish(api, m, apk, compare_from=None):
         rolling = api.call('POST', 'releases', dict(
             tag_name='develop', target_commitish=m['sourceSha'],
             **release_fields(m, True, compare_from=compare_from, repository=api.repository)))
+    else:
+        rolling = api.call('PATCH', f"releases/{rolling['id']}", dict(
+            tag_name='develop', target_commitish=m['sourceSha'],
+            draft=True, prerelease=True, make_latest='false'))
     for asset in api.pages(f"releases/{rolling['id']}/assets"):
-        if asset['name'] not in expected:
-            raise ValueError('Unexpected rolling asset; explicit recovery review required')
         api.call('DELETE', f"releases/assets/{asset['id']}")
     assets(api, rolling, expected, allow_upload=True)
-    result = api.call('PATCH', f"releases/{rolling['id']}", release_fields(
-        m, False, compare_from=compare_from, repository=api.repository))
-    if result.get('draft') or result.get('prerelease') is not True or result.get('tag_name') != 'develop':
-        raise ValueError('Rolling release final verification failed')
+    api.call('PATCH', f"releases/{rolling['id']}", dict(
+        tag_name='develop', target_commitish=m['sourceSha'],
+        **release_fields(m, False, compare_from=compare_from, repository=api.repository)))
+    _verify_final_rolling(
+        api, rolling['id'], m, expected, compare_from,
+        allow_recovery_ref=plan['cleanup_recovery_ref'],
+    )
+    if plan['cleanup_recovery_ref']:
+        recovery_ref = api.call(
+            'GET', f"git/ref/tags/{R2_DETACHED_RECOVERY['tagName']}", missing=True
+        )
+        if (not recovery_ref or recovery_ref.get('object', {}).get('type') != 'commit'
+                or recovery_ref.get('object', {}).get('sha') != R2_DETACHED_RECOVERY['targetCommitish']):
+            raise ValueError('Detached rolling recovery tag identity mismatch')
+        api.call('DELETE', f"git/refs/tags/{R2_DETACHED_RECOVERY['tagName']}")
+        _verify_final_rolling(
+            api, rolling['id'], m, expected, compare_from,
+            allow_recovery_ref=False,
+        )
     return compare_from
 
 

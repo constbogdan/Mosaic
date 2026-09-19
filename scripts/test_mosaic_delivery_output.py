@@ -140,14 +140,15 @@ class DeliveryOutputTests(unittest.TestCase):
                 self.assertNotIn('Compare changes', body)
                 self.assertNotIn('/compare/', body)
 
-    def test_existing_published_bodies_are_not_backfilled_on_retry(self):
+    def test_published_body_drift_refuses_without_backfill(self):
         api = fixtures.FakeGitHub()
         development.publish(api, self.m, self.apk)
         for release in api.releases.values():
             release['body'] = 'Historical body retained'
         before = copy.deepcopy((api.refs, api.tags, api.releases, api.uploads))
         api.calls.clear()
-        development.publish(api, self.m, self.apk, compare_from='b' * 40)
+        with self.assertRaisesRegex(ValueError, 'release metadata mismatch'):
+            development.publish(api, self.m, self.apk, compare_from='b' * 40)
         self.assertEqual(before, (api.refs, api.tags, api.releases, api.uploads))
         self.assertFalse(any(method in ('POST', 'PATCH', 'DELETE') for method, _, _ in api.calls))
 

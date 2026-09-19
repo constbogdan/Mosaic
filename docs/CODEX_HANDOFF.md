@@ -50,6 +50,8 @@
 
 `T0-3.0 R2 canonical Mosaic identity migration - IMPLEMENTED / LOCAL VALIDATED; HOSTED + DEVICE ACCEPTANCE PENDING`
 
+`Development publisher correction - IMPLEMENTED / LOCAL VALIDATED; HOSTED RECOVERY PENDING`
+
 `External contribution lifecycle - KEEP / DOCUMENTED`
 
 The approved [Mosaic identity establishment decision](Wholphin_ROADMAP.md#t0-30-mosaic-identity-establishment-decision) and
@@ -103,6 +105,19 @@ R4. R2's repository rename is **COMPLETE / VERIFIED**. The R2 canonical Mosaic i
 is **IMPLEMENTED / LOCAL VALIDATED; HOSTED + DEVICE ACCEPTANCE PENDING**; R3 owns the real-device
 lifecycle proof after hosted R2 acceptance. Historical old-name evidence remains correct, and the
 old-name authorization remains installed until R4.
+
+PR #91 passed authoritative `ANDROID_FULL`, protected-main exact-tree reuse, Build, and Sign.
+Immutable `downstream-build-72` is valid. Rolling Development did not publish successfully: attempt
+1 began rolling mutation before rejecting stale unexpected inventory; after the reviewed removal of
+only the stale mutable APK, attempt 2 omitted explicit Release tag identity and GitHub detached
+Release `385461835` under `untagged-0d30e3a083c52d7b0ee5`. Its exact v72 Mosaic assets/body and the
+authoritative `develop` ref at `44fcf58043272ce07b200fab74cb869b21d720d6` are preserved as the
+authenticated recovery input. Do not manually normalize or delete that state, and do not import
+v72 bytes into a later source. The bounded publisher correction is **IMPLEMENTED / LOCAL VALIDATED;
+HOSTED RECOVERY PENDING**: it preflights existing state before rolling mutation, admits only the
+exact detached incident, explicitly rebinds `develop`, and authenticates the complete final state.
+Its merge must produce a fresh protected-main Development version through normal Build, Sign, and
+Publish. R2 hosted acceptance remains pending until that recovery succeeds.
 
 The external contribution lifecycle is **KEEP / NO SECURITY OR PROVENANCE DEFECT**. A fork PR may
 run approved unprivileged authoritative CI and upload a correctly named policy artifact, but receives
