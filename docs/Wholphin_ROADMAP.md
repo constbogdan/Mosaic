@@ -371,7 +371,8 @@ default; the surviving mechanisms each protect a reviewed consumer or authority 
 
 Status: **R1 — COMPLETE / BOTH-NAME HOSTED VALIDATED. R2 repository rename — COMPLETE / VERIFIED.
 R2 canonical Mosaic identity migration — IMPLEMENTED / LOCAL VALIDATED; HOSTED + DEVICE
-ACCEPTANCE PENDING.**
+ACCEPTANCE PENDING. Development publisher correction — IMPLEMENTED / LOCAL VALIDATED; HOSTED
+RECOVERY PENDING.**
 
 T0-3 begins by establishing the permanent downstream product identity before the broader
 documentation, wiki, and roadmap consolidation. This record preserves the accepted decisions and
@@ -667,6 +668,18 @@ Establish the approved current identities coherently:
 R2 hosted acceptance must prove prepare-pr, authoritative PR CI, protected-main exact-tree reuse,
 Development Build/Sign/Publish, and the exact canonical release inventory. Stable and Hold retain
 the same fail-closed consumer contract and do not require artificial live dispatches.
+
+PR #91 passed authoritative `ANDROID_FULL`, exact-tree protected-main reuse, Build, and Sign. Its
+immutable `downstream-build-72` is valid, but rolling publication exposed two publisher defects:
+attempt 1 authenticated unexpected rolling inventory too late, and attempt 2 omitted explicit
+Release tag identity, allowing GitHub to detach Release `385461835` under
+`untagged-0d30e3a083c52d7b0ee5`. The `develop` ref and detached v72 state are preserved as the exact
+authenticated recovery input; v72 must not be described as a successful rolling publication. The
+bounded correction now performs read-only preflight before rolling mutation, accepts only the exact
+incident, binds `tag_name=develop` plus the authenticated target explicitly, and verifies the full
+final Release/ref/asset/provenance state. It is **IMPLEMENTED / LOCAL VALIDATED; HOSTED RECOVERY
+PENDING**. The correction merge must produce its own newer Build/Sign payload through the normal
+protected-main lifecycle; immutable v72 and Stable history remain unchanged.
 
 ##### R3 — real-device Mosaic acceptance
 

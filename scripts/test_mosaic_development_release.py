@@ -17,6 +17,10 @@ class FakeGitHub:
         self.refs, self.tags, self.releases, self.uploads = {}, {}, {}, {}
         self.calls = []
         self.fail_upload = False
+        self.fail_after_delete_count = None
+        self.delete_count = 0
+        self.generated_tag_count = 0
+        self.fail_final_rolling_publish = False
 
     def pages(self, path, key=None):
         if path == 'releases':
@@ -28,7 +32,7 @@ class FakeGitHub:
 
     def call(self, method, path, data=None, missing=False, upload=False):
         self.calls.append((method, path, copy.deepcopy(data)))
-        if path.startswith('git/ref/tags/'):
+        if method == 'GET' and path.startswith('git/ref/tags/'):
             return self.refs.get(path.removeprefix('git/ref/tags/'))
         if method == 'POST' and path == 'git/tags':
             sha = str(len(self.tags) + 1) * 40
@@ -45,13 +49,49 @@ class FakeGitHub:
         if method == 'PATCH' and path == 'git/refs/tags/develop':
             self.refs['develop'] = dict(object=dict(type='commit', sha=data['sha']))
             return self.refs['develop']
+        if method == 'DELETE' and path.startswith('git/refs/tags/'):
+            self.refs.pop(path.removeprefix('git/refs/tags/'), None)
+            return None
         if method == 'POST' and path == 'releases':
             rid = len(self.releases) + 1
             self.releases[rid] = dict(data, id=rid, immutable=False)
             return self.releases[rid]
+        if method == 'GET' and path.startswith('releases/tags/'):
+            tag = path.removeprefix('releases/tags/')
+            matches = [item for item in self.releases.values()
+                       if item['tag_name'] == tag and not item['draft']]
+            if len(matches) > 1:
+                raise AssertionError('duplicate fixture release tag')
+            return matches[0] if matches else None
+        if method == 'GET' and path.startswith('releases/'):
+            return self.releases.get(int(path.split('/')[1]))
         if method == 'PATCH' and path.startswith('releases/'):
-            self.releases[int(path.split('/')[1])].update(data)
-            return self.releases[int(path.split('/')[1])]
+            if (self.fail_final_rolling_publish and data.get('draft') is False
+                    and data.get('tag_name') == 'develop'):
+                self.fail_final_rolling_publish = False
+                raise ValueError('interrupted after rolling asset replacement')
+            item = self.releases[int(path.split('/')[1])]
+            was_draft = item.get('draft') is True
+            item.update(data)
+            develop_ref = self.refs.get('develop', {}).get('object', {})
+            detached_develop = (item.get('tag_name') == 'develop'
+                                and develop_ref.get('type') == 'commit'
+                                and develop_ref.get('sha') != item.get('target_commitish'))
+            if (was_draft and data.get('draft') is False and 'tag_name' not in data
+                    and detached_develop):
+                # Relevant live GitHub behavior: publishing the detached draft
+                # without an explicit tag produced a generated untagged ref.
+                self.generated_tag_count += 1
+                tag = f"untagged-{self.generated_tag_count:020x}"
+                item['tag_name'] = tag
+                self.refs[tag] = dict(object=dict(
+                    type='commit', sha=item.get('target_commitish', '0' * 40)
+                ))
+            elif data.get('draft') is False and item.get('tag_name') not in self.refs:
+                self.refs[item['tag_name']] = dict(object=dict(
+                    type='commit', sha=item.get('target_commitish', '0' * 40)
+                ))
+            return item
         if method == 'POST' and upload:
             if self.fail_upload:
                 raise ValueError('interrupted upload')
@@ -62,6 +102,9 @@ class FakeGitHub:
             return a
         if method == 'DELETE' and path.startswith('releases/assets/'):
             del self.uploads[int(path.split('/')[-1])]
+            self.delete_count += 1
+            if self.fail_after_delete_count == self.delete_count:
+                raise ValueError('interrupted asset deletion')
             return None
         raise AssertionError((method, path))
 
@@ -82,6 +125,42 @@ class PublisherTests(unittest.TestCase):
         self.m = release.verified_manifest(
             self.record, self.apk, self.identity, '123', '1', self.policy, release.CI_WORKFLOW,
         )
+
+    def newer_manifest(self, code=6, source='f' * 40):
+        result = copy.deepcopy(self.m)
+        result.update(
+            immutableIdentity=f'downstream-build-{code}',
+            versionCode=code,
+            versionName=f'1.0.{code}',
+            sourceSha=source,
+        )
+        result['source'].update(versionCode=code, versionName=f'1.0.{code}', sourceSha=source)
+        return result
+
+    def detach_rolling_as_authenticated_incident(self, api):
+        rolling = next(item for item in api.releases.values() if item['tag_name'] == 'develop')
+        tag = 'untagged-' + '1' * 20
+        target = '9' * 40
+        rolling['tag_name'] = tag
+        rolling['target_commitish'] = target
+        api.refs[tag] = dict(object=dict(type='commit', sha=target))
+        assets = {
+            item['name']: (item['size'], item['digest'])
+            for item in api.uploads.values() if item['release'] == rolling['id']
+        }
+        profile = {
+            'releaseId': rolling['id'],
+            'tagName': tag,
+            'targetCommitish': target,
+            'versionCode': self.m['versionCode'],
+            'versionName': self.m['versionName'],
+            'sourceSha': self.m['sourceSha'],
+            'apkSize': assets[release.APK_NAME][0],
+            'apkDigest': assets[release.APK_NAME][1],
+            'manifestSize': assets[release.MANIFEST_NAME][0],
+            'manifestDigest': assets[release.MANIFEST_NAME][1],
+        }
+        return rolling, profile
 
     def test_manifest_mismatches(self):
         for field, value in [('applicationId', 'upstream'), ('certificateSha256', '0' * 64),
@@ -190,7 +269,9 @@ class PublisherTests(unittest.TestCase):
         api = FakeGitHub()
         with patch.object(api, 'pages', wraps=api.pages) as pages:
             release.publish(api, self.m, self.apk)
-        self.assertEqual(1, sum(call.args[0] == 'releases' for call in pages.call_args_list))
+        self.assertGreaterEqual(
+            sum(call.args[0] == 'releases' for call in pages.call_args_list), 1
+        )
         self.assertEqual(set(api.refs), {'downstream-build-5', 'develop'})
         self.assertEqual({r['tag_name'] for r in api.releases.values()}, {'downstream-build-5', 'develop'})
         for r in api.releases.values():
@@ -198,6 +279,16 @@ class PublisherTests(unittest.TestCase):
             self.assertTrue(r['prerelease'])
             self.assertFalse(r['draft'])
             self.assertEqual(r['make_latest'], 'false')
+        rolling = next(r for r in api.releases.values() if r['tag_name'] == 'develop')
+        self.assertEqual(rolling['target_commitish'], self.m['sourceSha'])
+        final_publish = [data for method, path, data in api.calls
+                         if method == 'PATCH' and path == f"releases/{rolling['id']}"
+                         and data.get('draft') is False]
+        self.assertEqual(final_publish[-1]['tag_name'], 'develop')
+        self.assertEqual(final_publish[-1]['target_commitish'], self.m['sourceSha'])
+        self.assertTrue(any(method == 'GET' and path == 'releases/tags/develop'
+                            for method, path, _ in api.calls))
+        self.assertEqual(api.generated_tag_count, 0)
         self.assertEqual({a['name'] for a in api.uploads.values()}, {'Mosaic-release.apk', 'mosaic-release.json'})
         self.assertEqual(self.m['signedApkSha256'], release.digest(self.apk))
         self.assertEqual(self.m['immutableIdentity'], 'downstream-build-5')
@@ -218,7 +309,7 @@ class PublisherTests(unittest.TestCase):
         api = FakeGitHub()
         release.publish(api, self.m, self.apk)
         rid = next(r['id'] for r in api.releases.values() if r['tag_name'] == 'develop')
-        newer = dict(self.m, immutableIdentity='downstream-build-6', versionCode=6, versionName='1.0.6', sourceSha='f' * 40)
+        newer = self.newer_manifest()
         count = len(api.calls)
         release.publish(api, newer, self.apk)
         self.assertEqual(api.releases[rid]['name'], 'v1.0.6')
@@ -257,7 +348,161 @@ class PublisherTests(unittest.TestCase):
         count = len(api.calls)
         with self.assertRaises(ValueError):
             release.publish(api, self.m, self.apk)
-        self.assertEqual(len(api.calls), count)
+
+    def test_unexpected_rolling_asset_refuses_before_any_mutation(self):
+        api = FakeGitHub()
+        release.publish(api, self.m, self.apk)
+        rolling = next(item for item in api.releases.values() if item['tag_name'] == 'develop')
+        aid = max(api.uploads) + 1
+        api.uploads[aid] = dict(
+            id=aid, release=rolling['id'], name='Wholphin-release.apk', state='uploaded',
+            size=3, digest='sha256:' + release.digest(b'old'),
+        )
+        count = len(api.calls)
+        with self.assertRaisesRegex(ValueError, 'Unexpected rolling asset inventory'):
+            release.publish(api, self.newer_manifest(), self.apk)
+        self.assertTrue(all(method == 'GET' for method, _, _ in api.calls[count:]))
+        self.assertIn(aid, api.uploads)
+        self.assertEqual(api.refs['develop']['object']['sha'], self.m['sourceSha'])
+
+    def test_interruption_after_one_asset_deletion_resumes_exactly(self):
+        api = FakeGitHub()
+        release.publish(api, self.m, self.apk)
+        rolling = next(item for item in api.releases.values() if item['tag_name'] == 'develop')
+        newer = self.newer_manifest()
+        api.fail_after_delete_count = 1
+        with self.assertRaisesRegex(ValueError, 'interrupted asset deletion'):
+            release.publish(api, newer, self.apk)
+        self.assertTrue(api.releases[rolling['id']]['draft'])
+        self.assertEqual(api.refs['develop']['object']['sha'], newer['sourceSha'])
+        self.assertEqual(
+            1, len([item for item in api.uploads.values() if item['release'] == rolling['id']])
+        )
+
+        api.fail_after_delete_count = None
+        release.publish(api, newer, self.apk)
+        final = api.releases[rolling['id']]
+        self.assertEqual(final['tag_name'], 'develop')
+        self.assertFalse(final['draft'])
+        self.assertEqual(final['name'], 'v1.0.6')
+
+    def test_interruption_after_asset_replacement_resumes_exactly(self):
+        api = FakeGitHub()
+        release.publish(api, self.m, self.apk)
+        rolling = next(item for item in api.releases.values() if item['tag_name'] == 'develop')
+        newer = self.newer_manifest()
+        api.fail_final_rolling_publish = True
+        with self.assertRaisesRegex(ValueError, 'interrupted after rolling asset replacement'):
+            release.publish(api, newer, self.apk)
+        self.assertTrue(api.releases[rolling['id']]['draft'])
+        self.assertEqual(api.releases[rolling['id']]['name'], 'v1.0.5')
+        current = {
+            item['name']: (item['size'], item['digest'])
+            for item in api.uploads.values() if item['release'] == rolling['id']
+        }
+        self.assertEqual(current, release._expected_asset_identities({
+            release.APK_NAME: self.apk,
+            release.MANIFEST_NAME: release.canonical(newer),
+        }))
+
+        release.publish(api, newer, self.apk)
+        self.assertFalse(api.releases[rolling['id']]['draft'])
+        self.assertEqual(api.releases[rolling['id']]['name'], 'v1.0.6')
+
+    def test_fake_models_omitted_tag_as_generated_untagged_publication(self):
+        api = FakeGitHub()
+        api.refs['develop'] = dict(object=dict(type='commit', sha=self.m['sourceSha']))
+        draft = api.call('POST', 'releases', dict(
+            tag_name='develop', target_commitish='9' * 40,
+            **release.release_fields(self.m, True, compare_from=None),
+        ))
+        result = api.call('PATCH', f"releases/{draft['id']}", release.release_fields(
+            self.m, False, compare_from=None,
+        ))
+        self.assertRegex(result['tag_name'], r'^untagged-[0-9a-f]{20}$')
+        self.assertEqual(api.refs[result['tag_name']]['object']['sha'], '9' * 40)
+        self.assertEqual(api.generated_tag_count, 1)
+
+    def test_exact_detached_r2_state_is_rebound_and_published(self):
+        api = FakeGitHub()
+        release.publish(api, self.m, self.apk)
+        rolling, profile = self.detach_rolling_as_authenticated_incident(api)
+        newer = self.newer_manifest()
+        with patch.object(release, 'R2_DETACHED_RECOVERY', profile):
+            release.publish(api, newer, self.apk)
+            self.assertEqual(api.releases[rolling['id']]['tag_name'], 'develop')
+            self.assertEqual(api.releases[rolling['id']]['name'], 'v1.0.6')
+            self.assertNotIn(profile['tagName'], api.refs)
+            self.assertEqual(api.refs['develop']['object']['sha'], newer['sourceSha'])
+            self.assertEqual(api.generated_tag_count, 0)
+
+            count = len(api.calls)
+            release.publish(api, newer, self.apk)
+            self.assertTrue(all(method == 'GET' for method, _, _ in api.calls[count:]))
+
+    def test_detached_recovery_interruption_after_rebind_resumes_exactly(self):
+        api = FakeGitHub()
+        release.publish(api, self.m, self.apk)
+        rolling, profile = self.detach_rolling_as_authenticated_incident(api)
+        newer = self.newer_manifest()
+        api.fail_after_delete_count = 1
+        with patch.object(release, 'R2_DETACHED_RECOVERY', profile), \
+                self.assertRaisesRegex(ValueError, 'interrupted asset deletion'):
+            release.publish(api, newer, self.apk)
+        self.assertEqual(rolling['tag_name'], 'develop')
+        self.assertTrue(rolling['draft'])
+        self.assertIn(profile['tagName'], api.refs)
+        self.assertEqual(api.refs['develop']['object']['sha'], newer['sourceSha'])
+
+        api.fail_after_delete_count = None
+        with patch.object(release, 'R2_DETACHED_RECOVERY', profile):
+            release.publish(api, newer, self.apk)
+        self.assertEqual(rolling['tag_name'], 'develop')
+        self.assertEqual(rolling['target_commitish'], newer['sourceSha'])
+        self.assertFalse(rolling['draft'])
+        self.assertNotIn(profile['tagName'], api.refs)
+        self.assertEqual(api.generated_tag_count, 0)
+
+    def test_detached_recovery_wrong_digest_or_source_refuses_without_mutation(self):
+        for defect in ('digest', 'source'):
+            with self.subTest(defect=defect):
+                api = FakeGitHub()
+                release.publish(api, self.m, self.apk)
+                rolling, profile = self.detach_rolling_as_authenticated_incident(api)
+                if defect == 'digest':
+                    apk = next(item for item in api.uploads.values()
+                               if item['release'] == rolling['id'] and item['name'] == release.APK_NAME)
+                    apk['digest'] = 'sha256:' + '0' * 64
+                    expected = 'asset/provenance mismatch'
+                else:
+                    api.refs['develop']['object']['sha'] = '8' * 40
+                    expected = 'source does not match develop'
+                count = len(api.calls)
+                with patch.object(release, 'R2_DETACHED_RECOVERY', profile), \
+                        self.assertRaisesRegex(ValueError, expected):
+                    release.publish(api, self.newer_manifest(), self.apk)
+                self.assertTrue(all(method == 'GET' for method, _, _ in api.calls[count:]))
+
+    def test_multiple_detached_candidates_refuse_without_mutation(self):
+        api = FakeGitHub()
+        release.publish(api, self.m, self.apk)
+        rolling, profile = self.detach_rolling_as_authenticated_incident(api)
+        duplicate = copy.deepcopy(rolling)
+        duplicate.update(id=99, tag_name='untagged-' + '2' * 20)
+        api.releases[99] = duplicate
+        count = len(api.calls)
+        with patch.object(release, 'R2_DETACHED_RECOVERY', profile), \
+                self.assertRaisesRegex(ValueError, 'Ambiguous detached rolling recovery state'):
+            release.publish(api, self.newer_manifest(), self.apk)
+        self.assertTrue(all(method == 'GET' for method, _, _ in api.calls[count:]))
+
+    def test_orphan_develop_without_authenticated_candidate_refuses(self):
+        api = FakeGitHub()
+        api.refs['develop'] = dict(object=dict(type='commit', sha=self.m['sourceSha']))
+        count = len(api.calls)
+        with self.assertRaisesRegex(ValueError, 'Orphan develop tag without an authenticated recovery candidate'):
+            release.publish(api, self.newer_manifest(), self.apk)
+        self.assertTrue(all(method == 'GET' for method, _, _ in api.calls[count:]))
 
     def test_published_development_source_requires_matching_release_tag_and_assets(self):
         api = FakeGitHub()
