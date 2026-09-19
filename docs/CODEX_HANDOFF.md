@@ -48,9 +48,9 @@
 
 `T0-3.0 R2 repository rename - COMPLETE / VERIFIED`
 
-`T0-3.0 R2 canonical Mosaic identity migration - IMPLEMENTED / LOCAL VALIDATED; HOSTED + DEVICE ACCEPTANCE PENDING`
+`T0-3.0 R2 canonical Mosaic identity migration - HOSTED VALIDATED / DEVICE ACCEPTANCE PENDING`
 
-`Development publisher correction - IMPLEMENTED / LOCAL VALIDATED; HOSTED RECOVERY PENDING`
+`Development publisher correction - COMPLETE / HOSTED RECOVERY VALIDATED`
 
 `External contribution lifecycle - KEEP / DOCUMENTED`
 
@@ -102,22 +102,36 @@ reported `No build required`, and skipped Release Build, Sign and Publish.
 
 R1 is **COMPLETE / BOTH-NAME HOSTED VALIDATED**. The exact two-name bridge remains installed until
 R4. R2's repository rename is **COMPLETE / VERIFIED**. The R2 canonical Mosaic identity migration
-is **IMPLEMENTED / LOCAL VALIDATED; HOSTED + DEVICE ACCEPTANCE PENDING**; R3 owns the real-device
-lifecycle proof after hosted R2 acceptance. Historical old-name evidence remains correct, and the
-old-name authorization remains installed until R4.
+is **HOSTED VALIDATED / DEVICE ACCEPTANCE PENDING**; R3 now owns the remaining real-device and
+update lifecycle proof. Historical old-name evidence remains correct, and the old-name authorization
+remains installed until R4.
 
-PR #91 passed authoritative `ANDROID_FULL`, protected-main exact-tree reuse, Build, and Sign.
-Immutable `downstream-build-72` is valid. Rolling Development did not publish successfully: attempt
-1 began rolling mutation before rejecting stale unexpected inventory; after the reviewed removal of
-only the stale mutable APK, attempt 2 omitted explicit Release tag identity and GitHub detached
-Release `385461835` under `untagged-0d30e3a083c52d7b0ee5`. Its exact v72 Mosaic assets/body and the
-authoritative `develop` ref at `44fcf58043272ce07b200fab74cb869b21d720d6` are preserved as the
-authenticated recovery input. Do not manually normalize or delete that state, and do not import
-v72 bytes into a later source. The bounded publisher correction is **IMPLEMENTED / LOCAL VALIDATED;
-HOSTED RECOVERY PENDING**: it preflights existing state before rolling mutation, admits only the
-exact detached incident, explicitly rebinds `develop`, and authenticates the complete final state.
-Its merge must produce a fresh protected-main Development version through normal Build, Sign, and
-Publish. R2 hosted acceptance remains pending until that recovery succeeds.
+PR #91 passed authoritative `ANDROID_FULL`, protected-main exact-tree reuse, Build, and Sign, and
+produced valid immutable `downstream-build-72`. Rolling publication then exposed two bounded
+publisher defects: complete inventory authentication occurred after mutation began, and a later
+update omitted explicit Release tag identity and allowed GitHub to detach Release `385461835`. The
+only manual Release-state mutation was the reviewed removal of the authenticated stale mutable
+`Wholphin-release.apk`; it was not the final recovery. No immutable Release, Stable Release, Git
+history, signed bytes, signer, package identity, provenance authority, or fail-closed boundary was
+weakened or rewritten.
+
+PR #92 (`fix/t0-3-r2-development-publisher-atomicity`) head
+`f7fd1e6716da3da1e174de08775c2fae58f86f13` passed authoritative `ANDROID_FULL` in run
+`35420809976`; evidence artifact `10576718759`, digest
+`sha256:20fb9d0526ebda19030c1530fda217a5920ce3e23cf24b6aa8046bbb123a4289`, authenticated tree
+`5227d6f727222d4f950e70f0fb6b2e3f679277e1`. Native merge
+`3d2093354090ad81a3d06efbeb98a9d55b6c1b5c` retained that tree. Protected-main run `35421307208`
+reused the exact evidence, treated the interrupted v72 state as no trustworthy rolling baseline,
+and conservatively built, signed, and published fresh v1.0.73. Signed artifact `10576878975` has
+archive digest `sha256:840246bcba28378c7cb20f115b94ea6b8463f4385fff48dec37b5dabdb781c16`.
+Rolling `develop` and immutable `downstream-build-73` now contain exactly matching
+`Mosaic-release.apk` (`sha256:1c84efececec51f3b2ae602f1ba5d0d5b2d1334724cbb37760a4c3c455cb04cd`)
+and `mosaic-release.json` (`sha256:b42f178ddf9fd56bf0691afa7c1d92f6026a5ce0c3554a3c593968bf59b7ca2b`).
+Their manifests authenticate the canonical package, signer, source/tree, run/attempt, version, and
+asset identity. `downstream-build-72` and Stable `mosaic-v1.0.34` remain unchanged; no
+`untagged-*` Release or Git ref remains. The correction is **COMPLETE / HOSTED RECOVERY VALIDATED**.
+R3 must use the actual signed v1.0.73 Development APK, or a later canonical Mosaic Development pair,
+for fresh-install and in-place-update acceptance.
 
 The external contribution lifecycle is **KEEP / NO SECURITY OR PROVENANCE DEFECT**. A fork PR may
 run approved unprivileged authoritative CI and upload a correctly named policy artifact, but receives

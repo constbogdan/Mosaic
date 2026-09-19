@@ -22,8 +22,9 @@ scheduled run #47). CP8 final consistency is COMPLETE. The T0-2 audit is COMPLET
 C1 is COMPLETE / LIVE VERIFIED; C2 is COMPLETE / HOSTED VALIDATED (PR #84); C3 is COMPLETE /
 HOSTED VALIDATED (PR #85); T0-2 is COMPLETE. T0-3.0 R1 is COMPLETE / BOTH-NAME HOSTED VALIDATED
 (old-name PR #87; new-name PR #89). R2's external repository rename is COMPLETE / VERIFIED; the
-[canonical Mosaic identity migration](T0_3_R2_MOSAIC_IDENTITY.md) is IMPLEMENTED / LOCAL VALIDATED;
-HOSTED + DEVICE ACCEPTANCE PENDING. The external contribution lifecycle is KEEP /
+[canonical Mosaic identity migration](T0_3_R2_MOSAIC_IDENTITY.md) is HOSTED VALIDATED / DEVICE
+ACCEPTANCE PENDING. Its Development publisher correction is COMPLETE / HOSTED RECOVERY VALIDATED.
+The external contribution lifecycle is KEEP /
 DOCUMENTED.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
 
@@ -370,9 +371,8 @@ default; the surviving mechanisms each protect a reviewed consumer or authority 
 ### T0-3.0 Mosaic identity establishment decision
 
 Status: **R1 — COMPLETE / BOTH-NAME HOSTED VALIDATED. R2 repository rename — COMPLETE / VERIFIED.
-R2 canonical Mosaic identity migration — IMPLEMENTED / LOCAL VALIDATED; HOSTED + DEVICE
-ACCEPTANCE PENDING. Development publisher correction — IMPLEMENTED / LOCAL VALIDATED; HOSTED
-RECOVERY PENDING.**
+R2 canonical Mosaic identity migration — HOSTED VALIDATED / DEVICE ACCEPTANCE PENDING.
+Development publisher correction — COMPLETE / HOSTED RECOVERY VALIDATED.**
 
 T0-3 begins by establishing the permanent downstream product identity before the broader
 documentation, wiki, and roadmap consolidation. This record preserves the accepted decisions and
@@ -665,28 +665,31 @@ Establish the approved current identities coherently:
 - preserve application IDs, signer, upstream namespace/source identities, upstream markers,
   `wholphin-pr-policy-v1-*`, and immutable history.
 
-R2 hosted acceptance must prove prepare-pr, authoritative PR CI, protected-main exact-tree reuse,
-Development Build/Sign/Publish, and the exact canonical release inventory. Stable and Hold retain
-the same fail-closed consumer contract and do not require artificial live dispatches.
-
 PR #91 passed authoritative `ANDROID_FULL`, exact-tree protected-main reuse, Build, and Sign. Its
-immutable `downstream-build-72` is valid, but rolling publication exposed two publisher defects:
-attempt 1 authenticated unexpected rolling inventory too late, and attempt 2 omitted explicit
-Release tag identity, allowing GitHub to detach Release `385461835` under
-`untagged-0d30e3a083c52d7b0ee5`. The `develop` ref and detached v72 state are preserved as the exact
-authenticated recovery input; v72 must not be described as a successful rolling publication. The
-bounded correction now performs read-only preflight before rolling mutation, accepts only the exact
-incident, binds `tag_name=develop` plus the authenticated target explicitly, and verifies the full
-final Release/ref/asset/provenance state. It is **IMPLEMENTED / LOCAL VALIDATED; HOSTED RECOVERY
-PENDING**. The correction merge must produce its own newer Build/Sign payload through the normal
-protected-main lifecycle; immutable v72 and Stable history remain unchanged.
+immutable `downstream-build-72` is valid, but rolling publication exposed two bounded publisher
+defects: complete existing-inventory authentication happened too late, then an update omitted the
+explicit Release tag identity and GitHub detached the rolling Release. The reviewed operator action
+removed only the authenticated stale `Wholphin-release.apk` from the mutable rolling state; it was
+not the final recovery, and no immutable or Stable history was changed.
+
+PR #92 corrected both defects and passed authoritative `ANDROID_FULL` in run `35420809976`.
+Protected-main run `35421307208` authenticated and reused its exact tree, rejected the interrupted
+v72 state as a trustworthy published baseline, conservatively selected a fresh build, and completed
+Build, Sign, and Publish for v1.0.73. Rolling `develop` and immutable `downstream-build-73` now
+contain exactly matching `Mosaic-release.apk` and `mosaic-release.json`; canonical repository,
+package, signer, source, tree, run, and version provenance authenticate successfully. Immutable
+`downstream-build-72` and Stable `mosaic-v1.0.34` remain unchanged, and no `untagged-*` Release or Git
+ref remains. The publisher correction is **COMPLETE / HOSTED RECOVERY VALIDATED** and R2 is
+**HOSTED VALIDATED / DEVICE ACCEPTANCE PENDING**. The detailed incident and evidence record is in
+[the R2 identity contract](T0_3_R2_MOSAIC_IDENTITY.md#pr-91-publication-incident-and-hosted-recovery).
 
 ##### R3 — real-device Mosaic acceptance
 
 R3 must prove fresh Mosaic installation; Mosaic N to N+1 in-place update; package, signer, and
 version continuity; launcher identity; `mosaic:` routing; Development and Stable discovery where
-applicable; and preservation of local Mosaic state. It must inspect the actual signed R2 release,
-not infer device compatibility from repository tests.
+applicable; and preservation of local Mosaic state. It must inspect the actual signed v1.0.73
+Development APK, or a later canonical Mosaic Development pair, rather than infer device
+compatibility from repository tests.
 
 ##### R4 — retire the bridge and close T0-3.0
 
