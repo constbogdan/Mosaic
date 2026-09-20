@@ -1,6 +1,7 @@
 # T0-3.0 R2 — canonical Mosaic identity
 
-Status: **HOSTED VALIDATED / DEVICE ACCEPTANCE PENDING**.
+Status: **R2 canonical Mosaic identity — HOSTED VALIDATED. R3 — DEVICE ACCEPTANCE IN PROGRESS /
+FINDINGS OPEN.**
 
 ## Current identity contract
 
@@ -152,16 +153,65 @@ Both manifests bind package `io.github.constbogdan.mosaic`, version `1.0.73`, so
 permanent signer, run/attempt, and canonical `Mosaic-release.apk`. The rolling Release is
 `Development v1.0.73`, published prerelease/non-draft, and `refs/tags/develop` resolves to the v73
 source. Canonical links target `constbogdan/Mosaic`; no new `Wholphin-release.apk` exists.
-`downstream-build-72` remains unchanged immutable canonical history, Stable remains unchanged at
-`mosaic-v1.0.34`, and live inspection found zero `untagged-*` Releases and zero `untagged-*` Git
-refs; specifically, `untagged-0d30e3a083c52d7b0ee5` no longer exists in either namespace.
+At hosted recovery completion, `downstream-build-72` remained unchanged immutable canonical history,
+Stable still identified `mosaic-v1.0.34`, and live inspection found zero `untagged-*` Releases and
+zero `untagged-*` Git refs; specifically, `untagged-0d30e3a083c52d7b0ee5` no longer existed in
+either namespace.
 
 Status: **Publisher correction — COMPLETE / HOSTED RECOVERY VALIDATED. R2 canonical Mosaic
-identity — HOSTED VALIDATED / DEVICE ACCEPTANCE PENDING.** R2 is not complete; R3 owns real-device
-and update acceptance using the actual signed v1.0.73 Development APK or a later canonical Mosaic
-Development pair.
+identity — HOSTED VALIDATED. R3 — DEVICE ACCEPTANCE IN PROGRESS / FINDINGS OPEN.** R3 owns the
+remaining real-device and update acceptance using the actual signed v1.0.73 bytes or a later
+canonical Mosaic Development pair.
+
+### Canonical Stable v1.0.73
+
+Stable Promotion run `35495689386`, attempt 1, successfully completed **Prepare → Release**. Prepare
+authenticated `downstream-build-73`; Release reauthenticated the candidate and promoted its exact
+bytes as latest Stable `mosaic-v1.0.73`, Release `392342793`, from source
+`3d2093354090ad81a3d06efbeb98a9d55b6c1b5c`. The immutable candidate, rolling Development, and
+Stable each contain exactly `Mosaic-release.apk` and `mosaic-release.json`.
+
+The three published APK assets are byte-identical:
+
+```text
+downstream-build-73 APK  ┐
+Development v1.0.73 APK ├─ SHA-256 1c84efececec51f3b2ae602f1ba5d0d5b2d1334724cbb37760a4c3c455cb04cd
+Stable v1.0.73 APK      ┘
+```
+
+All three APK assets are 27,821,299 bytes. Their manifests also share GitHub asset digest
+`sha256:b42f178ddf9fd56bf0691afa7c1d92f6026a5ce0c3554a3c593968bf59b7ca2b`. The annotated immutable
+and Stable tags both bind source `3d2093354090ad81a3d06efbeb98a9d55b6c1b5c`; rolling `develop`
+resolves directly to that source. No `untagged-*` Release or Git ref remains.
+
+The operator installed the APK linked from the immutable `downstream-build-73` candidate in the
+Stable Promotion Prepare summary before the final Stable Release existed. Because the candidate,
+rolling Development, and final Stable APK digests authenticate as identical, those physical-device
+observations remain valid evidence for the exact Stable v1.0.73 bytes.
 
 ## R3 real-device acceptance
+
+R2 is complete on the hosted engineering path. R3 is not complete.
+
+Current physical-device evidence is partial:
+
+```text
+Android tablet launcher:      Mosaic
+Android TV launcher/app menu: Wholphin
+```
+
+The current manifest already uses `android:label="@string/app_name"`, and `app_name` resolves to
+`Mosaic`. Android TV separately uses `android:banner="@mipmap/ic_banner"`; both
+`app/src/main/res/mipmap-xhdpi/ic_banner.png` and
+`app/src/main/res/mipmap-xhdpi/ic_banner_foreground.png` still contain inherited Wholphin artwork.
+This is an **R3 ACCEPTANCE BLOCKER**. The required result is:
+
+```text
+TV launcher/app menu → Mosaic
+tablet launcher      → Mosaic
+```
+
+Do not close R3 until approved Mosaic TV artwork is shipped and accepted on a real device.
 
 Repository and hosted evidence cannot close device acceptance. On a fresh Android/Android TV test
 device with neither app installed:
@@ -183,11 +233,22 @@ device with neither app installed:
 7. Confirm no request or downloaded asset requires `constbogdan/Wholphin` or
    `Wholphin-release.apk`.
 
-Only after hosted and device acceptance may R4 remove the old repository name from the R1 bridge.
+The remaining R3 order is:
+
+1. fix Android TV Mosaic presentation;
+2. apply the approved Stable Promotion/Release presentation cleanup;
+3. publish a normal new Mosaic build;
+4. repeat real-device acceptance;
+5. prove Mosaic N → Mosaic N+1 as an in-place update;
+6. prove login, preferences, database, and other local state survive;
+7. close R3.
+
+Only after R3 closes may R4 remove the old repository name from the R1 bridge. The dedicated
+documentation/wiki consolidation remains a later phase.
 
 ## Visual follow-up
 
 The existing launcher icon is text-free and remains usable. The Android TV banner contains literal
-Wholphin artwork; no approved Mosaic artwork exists, so R2 deliberately does not invent a logo.
-Replacing that banner and reviewing inherited README screenshots are post-R2 design work and do not
-alter the canonical functional identity above.
+Wholphin artwork; no approved Mosaic artwork exists, so R2 deliberately did not invent a logo.
+Replacing both banner assets is now the first bounded R3 implementation point. Reviewing inherited
+README screenshots remains separate and does not alter the canonical functional identity above.

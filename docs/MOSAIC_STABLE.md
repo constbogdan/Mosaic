@@ -1,6 +1,7 @@
 # Mosaic Stable channel and promotion
 
-Status: **Stable promotion COMPLETE / LIVE VALIDATED** (through downstream-build-34). Permanent signing, downstream
+Status: **Stable promotion COMPLETE / LIVE VALIDATED** (through downstream-build-73 / Stable
+v1.0.73). Permanent signing, downstream
 routing, development delivery and in-place updater acceptance remain COMPLETE / LIVE
 VALIDATED. Channel selector and existing-user migration are now LIVE VALIDATED through 1.0.5 -> 1.0.8. T0-1 CI/developer-velocity simplification is COMPLETE / HOSTED VALIDATED; further
 performance work is evidence-driven rather than a pending migration. No stable release was created
@@ -17,6 +18,59 @@ approval`, links the exact authenticated candidate APK, and explains the `releas
 `release-promote`; after approval it reauthenticates protected main and proves rolling
 `develop` still identifies the exact prepared candidate before invoking the unchanged
 exact-byte publisher. Movement or ambiguity refuses instead of selecting another build.
+
+Canonical Mosaic acceptance used run `35495689386`, attempt 1. Prepare authenticated
+`downstream-build-73`; Release promoted the exact candidate bytes as latest Stable
+`mosaic-v1.0.73` from source `3d2093354090ad81a3d06efbeb98a9d55b6c1b5c`. The immutable,
+rolling Development, and Stable `Mosaic-release.apk` assets are byte-identical at SHA-256
+`1c84efececec51f3b2ae602f1ba5d0d5b2d1334724cbb37760a4c3c455cb04cd`.
+
+### Approved R3 presentation cleanup — pending implementation
+
+This is presentation-only. The fixed machine-facing inventory remains exactly
+`Mosaic-release.apk` plus `mosaic-release.json`; versioned APK filenames were reviewed and are
+**NOT CURRENTLY REQUIRED**. Present the human action as `Download Mosaic vX.Y.Z` while keeping the
+stable asset name unchanged.
+
+Before approval, lead with product state:
+
+```text
+Mosaic vX.Y.Z pending approval
+```
+
+Do not show “Explicitly promote the authenticated Development build for normal consumption,” the
+prominent “Download the exact candidate APK,” or “Waiting for `release-promote` approval. Nothing
+has been published by this run.” Put the immutable candidate under **Technical details**, preferably
+as `Candidate: downstream-build-N` with the identity linked to its immutable Release. A direct APK
+link may remain there only when explicitly labeled as a candidate.
+
+After approval, lead with:
+
+```text
+Mosaic vX.Y.Z released
+
+Download Mosaic vX.Y.Z · Release details · Compare changes
+```
+
+The download must target the APK on the actual Stable Release, never `downstream-build-N`. The
+Stable Release title should be `Mosaic vX.Y.Z`; remove “Explicitly promoted trusted build for normal
+consumption” and “Choose Stable in the app update channel for normal updates.” Preserve detailed
+technical provenance beneath the primary product actions.
+
+The durable distinction is:
+
+```text
+BEFORE APPROVAL
+downstream-build-N = immutable candidate = technical/provenance information
+
+AFTER APPROVAL
+mosaic-vX.Y.Z = actual Stable Release = normal product download
+```
+
+Stable workflow UX follows **product state first → primary operator action second → technical and
+provenance details secondary but available**. Candidate authentication, exact signed-byte
+promotion, signer and manifest verification, approval authority, exact inventory, Hold, and every
+fail-closed boundary remain unchanged.
 
 I07 forward-recovery acceptance promoted `downstream-build-34` unchanged in run
 `34694610864`. Stable release `387569996` / v1.0.34 became latest with APK SHA-256
