@@ -193,25 +193,37 @@ observations remain valid evidence for the exact Stable v1.0.73 bytes.
 
 R2 is complete on the hosted engineering path. R3 is not complete.
 
-Current physical-device evidence is partial:
+The pre-fix physical-device evidence was:
 
 ```text
 Android tablet launcher:      Mosaic
 Android TV launcher/app menu: Wholphin
 ```
 
-The current manifest already uses `android:label="@string/app_name"`, and `app_name` resolves to
-`Mosaic`. Android TV separately uses `android:banner="@mipmap/ic_banner"`; both
+The manifest already used `android:label="@string/app_name"`, and `app_name` resolved to `Mosaic`.
+Android TV separately uses `android:banner="@mipmap/ic_banner"`; both
 `app/src/main/res/mipmap-xhdpi/ic_banner.png` and
-`app/src/main/res/mipmap-xhdpi/ic_banner_foreground.png` still contain inherited Wholphin artwork.
-This is an **R3 ACCEPTANCE BLOCKER**. The required result is:
+`app/src/main/res/mipmap-xhdpi/ic_banner_foreground.png` contained the inherited Wholphin
+wordmark.
+
+The source defect is **FIXED / LOCALLY VALIDATED** on
+`fix/t0-3-r3-tv-banner-identity`. Both 320×180 banner paths now preserve the established cube,
+palette, safe layout, opaque fallback background, and transparent adaptive foreground while using
+the Mosaic wordmark. The existing adaptive XML, background color, manifest reference, launcher
+intent filters, and package identity are unchanged. The defaultDebug compile, unit-test, and APK
+assembly graph passed, and inspection of the generated APK authenticated the manifest reference,
+resource table entries, and exact packaged banner bytes. An existing product-identity contract test
+now pins the approved banner dimensions and SHA-256 values so accidental restoration of the old
+rasters fails.
+
+Real Android TV verification remains an **R3 ACCEPTANCE BLOCKER**. The required result is:
 
 ```text
 TV launcher/app menu → Mosaic
 tablet launcher      → Mosaic
 ```
 
-Do not close R3 until approved Mosaic TV artwork is shipped and accepted on a real device.
+Do not close R3 until the new Mosaic banner is shipped and accepted on a real device.
 
 Repository and hosted evidence cannot close device acceptance. On a fresh Android/Android TV test
 device with neither app installed:
@@ -235,7 +247,7 @@ device with neither app installed:
 
 The remaining R3 order is:
 
-1. fix Android TV Mosaic presentation;
+1. publish the validated Android TV Mosaic presentation fix;
 2. apply the approved Stable Promotion/Release presentation cleanup;
 3. publish a normal new Mosaic build;
 4. repeat real-device acceptance;

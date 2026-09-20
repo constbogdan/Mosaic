@@ -54,6 +54,8 @@
 
 `T0-3.0 R3 - DEVICE ACCEPTANCE IN PROGRESS / FINDINGS OPEN`
 
+`R3 Android TV banner identity - FIXED / LOCALLY VALIDATED / DEVICE ACCEPTANCE PENDING`
+
 `External contribution lifecycle - KEEP / DOCUMENTED`
 
 The approved [Mosaic identity establishment decision](Wholphin_ROADMAP.md#t0-30-mosaic-identity-establishment-decision) and
@@ -146,16 +148,25 @@ Release or ref remains.
 The operator's first Android TV installation used the immutable `downstream-build-73` candidate link
 from the Stable Prepare summary. Because candidate, Development, and final Stable APK bytes are
 identical, those observations remain valid evidence for Stable v1.0.73. The Android tablet launcher
-shows **Mosaic**, but the Android TV launcher/app menu shows **Wholphin**. The manifest label already
-resolves to Mosaic; the confirmed source is the inherited wordmark in
-`app/src/main/res/mipmap-xhdpi/ic_banner.png` and `ic_banner_foreground.png`. This is an **R3
-ACCEPTANCE BLOCKER**. Required result: both tablet and TV launcher surfaces show Mosaic.
+showed **Mosaic**, but the Android TV launcher/app menu showed **Wholphin**. The manifest label
+already resolved to Mosaic; the confirmed source was the inherited wordmark in
+`app/src/main/res/mipmap-xhdpi/ic_banner.png` and `ic_banner_foreground.png`.
 
-R3 must next replace those two banner assets with approved Mosaic artwork, implement the approved
-Stable Promotion/Release presentation cleanup, publish a normal new Mosaic build, repeat real-device
-acceptance, prove Mosaic N → Mosaic N+1 in-place update, and prove login/preferences/local state
-survive. Do not close R3 before all of those checks pass; R4 then remains the next T0 point before
-the dedicated documentation/wiki consolidation.
+The source defect is now **FIXED / LOCALLY VALIDATED** on
+`fix/t0-3-r3-tv-banner-identity`. Both approved 320×180 rasters retain the exact established cube
+pixels and replace only the wordmark treatment with Mosaic. The fallback remains opaque; the
+adaptive foreground remains transparent; XML/background/manifest/launcher structure is unchanged.
+The existing Mosaic product-identity test pins PNG format, dimensions, and approved SHA-256 values.
+Focused identity tests passed, the complete defaultDebug compile/unit-test/assemble graph passed,
+and APK inspection confirmed the manifest's `@mipmap/ic_banner` reference, both resource variants,
+and exact packaged raster hashes. Real Android TV confirmation remains an **R3 ACCEPTANCE BLOCKER**;
+required result: both tablet and TV launcher surfaces show Mosaic.
+
+R3 must next publish this normal APK-facing banner fix, implement the separately scoped Stable
+Promotion/Release presentation cleanup, repeat real-device acceptance, prove Mosaic N → Mosaic N+1
+in-place update, and prove login/preferences/local state survive. Do not close R3 before all of
+those checks pass; R4 then remains the next T0 point before the dedicated documentation/wiki
+consolidation.
 
 The external contribution lifecycle is **KEEP / NO SECURITY OR PROVENANCE DEFECT**. A fork PR may
 run approved unprivileged authoritative CI and upload a correctly named policy artifact, but receives

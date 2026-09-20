@@ -697,14 +697,17 @@ applicable; and preservation of local Mosaic state. It must inspect the actual s
 Development APK, or a later canonical Mosaic Development pair, rather than infer device
 compatibility from repository tests.
 
-Current device evidence is mixed: the Android tablet launcher reports **Mosaic**, while the Android
-TV launcher/app menu reports **Wholphin**. The manifest/application label already resolves to
-Mosaic; `app/src/main/res/mipmap-xhdpi/ic_banner.png` and `ic_banner_foreground.png` contain the
-inherited Wholphin wordmark used by Android TV. This is an **R3 ACCEPTANCE BLOCKER**. The remaining
-sequence is: replace both banner assets with approved Mosaic artwork; apply the presentation-only
-Stable Promotion/Release cleanup; publish a normal new Mosaic build; repeat device acceptance;
-prove Mosaic N → Mosaic N+1 in-place update; prove login/preferences/local state survive; then close
-R3. R4 remains the next T0-3.0 point before the dedicated documentation/wiki consolidation.
+Pre-fix device evidence was mixed: the Android tablet launcher reported **Mosaic**, while the
+Android TV launcher/app menu reported **Wholphin**. The manifest/application label already resolved
+to Mosaic; the inherited wordmark in `app/src/main/res/mipmap-xhdpi/ic_banner.png` and
+`ic_banner_foreground.png` caused the TV defect. The source correction is **FIXED / LOCALLY
+VALIDATED**: both 320×180 assets now preserve the established cube/layout and show Mosaic; the
+defaultDebug compile, unit-test, and APK assembly graph passed; and generated-APK inspection proved
+the manifest/resource mapping and exact packaged bytes. Real Android TV confirmation remains an
+**R3 ACCEPTANCE BLOCKER**. The remaining sequence is: publish this normal APK-facing fix; apply the
+presentation-only Stable Promotion/Release cleanup; repeat device acceptance; prove Mosaic N →
+Mosaic N+1 in-place update; prove login/preferences/local state survive; then close R3. R4 remains
+the next T0-3.0 point before the dedicated documentation/wiki consolidation.
 
 ##### R4 — retire the bridge and close T0-3.0
 
