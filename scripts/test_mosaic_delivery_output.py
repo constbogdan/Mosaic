@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import struct
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
@@ -100,6 +101,25 @@ class DeliveryOutputTests(unittest.TestCase):
         self.assertNotIn('constbogdan/Wholphin/releases', resolver)
         self.assertIn('f"wholphin-{CONTRACT}', reuse)
         self.assertIn('wholphin-upstream-', upstream)
+
+        self.assertIn('android:banner="@mipmap/ic_banner"', manifest)
+        self.assertIn('android.intent.category.LEANBACK_LAUNCHER', manifest)
+        adaptive_banner = (ROOT / 'app/src/main/res/mipmap-anydpi-v26/ic_banner.xml').read_text(
+            encoding='utf-8'
+        )
+        self.assertIn('@color/ic_banner_background', adaptive_banner)
+        self.assertIn('@mipmap/ic_banner_foreground', adaptive_banner)
+        approved_banners = {
+            'ic_banner.png': '7c9a5eeb075a3b369e21b8dadf09ba4effeda03ff9f732ad00cd4ec2aedcbc3e',
+            'ic_banner_foreground.png': 'c7c3234702544418e45ab722bf152bd14841f0ac5e6947e2bd33f7ca8e6b50e4',
+        }
+        banner_root = ROOT / 'app/src/main/res/mipmap-xhdpi'
+        for name, expected_sha256 in approved_banners.items():
+            data = (banner_root / name).read_bytes()
+            with self.subTest(banner=name):
+                self.assertEqual(b'\x89PNG\r\n\x1a\n', data[:8])
+                self.assertEqual((320, 180), struct.unpack('>II', data[16:24]))
+                self.assertEqual(expected_sha256, hashlib.sha256(data).hexdigest())
 
     def test_release_bodies_distinguish_channels_without_changing_identity(self):
         before = copy.deepcopy(self.m)
