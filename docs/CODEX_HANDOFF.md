@@ -48,9 +48,11 @@
 
 `T0-3.0 R2 repository rename - COMPLETE / VERIFIED`
 
-`T0-3.0 R2 canonical Mosaic identity migration - HOSTED VALIDATED / DEVICE ACCEPTANCE PENDING`
+`T0-3.0 R2 canonical Mosaic identity migration - HOSTED VALIDATED`
 
 `Development publisher correction - COMPLETE / HOSTED RECOVERY VALIDATED`
+
+`T0-3.0 R3 - DEVICE ACCEPTANCE IN PROGRESS / FINDINGS OPEN`
 
 `External contribution lifecycle - KEEP / DOCUMENTED`
 
@@ -102,8 +104,8 @@ reported `No build required`, and skipped Release Build, Sign and Publish.
 
 R1 is **COMPLETE / BOTH-NAME HOSTED VALIDATED**. The exact two-name bridge remains installed until
 R4. R2's repository rename is **COMPLETE / VERIFIED**. The R2 canonical Mosaic identity migration
-is **HOSTED VALIDATED / DEVICE ACCEPTANCE PENDING**; R3 now owns the remaining real-device and
-update lifecycle proof. Historical old-name evidence remains correct, and the old-name authorization
+is **HOSTED VALIDATED**; R3 is **DEVICE ACCEPTANCE IN PROGRESS / FINDINGS OPEN** and owns the
+remaining real-device and update lifecycle proof. Historical old-name evidence remains correct, and the old-name authorization
 remains installed until R4.
 
 PR #91 passed authoritative `ANDROID_FULL`, protected-main exact-tree reuse, Build, and Sign, and
@@ -128,10 +130,32 @@ Rolling `develop` and immutable `downstream-build-73` now contain exactly matchi
 `Mosaic-release.apk` (`sha256:1c84efececec51f3b2ae602f1ba5d0d5b2d1334724cbb37760a4c3c455cb04cd`)
 and `mosaic-release.json` (`sha256:b42f178ddf9fd56bf0691afa7c1d92f6026a5ce0c3554a3c593968bf59b7ca2b`).
 Their manifests authenticate the canonical package, signer, source/tree, run/attempt, version, and
-asset identity. `downstream-build-72` and Stable `mosaic-v1.0.34` remain unchanged; no
-`untagged-*` Release or Git ref remains. The correction is **COMPLETE / HOSTED RECOVERY VALIDATED**.
-R3 must use the actual signed v1.0.73 Development APK, or a later canonical Mosaic Development pair,
-for fresh-install and in-place-update acceptance.
+asset identity. At hosted recovery completion, `downstream-build-72` and Stable
+`mosaic-v1.0.34` remained unchanged; no `untagged-*` Release or Git ref remained. The correction is
+**COMPLETE / HOSTED RECOVERY VALIDATED**.
+
+Stable Promotion run `35495689386`, attempt 1, subsequently authenticated and promoted
+`downstream-build-73` unchanged as latest Stable `mosaic-v1.0.73`. Immutable candidate, rolling
+Development, and Stable each expose a 27,821,299-byte `Mosaic-release.apk` with SHA-256
+`1c84efececec51f3b2ae602f1ba5d0d5b2d1334724cbb37760a4c3c455cb04cd`; their exact
+`mosaic-release.json` assets also share digest
+`sha256:b42f178ddf9fd56bf0691afa7c1d92f6026a5ce0c3554a3c593968bf59b7ca2b`. Both annotated tags and
+rolling `develop` bind source `3d2093354090ad81a3d06efbeb98a9d55b6c1b5c`; no `untagged-*`
+Release or ref remains.
+
+The operator's first Android TV installation used the immutable `downstream-build-73` candidate link
+from the Stable Prepare summary. Because candidate, Development, and final Stable APK bytes are
+identical, those observations remain valid evidence for Stable v1.0.73. The Android tablet launcher
+shows **Mosaic**, but the Android TV launcher/app menu shows **Wholphin**. The manifest label already
+resolves to Mosaic; the confirmed source is the inherited wordmark in
+`app/src/main/res/mipmap-xhdpi/ic_banner.png` and `ic_banner_foreground.png`. This is an **R3
+ACCEPTANCE BLOCKER**. Required result: both tablet and TV launcher surfaces show Mosaic.
+
+R3 must next replace those two banner assets with approved Mosaic artwork, implement the approved
+Stable Promotion/Release presentation cleanup, publish a normal new Mosaic build, repeat real-device
+acceptance, prove Mosaic N → Mosaic N+1 in-place update, and prove login/preferences/local state
+survive. Do not close R3 before all of those checks pass; R4 then remains the next T0 point before
+the dedicated documentation/wiki consolidation.
 
 The external contribution lifecycle is **KEEP / NO SECURITY OR PROVENANCE DEFECT**. A fork PR may
 run approved unprivileged authoritative CI and upload a correctly named policy artifact, but receives
@@ -1531,7 +1555,7 @@ change. Live stable promotion and selector/device acceptance remain pending.
 
 User-supplied acceptance establishes operational downstream delivery and Mosaic-driven
 1.0.3 -> 1.0.5 updating. Full evidence, hash, recovery boundaries and timing observations
-are in [the delivery acceptance record](MOSAIC_DEVELOPMENT_RELEASE.md#historical-development-delivery-and-in-place-updater-acceptance---complete--live-validated).
+are in [the delivery acceptance record](MOSAIC_DEVELOPMENT_RELEASE.md#historical-development-delivery-and-in-place-updater-acceptance---complete-live-validated).
 
 The initial normal run built source `41f9f83c36b8866211c9680d3b416d5ebede4888`, version
 1.0.5/code 5, unsigned artifact `10099950969`; signing-secret availability failed and

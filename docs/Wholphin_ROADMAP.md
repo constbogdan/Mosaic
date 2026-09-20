@@ -22,8 +22,9 @@ scheduled run #47). CP8 final consistency is COMPLETE. The T0-2 audit is COMPLET
 C1 is COMPLETE / LIVE VERIFIED; C2 is COMPLETE / HOSTED VALIDATED (PR #84); C3 is COMPLETE /
 HOSTED VALIDATED (PR #85); T0-2 is COMPLETE. T0-3.0 R1 is COMPLETE / BOTH-NAME HOSTED VALIDATED
 (old-name PR #87; new-name PR #89). R2's external repository rename is COMPLETE / VERIFIED; the
-[canonical Mosaic identity migration](T0_3_R2_MOSAIC_IDENTITY.md) is HOSTED VALIDATED / DEVICE
-ACCEPTANCE PENDING. Its Development publisher correction is COMPLETE / HOSTED RECOVERY VALIDATED.
+[canonical Mosaic identity migration](T0_3_R2_MOSAIC_IDENTITY.md) is HOSTED VALIDATED. Its
+Development publisher correction is COMPLETE / HOSTED RECOVERY VALIDATED. R3 is DEVICE ACCEPTANCE
+IN PROGRESS / FINDINGS OPEN.
 The external contribution lifecycle is KEEP /
 DOCUMENTED.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
@@ -371,8 +372,8 @@ default; the surviving mechanisms each protect a reviewed consumer or authority 
 ### T0-3.0 Mosaic identity establishment decision
 
 Status: **R1 — COMPLETE / BOTH-NAME HOSTED VALIDATED. R2 repository rename — COMPLETE / VERIFIED.
-R2 canonical Mosaic identity migration — HOSTED VALIDATED / DEVICE ACCEPTANCE PENDING.
-Development publisher correction — COMPLETE / HOSTED RECOVERY VALIDATED.**
+R2 canonical Mosaic identity migration — HOSTED VALIDATED. Development publisher correction —
+COMPLETE / HOSTED RECOVERY VALIDATED. R3 — DEVICE ACCEPTANCE IN PROGRESS / FINDINGS OPEN.**
 
 T0-3 begins by establishing the permanent downstream product identity before the broader
 documentation, wiki, and roadmap consolidation. This record preserves the accepted decisions and
@@ -678,18 +679,32 @@ v72 state as a trustworthy published baseline, conservatively selected a fresh b
 Build, Sign, and Publish for v1.0.73. Rolling `develop` and immutable `downstream-build-73` now
 contain exactly matching `Mosaic-release.apk` and `mosaic-release.json`; canonical repository,
 package, signer, source, tree, run, and version provenance authenticate successfully. Immutable
-`downstream-build-72` and Stable `mosaic-v1.0.34` remain unchanged, and no `untagged-*` Release or Git
-ref remains. The publisher correction is **COMPLETE / HOSTED RECOVERY VALIDATED** and R2 is
-**HOSTED VALIDATED / DEVICE ACCEPTANCE PENDING**. The detailed incident and evidence record is in
+`downstream-build-72` remained unchanged, and no `untagged-*` Release or Git ref remains. Stable
+Promotion run `35495689386` subsequently promoted `downstream-build-73` unchanged as latest Stable
+`mosaic-v1.0.73`. The immutable candidate, rolling Development, and Stable APKs are byte-identical
+at SHA-256 `1c84efececec51f3b2ae602f1ba5d0d5b2d1334724cbb37760a4c3c455cb04cd`. The publisher correction
+is **COMPLETE / HOSTED RECOVERY VALIDATED**, R2 is **HOSTED VALIDATED**, and R3 is **DEVICE
+ACCEPTANCE IN PROGRESS / FINDINGS OPEN**. The detailed incident and evidence record is in
 [the R2 identity contract](T0_3_R2_MOSAIC_IDENTITY.md#pr-91-publication-incident-and-hosted-recovery).
 
 ##### R3 — real-device Mosaic acceptance
+
+R2 is complete on the hosted engineering path. R3 is not complete.
 
 R3 must prove fresh Mosaic installation; Mosaic N to N+1 in-place update; package, signer, and
 version continuity; launcher identity; `mosaic:` routing; Development and Stable discovery where
 applicable; and preservation of local Mosaic state. It must inspect the actual signed v1.0.73
 Development APK, or a later canonical Mosaic Development pair, rather than infer device
 compatibility from repository tests.
+
+Current device evidence is mixed: the Android tablet launcher reports **Mosaic**, while the Android
+TV launcher/app menu reports **Wholphin**. The manifest/application label already resolves to
+Mosaic; `app/src/main/res/mipmap-xhdpi/ic_banner.png` and `ic_banner_foreground.png` contain the
+inherited Wholphin wordmark used by Android TV. This is an **R3 ACCEPTANCE BLOCKER**. The remaining
+sequence is: replace both banner assets with approved Mosaic artwork; apply the presentation-only
+Stable Promotion/Release cleanup; publish a normal new Mosaic build; repeat device acceptance;
+prove Mosaic N → Mosaic N+1 in-place update; prove login/preferences/local state survive; then close
+R3. R4 remains the next T0-3.0 point before the dedicated documentation/wiki consolidation.
 
 ##### R4 — retire the bridge and close T0-3.0
 
