@@ -4,6 +4,10 @@ Small, non-blocking issues observed during development or manual validation.
 
 These items should be preserved for later review but should not interrupt the current implementation unless they become functionally significant. When an issue is fixed, record the resolution before removing or marking it resolved.
 
+This is an observation ledger, not the product roadmap, issue tracker, architecture owner, or
+operating authority. [MOSAIC_ROADMAP.md](MOSAIC_ROADMAP.md) owns priorities and direction. Moving
+these observations to GitHub Issues requires a separate explicit decision.
+
 ## Open
 
 ### Series Details — Incomplete badge briefly flickers during initial load

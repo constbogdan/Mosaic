@@ -1,11 +1,11 @@
 # T0-3 documentation consolidation audit and plan
 
-Status: **D1-D5 COMPLETE; D6 implemented pending review. D7 has not begun.**
+Status: **T0-3 Documentation, Wiki & Roadmap consolidation — COMPLETE. D1-D7 complete.**
 
 This audit describes the documentation set at `main` commit
 `44564901cbdb7ffce4b1c0704aa2d53f93c40fa9`. It does not move, delete, rename, or broadly rewrite
-existing documents. T0-3 and Baseline T0 remain open. The next checkpoint requires separate review
-and authorization.
+existing documents. T0-3 is now complete; Baseline T0 remains open and its final acceptance requires
+separate review and authorization.
 
 ## Principles
 
@@ -386,7 +386,29 @@ GitHub Wiki is therefore an optional presentation layer: it may summarize user-f
 must link its versioned repository source, cannot own engineering or security contracts, and may be
 published only through a separate explicit operator action.
 
-`docs/README.md` now distinguishes public product documentation, contributor orientation,
-versioned engineering authority, current continuity, history, and the optional Wiki boundary. No
-validation, publication, signing, provenance, Hold, repository-authentication, or upstream contract
-changed. D7 remains the final consistency and status audit; T0-3 and Baseline T0 remain open.
+At D6 closure, `docs/README.md` distinguished public product documentation, contributor
+orientation, versioned engineering authority, current continuity, history, and the optional Wiki
+boundary. No validation, publication, signing, provenance, Hold, repository-authentication, or
+upstream contract changed. D7 and Baseline T0 acceptance remained open.
+
+## D7 completion audit
+
+D7 reconciled current checkpoint wording after the D6 merge and audited the complete documentation
+system for ownership, naming, links, anchors, agent bootstrap, public/Wiki boundaries, history, and
+machine-adjacent consumers. Every topic in the canonical matrix has one current owner. The root
+README now exposes the versioned user guide directly; contributor documents route to repository
+authority; the observation ledger explicitly does not compete with the roadmap or operating docs.
+
+Current Wholphin occurrences are limited to upstream identity, inherited source/package names,
+stable machine protocols, or truthful historical evidence. The established historical roadmap,
+identity record, and pre-D5 handoff remain clearly non-operational and discoverable through the
+history index. `AGENTS.md` is the general authority, `UI_AGENTS.md` is a bounded extension, and the
+live handoff remains limited to current continuity and negative knowledge.
+
+Repository-wide Markdown links and heading anchors, canonical-path searches, machine/config path
+tests, changed-scope pre-commit, whitespace validation, and Fast validation pass. D7 creates no
+Wiki, changes no operating contract, and performs no historical restructuring.
+
+All T0-3 completion criteria below are satisfied. **T0-3 Documentation, Wiki & Roadmap
+consolidation is COMPLETE.** Baseline T0 remains open; its independent final acceptance and closure
+is the next checkpoint and is not authorized or performed by D7.

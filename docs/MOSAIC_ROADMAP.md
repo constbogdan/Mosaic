@@ -9,17 +9,15 @@ the [documentation index](README.md).
 - T0-1 validation, operator UX, and pipeline simplification — complete.
 - T0-2 bounded authority/bootstrap/diagnostic corrections — complete.
 - T0-3.0 Mosaic identity establishment — complete.
-- T0-3 documentation consolidation — D1–D5 complete; D6 public/Wiki boundary is in progress and D7
-  remains open.
+- T0-3 Documentation, Wiki & Roadmap consolidation — complete through D7.
 
-Baseline T0 remains open until the separately defined T0-3 completion and final consistency work is
-accepted. Current D6 work does not declare either T0-3 or Baseline T0 complete.
+Baseline T0 remains open until its independent final acceptance is performed and authorized.
+Completing T0-3 does not itself declare Baseline T0 complete.
 
 ## Current priorities
 
-1. Complete D6 public/Wiki boundary work; no Wiki publication is implied.
-2. D7: final documentation consistency, link, ownership, and status audit.
-3. Resume evidence-driven product work from the feature roadmap below.
+1. Perform the separately authorized Baseline T0 final acceptance and closure.
+2. Resume evidence-driven product work from the feature roadmap below after that decision.
 
 ## Product direction
 

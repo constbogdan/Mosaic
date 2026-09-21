@@ -89,7 +89,7 @@ Prefer designs that allow this state to be reused across Library, Series, Downlo
 
 The extended Seerr/discovery functionality is intended to become one coherent optional product capability.
 
-Do not introduce dependencies that break or materially change normal Wholphin/Jellyfin behavior when the extended feature set is disabled or unavailable.
+Do not introduce dependencies that break or materially change inherited Wholphin/Jellyfin behavior when the extended feature set is disabled or unavailable.
 
 Prefer graceful degradation.
 
@@ -112,7 +112,7 @@ Current library diagnostics answer a different question:
 
 -   Is the content that should exist actually playable in Jellyfin?
 
-For TV seasons, Wholphin may persist trusted released-episode expectations so a later visit can compare them with a fresh Jellyfin inventory even after acquisition history has expired or Seerr is unavailable.
+For TV seasons, Mosaic may persist trusted released-episode expectations so a later visit can compare them with a fresh Jellyfin inventory even after acquisition history has expired or Seerr is unavailable.
 
 Do not persist complete/incomplete conclusions, live Jellyfin counts, missing-episode results, or acquisition-adjusted status. Those values are ephemeral and must be calculated from persisted expectations, fresh Jellyfin playability, and current acquisition evidence.
 
@@ -161,7 +161,8 @@ Use the repository documents deliberately:
 - `docs/UPSTREAM_SYNC.md` holds permanent branching and upstream-sync policy.
 - `docs/MOSAIC_ROADMAP.md` holds durable product and engineering direction.
 - `docs/ARCHITECTURE.md` holds stable application and engineering architecture.
-- `docs/CODEX_HANDOFF.md` holds current and historical implementation continuity, non-obvious discoveries, rejected approaches, merge resolutions, and validation results.
+- `docs/CODEX_HANDOFF.md` holds current implementation continuity, unresolved risks, and non-obvious
+  negative knowledge. Completed chronology belongs in `docs/history/README.md`.
 
 During development, preserve information in this file whenever losing it
 would make a future agent materially less effective or force it to

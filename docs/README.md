@@ -47,10 +47,10 @@ continuity, and point-in-time evidence.
   program are going.
 - **Current continuity** — [Codex handoff](CODEX_HANDOFF.md): what a future engineering session
   cannot safely infer from code alone.
-- **Current issue ledger** — [Observed minor issues](OBSERVED_MINOR_ISSUES.md): bounded open and
-  resolved product observations.
-- **Current planning record** — [T0-3 documentation consolidation plan](T0_3_DOCUMENTATION_CONSOLIDATION_PLAN.md):
-  reviewed ownership, consolidation sequence, and acceptance criteria for this documentation phase.
+- **Current observation ledger** — [Observed minor issues](OBSERVED_MINOR_ISSUES.md): bounded open
+  and resolved observations; it is not the roadmap or an operating authority.
+- **Completed program record** — [T0-3 documentation consolidation plan](T0_3_DOCUMENTATION_CONSOLIDATION_PLAN.md):
+  reviewed ownership, implementation sequence, and completion criteria for the documentation phase.
 
 ## Engineering architecture
 

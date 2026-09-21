@@ -2,8 +2,8 @@
 
 ## Current checkpoint
 
-T0-3 documentation consolidation D1–D5 is complete. D6 is defining the public/Wiki boundary; D7
-final consistency remains open. T0-3 and Baseline T0 are not complete.
+T0-3 Documentation, Wiki & Roadmap consolidation is complete through D7. The next checkpoint is
+the separately authorized Baseline T0 final acceptance and closure. Baseline T0 is not yet complete.
 
 Current repository identity is exactly `constbogdan/Mosaic`; upstream remains
 `damontecres/Wholphin`. Work begins from current protected `origin/main` on a purpose-specific
@@ -30,11 +30,10 @@ not current instruction.
 
 ## Immediate continuity
 
-- D6 owns public product guidance, contributor routing, and the rule that optional Wiki content
-  cannot replace versioned engineering authority. Wiki publication remains a separate operator
-  action.
-- D7 will own the final documentation consistency and status audit. Do not declare T0-3 or Baseline
-  T0 complete before that separately reviewed acceptance.
+- Do not declare Baseline T0 complete until its independent final acceptance is explicitly
+  performed and authorized.
+- Public guidance is versioned in the repository. Optional Wiki publication remains a separate
+  operator action and cannot replace engineering authority.
 
 ## Non-obvious invariants and negative knowledge
 
@@ -79,7 +78,7 @@ rather than silently publishing a rewritten snapshot.
 
 ## Open risks and questions
 
-- The current documentation phase still needs D6 and D7 acceptance.
+- Baseline T0 still requires its independent final acceptance and closure decision.
 - External GitHub settings remain manually administered; documentation may describe them, but no
   configuration doctor or scheduled drift monitor is justified without repeated evidence.
 - Android TV visual/focus/device behavior is not fully proven by hosted compilation and JVM tests.
