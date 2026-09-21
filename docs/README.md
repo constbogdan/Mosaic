@@ -86,27 +86,12 @@ Current lifecycle boundaries are: [PR preparation](PREPARE_PR.md) →
 
 ## Historical decisions and acceptance
 
-The following files are point-in-time engineering evidence, not current operating runbooks. D4 may
-add historical navigation or move records only after preserving their links and meaning.
-
-- **Historical acceptance/evidence** — [T0-1 operator UX inventory](T0_1_OPERATOR_UX_INVENTORY.md):
-  completed CP1–CP8 implementation and hosted acceptance ledger.
-- **Historical decision and evidence** — [T0-1 performance audit](T0_1_CP7_PERFORMANCE_AUDIT.md):
-  measured performance corpus and accepted optimization decisions.
-- **Historical acceptance/evidence** — [Item 6 consolidation checklist](ITEM_6_CONSOLIDATION_CHECKLIST.md):
-  delivery/tooling consolidation program ledger.
-- **Historical design and acceptance** — [I05 presentation ledger](ITEM_6_I05_PRESENTATION.md):
-  delivery presentation and compatibility decisions.
-- **Historical design/audit** — [Upstream automation audit](ITEM_6_UPSTREAM_AUTOMATION_AUDIT.md):
-  pinned workflow inventory and ownership analysis.
-- **Historical decision** — [Release pipeline simplification plan](RELEASE_PIPELINE_SIMPLIFICATION_PLAN.md):
-  rationale for the surviving validation and release topology.
-- **Historical decision and acceptance** — [I06 native upstream migration](I06_NATIVE_UPSTREAM_MIGRATION_PLAN.md):
-  migration from the superseded synchronization lifecycle.
-- **Historical decision** — [I07 published Release remediation](I07_PUBLISHED_RELEASE_REMEDIATION.md):
-  accepted containment and forward-recovery policy.
-- **Current architecture with historical acceptance** — [R2 Mosaic identity record](T0_3_R2_MOSAIC_IDENTITY.md):
-  canonical identity plus R2–R4 evidence retained in its current location until later consolidation.
+- **Historical evidence index** — [Historical engineering records](history/README.md): grouped Item 6,
+  T0-1, performance, upstream-migration, release-remediation, and Mosaic-identity evidence. These
+  records explain decisions and acceptance; they are not current operating runbooks.
+- **Historical decision still referenced by current operation** —
+  [Published Release remediation](I07_PUBLISHED_RELEASE_REMEDIATION.md): rationale for the current
+  Stable Hold plus forward-fix policy owned by `MOSAIC_STABLE.md`.
 
 ## Component references
 

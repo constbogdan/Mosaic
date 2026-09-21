@@ -1612,7 +1612,7 @@ change. Live stable promotion and selector/device acceptance remain pending.
 
 User-supplied acceptance establishes operational downstream delivery and Mosaic-driven
 1.0.3 -> 1.0.5 updating. Full evidence, hash, recovery boundaries and timing observations
-are in [the delivery acceptance record](MOSAIC_DEVELOPMENT_RELEASE.md#historical-development-delivery-and-in-place-updater-acceptance---complete-live-validated).
+are in [the delivery acceptance record](MOSAIC_DEVELOPMENT_RELEASE.md#historical-development-delivery-and-in-place-updater-acceptance---complete--live-validated).
 
 The initial normal run built source `41f9f83c36b8866211c9680d3b416d5ebede4888`, version
 1.0.5/code 5, unsigned artifact `10099950969`; signing-secret availability failed and

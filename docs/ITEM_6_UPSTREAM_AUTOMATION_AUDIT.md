@@ -5,6 +5,8 @@
 > T0-1 CP2 subsequently removed the guarded inherited `main.yml` and `release.yml` workflows as
 > explicit downstream-owned absences. Baseline T0 does not support their historical store/AAB
 > distribution capability. The pinned inventory below remains evidence, not current workflow state.
+> Current upstream operation is owned by [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md); related evidence is
+> grouped in the [history index](history/README.md).
 
 Analysis checkpoint, 2026-09-10. Governing tracker: [Item 6 consolidation checklist](ITEM_6_CONSOLIDATION_CHECKLIST.md).
 This inventory began read-only. I05 presentation and I06 ownership-aware Sync were subsequently
