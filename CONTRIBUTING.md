@@ -2,8 +2,10 @@
 
 We appreciate your interest in contributing to Mosaic!
 
-Use the [documentation index](docs/README.md) to find the developer guide, pull-request workflow,
-current project state, and engineering contracts.
+Start with the [developer guide](DEVELOPMENT.md), then use the
+[documentation index](docs/README.md) to find architecture and current engineering contracts.
+Code contributors must follow the canonical [pull-request workflow](docs/PREPARE_PR.md) and
+[validation contract](docs/VALIDATION.md); this page does not redefine either process.
 
 ## Code of Conduct
 

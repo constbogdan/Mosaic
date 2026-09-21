@@ -1,12 +1,15 @@
 # Mosaic documentation
 
 This page answers where to find Mosaic documentation. It is an index, not an operating runbook.
-Role labels distinguish current authority from continuity and point-in-time engineering evidence.
+Role labels distinguish public guidance, contributor orientation, engineering authority, current
+continuity, and point-in-time evidence.
 
 ## Start here
 
 - **Public product entry point** — [Mosaic README](../README.md): what Mosaic is, installation,
   updates, and compatibility.
+- **Public user guidance** — [Mosaic user guide](USER_GUIDE.md): installation and sideloading,
+  Stable versus Development, automatic updates, optional Seerr integration, and troubleshooting.
 - **Product roadmap** — [Mosaic roadmap](MOSAIC_ROADMAP.md): current program status, product
   direction, major completed phases, and remaining work.
 - **Current continuity** — [Codex handoff](CODEX_HANDOFF.md): current checkpoint, recent continuity,
@@ -24,6 +27,19 @@ Role labels distinguish current authority from continuity and point-in-time engi
   local feedback, authoritative PR validation, exact-tree reuse, fallback, and delivery boundaries.
 - **Agent guidance** — [Repository agent instructions](AGENTS.md): permanent repository-specific
   rules for coding agents.
+
+## Public and engineering boundary
+
+- **Public product documentation** — the root [README](../README.md) is the concise product entry
+  point; the [user guide](USER_GUIDE.md) owns user-facing setup, channels, and troubleshooting.
+- **Contributor orientation** — [Contributing](../CONTRIBUTING.md) and the
+  [developer guide](../DEVELOPMENT.md) explain where to start and route deeper work here.
+- **Versioned engineering authority** — architecture, validation, publication, signing,
+  repository identity, and upstream rules are owned only by the canonical repository documents
+  indexed below.
+- **Optional GitHub Wiki** — no Wiki content is currently published or maintained from this
+  repository. A future Wiki may offer user-facing summaries, but must identify and link its
+  versioned source and cannot become engineering authority.
 
 ## Current project state
 
