@@ -337,6 +337,13 @@ class ValidationIntegrationContractTest(unittest.TestCase):
         ):
             self.assertIn(safety_boundary, prepare)
         self.assertIn("'.vscode/*'", prepare_config)
+        for canonical_doc in (
+            "'docs/MOSAIC_ROADMAP.md'",
+            "'docs/ARCHITECTURE.md'",
+            "'docs/MOSAIC_IDENTITY.md'",
+        ):
+            self.assertIn(canonical_doc, prepare_config)
+        self.assertNotIn("'docs/Wholphin_ROADMAP.md'", prepare_config)
         self.assertIn("$path -ne '.vscode/tasks.json'", prepare)
         self.assertIn("[credentials-redacted]", prepare)
 

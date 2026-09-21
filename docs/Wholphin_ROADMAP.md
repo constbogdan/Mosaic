@@ -1,5 +1,9 @@
 # Mosaic Roadmap
 
+> **Historical pre-D5 roadmap and engineering ledger.** The current product roadmap is
+> [MOSAIC_ROADMAP.md](MOSAIC_ROADMAP.md). This file remains at its established path to preserve
+> detailed acceptance evidence and heading anchors; it is not the current roadmap.
+
 > Living roadmap for Mosaic, derived from Wholphin: completed work, current direction, and future backlog.
 
 ## Current engineering program: Baseline T0
@@ -1412,9 +1416,9 @@ Completed evidence and remaining work:
 - [x] Merge hosted upstream detection/candidate preparation on `main`, with isolated normal merges, exact-SHA deduplication, durable blocked issues, and offline safety tests.
 - [x] Establish **Detection: OPERATIONAL**. First manual smoke [run 34281315948](https://github.com/constbogdan/Wholphin/actions/runs/34281315948) succeeded with `no_delta`, zero incoming commits and successful ancestry validation. Exact SHAs and external App setup are recorded in [UPSTREAM_SYNC](UPSTREAM_SYNC.md#hosted-upstream-synchronization-v2).
 - [x] **I06 native Upstream Sync: COMPLETE / LIVE VALIDATED.** PR #55 proved a genuine clean FOLLOW range through native two-parent candidate, required PR Full, human merge, unchanged candidate/tested/main tree, accepted upstream ancestry, exact-tree protected-main reuse, Development publication, and subsequent quiet `no_delta`. Checkpoint 5 removed the duplicated Issue/journal/finalizer/priority lifecycle while preserving ownership, Draft/conflict, orphan, retry, provenance, least-privilege and required-CI safety. Natural textual-conflict live acceptance remains opportunistic evidence, not an I06 completion blocker.
-- [x] Implement PR-only universal defaultDebug artifacts from successful Full CI, reusing its existing APK with seven-day retention, head/tested/base SHA metadata and a job-summary download link. OPERATIONAL + LIVE VALIDATED through PR #12 / run 34284819578: the exact artifact was downloaded, installed and run on the emulator after removing an old Debug installation. See [retrieval and install instructions](CODEX_HANDOFF.md#pr-debug-apk-artifacts-2026-09-09).
-- [x] Implement approved Mosaic technical identity (`io.github.constbogdan.mosaic`, Debug `.debug`, upstream Kotlin namespace retained) and frozen-epoch first-parent versions (`1.0.N`). Signing is live-validated below; updater routing and rolling development delivery are live validated; stable promotion is live validated; visual branding remains pending. See [implementation boundaries](CODEX_HANDOFF.md#mosaic-technical-identity-and-versions-implemented-2026-09-09).
-- [x] Persist the [downstream Release identity proposal](CODEX_HANDOFF.md#downstream-release-identity-contract-proposal-2026-09-09): separate app ID, owned Release key, anchored first-parent version sequence, common updater source and exact-artifact promotion. Identity/version allocation is approved and implemented; signing is live-validated; manual development publication is live validated through unsigned recovery; automatic Development after exact-main CI is live validated; Stable stays manual.
+- [x] Implement PR-only universal defaultDebug artifacts from successful Full CI, reusing its existing APK with seven-day retention, head/tested/base SHA metadata and a job-summary download link. OPERATIONAL + LIVE VALIDATED through PR #12 / run 34284819578: the exact artifact was downloaded, installed and run on the emulator after removing an old Debug installation. See the [preserved pre-D5 handoff](history/CODEX_HANDOFF_PRE_D5.txt).
+- [x] Implement approved Mosaic technical identity (`io.github.constbogdan.mosaic`, Debug `.debug`, upstream Kotlin namespace retained) and frozen-epoch first-parent versions (`1.0.N`). Signing is live-validated below; updater routing and rolling development delivery are live validated; stable promotion is live validated; visual branding remains pending. See the [preserved pre-D5 handoff](history/CODEX_HANDOFF_PRE_D5.txt).
+- [x] Preserve the downstream Release identity proposal in the [pre-D5 handoff](history/CODEX_HANDOFF_PRE_D5.txt): separate app ID, owned Release key, anchored first-parent version sequence, common updater source and exact-artifact promotion. Identity/version allocation is approved and implemented; signing is live-validated; manual development publication is live validated through unsigned recovery; automatic Development after exact-main CI is live validated; Stable stays manual.
 - [x] Prepare [Mosaic signing infrastructure](MOSAIC_SIGNING.md): explicitly unsigned Gradle Release builds, public fingerprint policy/verifier and user-only custody/restore instructions. The manual exercise remains available; normal Development now uses the isolated signer after successful main CI. Identity/versioning is operational on main.
 - [x] Permanent Mosaic Release signing identity established: user confirms two independent encrypted backups and successful restore/hash/certificate/private-key-access verification. Only the public SHA256 is recorded in the pinned signing policy.
 - [x] Historical signing isolation was proven with `mosaic-release-signing`; active Development signing now uses the main-restricted `release-sign` Environment with the same four secrets. No active workflow/script references the retired Environment, which may be deleted manually after operator review.
@@ -1553,7 +1557,7 @@ requires one. No labels, Issues, Project, or unrelated GitHub changes occur here
 Live run/artifact audit corrected the earlier credential-binding hypothesis: read-only
 observation found SeriesOverview.kt / SeriesViewModel.kt conflicts; the ready-only App
 mint step correctly skipped. Durable issue recording failed and repository Issues are
-currently disabled. See [historical diagnosis](CODEX_HANDOFF.md#historical-v1-upstream-publication-diagnosis-superseded-by-i06).
+currently disabled. See the [preserved historical diagnosis](history/CODEX_HANDOFF_PRE_D5.txt).
 This evidence is retained only to explain the path to I06. The completed native lifecycle no
 longer depends on Issues or journal reporting; current behavior and remaining natural-conflict
 acceptance are documented in [UPSTREAM_SYNC](UPSTREAM_SYNC.md) and

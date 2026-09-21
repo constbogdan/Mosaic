@@ -35,7 +35,9 @@
         'docs/AGENTS.md'
         'docs/UPSTREAM_SYNC.md'
         'docs/CODEX_HANDOFF.md'
-        'docs/Wholphin_ROADMAP.md'
+        'docs/MOSAIC_ROADMAP.md'
+        'docs/ARCHITECTURE.md'
+        'docs/MOSAIC_IDENTITY.md'
     )
 
     RefusedArtifactPatterns = @(

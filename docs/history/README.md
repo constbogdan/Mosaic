@@ -58,10 +58,14 @@ Current operation belongs to [Development publication](../MOSAIC_DEVELOPMENT_REL
 
 ## Mosaic identity migration and T0-3 evidence
 
-- [R2–R4 Mosaic identity record](../T0_3_R2_MOSAIC_IDENTITY.md) — the current identity contract plus
-  retained repository rename, canonicalization, presentation, and old-name retirement acceptance.
+- [R2–R4 Mosaic identity record](../T0_3_R2_MOSAIC_IDENTITY.md) — retained repository rename,
+  canonicalization, presentation, and old-name retirement acceptance.
+- [Pre-D5 roadmap and engineering ledger](../Wholphin_ROADMAP.md) — detailed completed-program
+  chronology retained at its established path after the concise current roadmap was created.
+- [Pre-D5 Codex handoff snapshot](CODEX_HANDOFF_PRE_D5.txt) — byte-identical preserved continuity,
+  incident, architecture, and acceptance ledger from immediately before handoff reduction.
 - [Documentation consolidation plan](../T0_3_DOCUMENTATION_CONSOLIDATION_PLAN.md) — D1 inventory,
   reviewed ownership model, and D1–D7 implementation decisions.
 
-The identity record remains in place because it still owns current identity until D5 decides its
-permanent form. Its historical sections are evidence, not alternate current identities.
+Current identity is owned by [MOSAIC_IDENTITY.md](../MOSAIC_IDENTITY.md), and the current roadmap by
+[MOSAIC_ROADMAP.md](../MOSAIC_ROADMAP.md). The older records remain evidence, not alternate owners.

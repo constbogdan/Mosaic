@@ -1,6 +1,6 @@
 # T0-3 documentation consolidation audit and plan
 
-Status: **D1-D3 COMPLETE; D4 implemented pending review. D5 has not begun.**
+Status: **D1-D4 COMPLETE; D5 implemented pending review. D6 has not begun.**
 
 This audit describes the documentation set at `main` commit
 `44564901cbdb7ffce4b1c0704aa2d53f93c40fa9`. It does not move, delete, rename, or broadly rewrite
@@ -347,7 +347,27 @@ used the history index to make their role unambiguous. `T0_3_R2_MOSAIC_IDENTITY.
 the current identity owner until D5; its acceptance sections are explicitly historical without
 renaming or splitting the file.
 
-D4 is complete pending review: evidence and historical names remain unchanged, established paths
-and anchors are preserved, and current ownership remains with the D3 manuals. D5 has not begun;
-roadmap/handoff reduction, `ARCHITECTURE.md`, roadmap or identity renaming, and agent-guide
-consolidation remain later work.
+At D4 closure, evidence and historical names remained unchanged, established paths and anchors were
+preserved, and current ownership remained with the D3 manuals. D5 subsequently resolved the
+roadmap, architecture, identity, handoff, and agent-guidance decisions recorded below.
+
+## D5 implementation decisions
+
+D5 created `ARCHITECTURE.md`, `MOSAIC_IDENTITY.md`, and `MOSAIC_ROADMAP.md` as the permanent current
+owners for stable architecture, identity, and product/engineering direction. Established
+`Wholphin_ROADMAP.md` and `T0_3_R2_MOSAIC_IDENTITY.md` paths remain as explicitly historical records
+because their many heading-level and likely external links make deletion or stub replacement unsafe.
+Current consumers now point to the Mosaic-named owners.
+
+`CODEX_HANDOFF.md` was reduced from the multi-thousand-line ledger to bounded current continuity,
+invariants, risks, negative knowledge, and canonical links. Its complete pre-D5 bytes are preserved
+as `history/CODEX_HANDOFF_PRE_D5.txt`; the machine-required live filename remains unchanged.
+
+`AGENTS.md` remains the unambiguous general authority. `UI_AGENTS.md` now contains only scoped
+Android TV presentation, focus, navigation, shared-state, and manual-validation guidance, with
+explicit precedence back to `AGENTS.md`. Roadmap path consumers in agent guidance, upstream docs,
+and `prepare-pr.config.psd1` migrated to `MOSAIC_ROADMAP.md`; architecture and identity are retained
+as high-risk documentation inputs rather than weakening classification.
+
+D5 changes documentation ownership only. D6 public/Wiki work and D7 final consistency remain open;
+T0-3 and Baseline T0 are not complete.

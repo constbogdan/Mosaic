@@ -71,8 +71,12 @@ docs/*
 !docs/T0_3_DOCUMENTATION_CONSOLIDATION_PLAN.md
 !docs/README.md
 !docs/VALIDATION.md
+!docs/ARCHITECTURE.md
+!docs/MOSAIC_IDENTITY.md
+!docs/MOSAIC_ROADMAP.md
 !docs/history/
 !docs/history/README.md
+!docs/history/CODEX_HANDOFF_PRE_D5.txt
 !docs/history/
 !docs/history/README.md
 !docs/AGENTS.md
