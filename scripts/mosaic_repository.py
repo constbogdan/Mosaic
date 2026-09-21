@@ -1,20 +1,15 @@
-"""Exact repository identities for the temporary T0-3.0 rename bridge."""
+"""Exact current downstream and upstream repository identities."""
 
-LEGACY_DOWNSTREAM_REPOSITORY = "constbogdan/Wholphin"
 MOSAIC_DOWNSTREAM_REPOSITORY = "constbogdan/Mosaic"
-DOWNSTREAM_REPOSITORIES = (
-    LEGACY_DOWNSTREAM_REPOSITORY,
-    MOSAIC_DOWNSTREAM_REPOSITORY,
-)
 UPSTREAM_REPOSITORY = "damontecres/Wholphin"
 
 
 def authenticate_downstream_repository(value):
     """Return a trusted exact downstream identity or fail closed."""
-    if value not in DOWNSTREAM_REPOSITORIES:
+    if value != MOSAIC_DOWNSTREAM_REPOSITORY:
         raise ValueError(
             "Untrusted downstream repository; expected exactly "
-            + " or ".join(DOWNSTREAM_REPOSITORIES)
+            + MOSAIC_DOWNSTREAM_REPOSITORY
         )
     return value
 

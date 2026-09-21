@@ -23,7 +23,7 @@ jobs:
   observe:
     name: Observe upstream integration
     if: >-
-      (github.repository == 'constbogdan/Wholphin' || github.repository == 'constbogdan/Mosaic') &&
+      github.repository == 'constbogdan/Mosaic' &&
       github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -61,7 +61,7 @@ jobs:
     name: Publish candidate
     needs: observe
     if: >-
-      (github.repository == 'constbogdan/Wholphin' || github.repository == 'constbogdan/Mosaic') &&
+      github.repository == 'constbogdan/Mosaic' &&
       github.ref == 'refs/heads/main' &&
       needs.observe.outputs.outcome != 'no_delta'
     runs-on: ubuntu-latest

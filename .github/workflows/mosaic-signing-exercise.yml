@@ -22,7 +22,7 @@ jobs:
   build:
     name: Validate and build diagnostic input
     if: >-
-      (github.repository == 'constbogdan/Wholphin' || github.repository == 'constbogdan/Mosaic') &&
+      github.repository == 'constbogdan/Mosaic' &&
       github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.ref_protected
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -72,7 +72,7 @@ jobs:
     permissions:
       contents: read
     if: >-
-      (github.repository == 'constbogdan/Wholphin' || github.repository == 'constbogdan/Mosaic') &&
+      github.repository == 'constbogdan/Mosaic' &&
       github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.ref_protected
     outputs:
       artifact_id: ${{ steps.signed.outputs.artifact-id }}

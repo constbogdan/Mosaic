@@ -12,12 +12,12 @@ import urllib.parse
 import urllib.request
 
 from mosaic_repository import (
-    LEGACY_DOWNSTREAM_REPOSITORY,
+    MOSAIC_DOWNSTREAM_REPOSITORY,
     authenticate_downstream_repository,
 )
 
-# Compatibility name for historical fixtures; live operations authenticate the runtime identity.
-REPOSITORY = LEGACY_DOWNSTREAM_REPOSITORY
+# Canonical downstream identity used by fixtures and live operations.
+REPOSITORY = MOSAIC_DOWNSTREAM_REPOSITORY
 WORKFLOW = ".github/workflows/ci.yml"
 JOB = "Full validation"
 CONTRACT = "pr-policy-v1"

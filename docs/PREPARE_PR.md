@@ -2,10 +2,9 @@
 
 `scripts/prepare-pr.ps1` is Mosaic's publication command. Codex and repository tooling must not invoke it merely because work appears complete. Running it, or explicitly instructing Codex to run it, is the user's **READY TO PUBLISH** decision. For an ordinary non-Draft PR, that authorization also asks GitHub to merge the exact published head automatically after repository protection succeeds. Upstream attention Drafts retain a separate human **READY TO MERGE** decision.
 
-During the T0-3.0 R1 repository-name transition, prepare-pr accepts exactly
-`constbogdan/Wholphin` or `constbogdan/Mosaic` as `origin`. This is a temporary closed bridge, not a
-configurable trust policy: lookalikes, different owners, forks, malformed identities, and casing
-variants are refused. Every `gh` target is derived from the exact origin identity after that check.
+Prepare-pr accepts exactly `constbogdan/Mosaic` as `origin`. Lookalikes, different owners, forks,
+the retired pre-rename identity, malformed identities, and casing variants are refused. Every `gh`
+target is derived from the exact origin identity after that check.
 
 **CURRENT:** Autonomous PR handoff v2 is integrated on `main` through [PR #9](https://github.com/constbogdan/Mosaic/pull/9). Validation and dogfooding evidence is preserved in [the handoff](CODEX_HANDOFF.md).
 

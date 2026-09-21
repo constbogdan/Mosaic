@@ -16,13 +16,13 @@ from pathlib import Path
 
 import mosaic_validation_policy
 from mosaic_repository import (
-    LEGACY_DOWNSTREAM_REPOSITORY,
+    MOSAIC_DOWNSTREAM_REPOSITORY,
     UPSTREAM_REPOSITORY,
     authenticate_downstream_repository,
 )
 
 
-REPOSITORY = LEGACY_DOWNSTREAM_REPOSITORY
+REPOSITORY = MOSAIC_DOWNSTREAM_REPOSITORY
 UPSTREAM = UPSTREAM_REPOSITORY
 BASE_BRANCH = "main"
 BRANCH_PREFIX = "chore/sync-upstream-"
@@ -215,7 +215,7 @@ def assert_preflight(runner: Runner, root: Path, *, allow_dirty=False) -> tuple[
         authenticate_downstream_repository(slug(origin))
     except ValueError as error:
         raise Refusal(
-            "Expected origin constbogdan/Wholphin or constbogdan/Mosaic; "
+            "Expected origin constbogdan/Mosaic; "
             f"found {slug(origin) or origin}."
         ) from error
     upstream = runner.run(["git", "remote", "get-url", "upstream"], cwd=root).stdout.strip()
@@ -237,7 +237,7 @@ def authenticated_origin(runner: Runner, root: Path) -> str:
         return authenticate_downstream_repository(slug(origin))
     except ValueError as error:
         raise Refusal(
-            "Expected origin constbogdan/Wholphin or constbogdan/Mosaic; "
+            "Expected origin constbogdan/Mosaic; "
             f"found {slug(origin) or origin}."
         ) from error
 

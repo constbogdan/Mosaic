@@ -19,13 +19,13 @@ import unicodedata
 from urllib.parse import quote
 
 from mosaic_repository import (
-    LEGACY_DOWNSTREAM_REPOSITORY,
+    MOSAIC_DOWNSTREAM_REPOSITORY,
     UPSTREAM_REPOSITORY,
     authenticate_downstream_repository,
 )
 
 
-ORIGIN = LEGACY_DOWNSTREAM_REPOSITORY
+ORIGIN = MOSAIC_DOWNSTREAM_REPOSITORY
 UPSTREAM = UPSTREAM_REPOSITORY
 URLS = {"origin": f"https://github.com/{ORIGIN}.git",
         "upstream": f"https://github.com/{UPSTREAM}.git"}

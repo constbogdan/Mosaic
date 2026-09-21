@@ -111,7 +111,7 @@ class HostedSyncTests(unittest.TestCase):
         return git, o
 
     def pr(self, o, state="open", head=None, draft=False, body=None):
-        return {"number": 123, "state": state, "html_url": "https://github.com/constbogdan/Wholphin/pull/123",
+        return {"number": 123, "state": state, "html_url": "https://github.com/constbogdan/Mosaic/pull/123",
                 "draft": draft, "body": body if body is not None else sync.description(o),
                 "base": {"ref": "main", "repo": {"full_name": sync.ORIGIN}},
                 "head": {"ref": o["branch"], "sha": head or o["candidate_sha"], "repo": {"full_name": sync.ORIGIN}}}
@@ -329,7 +329,7 @@ class HostedSyncTests(unittest.TestCase):
         git, observation = self.observe()
         first = self.pr(observation)
         second = {**first, "number": 124,
-                  "html_url": "https://github.com/constbogdan/Wholphin/pull/124"}
+                  "html_url": "https://github.com/constbogdan/Mosaic/pull/124"}
         git.run(
             "push",
             str(self.remotes["origin"]),
@@ -365,7 +365,7 @@ class HostedSyncTests(unittest.TestCase):
         self.assertFalse(retry.pushes or self.github.created)
         summary = sync.upstream_summary(result, publication=True)
         self.assertIn("### Candidate ready", summary)
-        self.assertIn("PR #123  [open](https://github.com/constbogdan/Wholphin/pull/123)", summary)
+        self.assertIn("PR #123  [open](https://github.com/constbogdan/Mosaic/pull/123)", summary)
         self.assertIn("no duplicate was created", summary)
 
     def test_draft_pr_appearing_during_publish_remains_blocked_and_open(self):
@@ -426,7 +426,7 @@ class HostedSyncTests(unittest.TestCase):
         self.assertEqual(published_count, len(self.github.created))
         summary = sync.upstream_summary(waiting, publication=True)
         self.assertTrue(summary.startswith("## Waiting on PR #123"))
-        self.assertIn("PR #123  [open](https://github.com/constbogdan/Wholphin/pull/123)", summary)
+        self.assertIn("PR #123  [open](https://github.com/constbogdan/Mosaic/pull/123)", summary)
         self.assertIn("current newer upstream observation is retained", summary)
         self.assertIn("No duplicate candidate branch or PR was created", summary)
 
@@ -483,7 +483,7 @@ class HostedSyncTests(unittest.TestCase):
         old_git, old = self.observe()
         self.retain_pr(old_git, old, draft=True)
         second = {**self.github.records[0], "number": 124,
-                  "html_url": "https://github.com/constbogdan/Wholphin/pull/124"}
+                  "html_url": "https://github.com/constbogdan/Mosaic/pull/124"}
         old_git.run(
             "push", str(self.remotes["origin"]),
             f"{old['candidate_sha']}:refs/pull/124/head",
@@ -579,8 +579,8 @@ class HostedSyncTests(unittest.TestCase):
         self.assertNotIn('finalize-merged-episode', workflow)
         self.assertNotIn('--finalize-merged-pr', workflow)
         for part in (observe, publish):
-            self.assertIn("github.repository == 'constbogdan/Wholphin'", part)
             self.assertIn("github.repository == 'constbogdan/Mosaic'", part)
+            self.assertNotIn("github.repository == 'constbogdan/Wholphin'", part)
             self.assertIn("github.ref == 'refs/heads/main'", part)
         self.assertIn("needs.observe.outputs.outcome != 'no_delta'", publish)
         mint, execution = publish.split('      - name: Recheck exact inputs', 1)
@@ -609,22 +609,22 @@ class HostedSyncTests(unittest.TestCase):
         self.assertIn('if: always()', execution)
         self.assertNotIn('MOSAIC_', workflow)
 
-    def test_transition_repositories_drive_exact_git_and_api_targets(self):
-        for repository in ("constbogdan/Wholphin", "constbogdan/Mosaic"):
-            with self.subTest(repository=repository):
-                path = self.root / repository.rsplit("/", 1)[1]
-                path.mkdir()
-                git = sync.Git(path, repository)
-                self.assertEqual(
-                    f"https://github.com/{repository}.git",
-                    git.text("remote", "get-url", "origin"),
-                )
-                github = sync.GitHub(repository)
-                completed = subprocess.CompletedProcess([], 0, stdout="[[]]", stderr="")
-                with patch.object(sync, "command", return_value=completed) as command:
-                    self.assertEqual([], github.pages("pulls"))
-                self.assertIn(f"repos/{repository}/pulls", command.call_args.args[0])
-        for repository in ("constbogdan/Mosaic2", "other/Mosaic", "forks/Mosaic", ""):
+    def test_mosaic_repository_drives_exact_git_and_api_targets(self):
+        repository = "constbogdan/Mosaic"
+        path = self.root / "Mosaic"
+        path.mkdir()
+        git = sync.Git(path, repository)
+        self.assertEqual(
+            f"https://github.com/{repository}.git",
+            git.text("remote", "get-url", "origin"),
+        )
+        github = sync.GitHub(repository)
+        completed = subprocess.CompletedProcess([], 0, stdout="[[]]", stderr="")
+        with patch.object(sync, "command", return_value=completed) as command:
+            self.assertEqual([], github.pages("pulls"))
+        self.assertIn(f"repos/{repository}/pulls", command.call_args.args[0])
+        for repository in ("constbogdan/Wholphin", "constbogdan/Mosaic2",
+                           "constbogdan/mosaic", "other/Mosaic", "forks/Mosaic", ""):
             with self.subTest(repository=repository), self.assertRaises(ValueError):
                 sync.GitHub(repository)
 
@@ -865,8 +865,8 @@ class HostedSyncTests(unittest.TestCase):
         observation = {"episode_id": "a" * 64, "outcome": "review_required",
                        "downstream_repo": sync.ORIGIN,
                        "upstream_sha": "b" * 40,
-                       "downstream_sha": "c" * 40, "pr_url": "https://github.com/constbogdan/Wholphin/pull/31",
-                       "pr_number": 31, "run_url": "https://github.com/constbogdan/Wholphin/actions/runs/9",
+                       "downstream_sha": "c" * 40, "pr_url": "https://github.com/constbogdan/Mosaic/pull/31",
+                       "pr_number": 31, "run_url": "https://github.com/constbogdan/Mosaic/actions/runs/9",
                        "incoming_commits": [{"sha": "d" * 40, "subject": "Fix duplicates (#1946)",
                                              "url": "https://github.com/damontecres/Wholphin/commit/" + "d" * 40,
                                              "pull_request_numbers": ["1946"],
@@ -875,7 +875,7 @@ class HostedSyncTests(unittest.TestCase):
                        "automation_changes": [{"path": path, "new_blob": "e" * 40,
                                                 "downstream_blob": "f" * 40, "ownership": "REVIEW",
                                                 "upstream_url": "https://github.com/damontecres/Wholphin/blob/" + "b" * 40 + "/" + path,
-                                                "downstream_url": "https://github.com/constbogdan/Wholphin/blob/" + "c" * 40 + "/" + path},
+                                                "downstream_url": "https://github.com/constbogdan/Mosaic/blob/" + "c" * 40 + "/" + path},
                                                {"path": clean_path, "new_blob": "1" * 40,
                                                 "downstream_blob": None, "ownership": "FOLLOW"}],
                        }
@@ -903,18 +903,18 @@ class HostedSyncTests(unittest.TestCase):
         summary = sync.upstream_summary(observation, publication=True)
         self.assertTrue(summary.startswith("## 2 upstream changes · review required"))
         self.assertIn("1 path requires semantic review", summary)
-        self.assertIn("PR #31  [open](https://github.com/constbogdan/Wholphin/pull/31)", summary)
+        self.assertIn("PR #31  [open](https://github.com/constbogdan/Mosaic/pull/31)", summary)
         self.assertLess(summary.index("### Review required"), summary.index("1 incoming"))
         self.assertIn("Semantic REVIEW:", summary)
         self.assertIn("Git textual conflict:", summary)
-        self.assertIn("[Current Mosaic](https://github.com/constbogdan/Wholphin/blob/", summary)
+        self.assertIn("[Current Mosaic](https://github.com/constbogdan/Mosaic/blob/", summary)
         self.assertIn("[Incoming upstream](https://github.com/damontecres/Wholphin/blob/", summary)
         self.assertIn("<summary>Operator navigation</summary>", summary)
         self.assertIn("<summary>Technical details</summary>", summary)
         self.assertIn("[PR 1946](https://github.com/damontecres/Wholphin/pull/1946)", summary)
         self.assertIn("https://github.com/damontecres/Wholphin/commit/" + "d" * 40, summary)
         self.assertIn("https://github.com/damontecres/Wholphin/blob/" + "b" * 40 + "/" + path, summary)
-        self.assertIn("https://github.com/constbogdan/Wholphin/blob/" + "c" * 40 + "/" + path, summary)
+        self.assertIn("https://github.com/constbogdan/Mosaic/blob/" + "c" * 40 + "/" + path, summary)
 
     def test_clean_follow_pr_stands_alone_without_journal(self):
         self.upstream("app/example.kt", "clean\n")
@@ -1133,7 +1133,7 @@ class HostedSyncTests(unittest.TestCase):
         summary = (self.root / "summary.md").read_text()
         self.assertIn("## Upstream publication failed", summary)
         self.assertIn("No candidate PR was confirmed", summary)
-        self.assertIn("Candidate branch  [inspect](https://github.com/constbogdan/Wholphin/tree/",
+        self.assertIn("Candidate branch  [inspect](https://github.com/constbogdan/Mosaic/tree/",
                       summary)
         self.assertIn("inspect the outcome artifact and branch before rerunning", summary)
         self.assertIn("permission_denied: fixture publication failed", summary)
@@ -1220,7 +1220,7 @@ class HostedSyncTests(unittest.TestCase):
                 ownership_counts={"FOLLOW": 1, "REVIEW": 0, "DOWNSTREAM-OWNED": 0},
                 ancestry_validated=True,
                 blocking_pr_number=123,
-                blocking_pr_url="https://github.com/constbogdan/Wholphin/pull/123",
+                blocking_pr_url="https://github.com/constbogdan/Mosaic/pull/123",
                 blocking_pr_head_sha=blocker_head,
                 blocking_pr_branch=sync.branch_name("1" * 40, "2" * 40),
                 blocking_upstream_sha="1" * 40,

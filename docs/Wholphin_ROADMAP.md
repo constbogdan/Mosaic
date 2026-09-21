@@ -24,7 +24,7 @@ HOSTED VALIDATED (PR #85); T0-2 is COMPLETE. T0-3.0 R1 is COMPLETE / BOTH-NAME H
 (old-name PR #87; new-name PR #89). R2's external repository rename is COMPLETE / VERIFIED; the
 [canonical Mosaic identity migration](T0_3_R2_MOSAIC_IDENTITY.md) is HOSTED VALIDATED. Its
 Development publisher correction is COMPLETE / HOSTED RECOVERY VALIDATED. R3 is COMPLETE / HOSTED
-AND REAL-DEVICE VALIDATED. R4 is next.
+AND REAL-DEVICE VALIDATED. R4 is LOCALLY IMPLEMENTED / HOSTED ACCEPTANCE PENDING.
 The external contribution lifecycle is KEEP /
 DOCUMENTED.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
@@ -373,7 +373,8 @@ default; the surviving mechanisms each protect a reviewed consumer or authority 
 
 Status: **R1 — COMPLETE / BOTH-NAME HOSTED VALIDATED. R2 repository rename — COMPLETE / VERIFIED.
 R2 canonical Mosaic identity migration — HOSTED VALIDATED. Development publisher correction —
-COMPLETE / HOSTED RECOVERY VALIDATED. R3 — COMPLETE / HOSTED AND REAL-DEVICE VALIDATED. R4 — NEXT.**
+COMPLETE / HOSTED RECOVERY VALIDATED. R3 — COMPLETE / HOSTED AND REAL-DEVICE VALIDATED. R4 —
+LOCALLY IMPLEMENTED / HOSTED ACCEPTANCE PENDING.**
 
 T0-3 begins by establishing the permanent downstream product identity before the broader
 documentation, wiki, and roadmap consolidation. This record preserves the accepted decisions and
@@ -719,6 +720,12 @@ With R3 complete:
 - remove transition-only repository targeting code;
 - preserve historical old repository values and evidence unchanged;
 - record **T0-3.0 — COMPLETE / LIVE VALIDATED**.
+
+R4 is **LOCALLY IMPLEMENTED / HOSTED ACCEPTANCE PENDING**. Current runtime and workflow
+authentication accepts only exact `constbogdan/Mosaic`; the retired `constbogdan/Wholphin` identity,
+case variants, lookalikes, foreign owners, and malformed identities fail closed before credentials
+or mutation. Historical old-name evidence and upstream `damontecres/Wholphin` remain unchanged.
+T0-3.0 is not closed until the Mosaic-only hosted lifecycle is accepted.
 
 The permanent T0-3 documentation/knowledge consolidation begins only after R4.
 

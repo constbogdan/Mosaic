@@ -4,19 +4,17 @@ This document is the authoritative policy for branch use and synchronization of 
 
 ## Remotes and integration baseline
 
-- During T0-3.0 R1, `origin` is authenticated as exactly `constbogdan/Wholphin` or
-  `constbogdan/Mosaic`; no other owner/name is trusted. R2 renamed the maintained fork to the
-  canonical `constbogdan/Mosaic`; the old name remains temporarily authorized only by the R1
-  transition bridge.
+- `origin` is authenticated as exactly `constbogdan/Mosaic`; no other owner/name, including the
+  retired pre-rename identity, is trusted for current operation.
 - `upstream` is `damontecres/Wholphin`, the original Wholphin project.
 - `origin/main` is the known-good integration branch: upstream Wholphin plus our validated enhancements.
 
 `main` must remain buildable and validated. Do not perform active development directly on it. Update local `main` from `origin/main`, then create a purpose-specific branch.
 
-The R1 bridge changes only downstream repository authentication and targeting. Upstream remains
-exactly `damontecres/Wholphin`; managed `wholphin-upstream-*` markers and human-controlled Draft
-authority are unchanged. The App token targets the current repository name only after the workflow
-and hosted implementation authenticate one of the two exact transition identities.
+R4 removed the temporary downstream repository-name bridge. Upstream remains exactly
+`damontecres/Wholphin`; managed `wholphin-upstream-*` markers and human-controlled Draft authority
+are unchanged. The App token targets `constbogdan/Mosaic` only after the workflow and hosted
+implementation authenticate that exact current identity.
 
 ## Branch classes
 

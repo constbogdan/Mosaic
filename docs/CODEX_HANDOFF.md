@@ -54,6 +54,8 @@
 
 `T0-3.0 R3 - COMPLETE / HOSTED AND REAL-DEVICE VALIDATED`
 
+`T0-3.0 R4 - LOCALLY IMPLEMENTED / HOSTED ACCEPTANCE PENDING`
+
 `R3 Android TV banner identity - COMPLETE / HOSTED AND REAL-DEVICE VALIDATED (PR #95)`
 
 `R3 Stable Promotion presentation - COMPLETE / HOSTED VALIDATED (PR #96; run 35571701304)`
@@ -67,11 +69,12 @@ Wholphin remains the upstream project/source identity. Future releases use only
 `Mosaic-release.apk`, new Mosaic builds target only `constbogdan/Mosaic`, and the public URI scheme
 becomes `mosaic:`; there are no compatibility aliases for a nonexistent installed population.
 `wholphin-pr-policy-v1-*` remains the current evidence protocol: only its authenticated repository
-value transitions. R1 now implements the exact, case-sensitive closed transition set
-`constbogdan/Wholphin` / `constbogdan/Mosaic` across prepare-pr, validation/evidence reuse,
-Development, version/signing, Stable, Hold, hosted upstream, and resolver boundaries. Runtime Git,
-API, release-navigation, and App-token repository targets derive only from that authenticated
-identity; foreign/lookalike/malformed identities fail before credentials or mutation. Workflow
+value transitions. R4 retires R1's temporary two-name bridge: current downstream operation now
+accepts only the exact, case-sensitive `constbogdan/Mosaic` identity across prepare-pr,
+validation/evidence reuse, Development, version/signing, Stable, Hold, hosted upstream, and resolver
+boundaries. Runtime Git, API, release-navigation, and App-token repository targets derive only from
+that authenticated identity; the retired old name and foreign/lookalike/malformed identities fail
+before credentials or mutation. Workflow
 permissions, Environment authority, App-token outcome allowlist, updater/APK identity, upstream
 identity and stable `wholphin-*` protocol markers are unchanged. PR #87 supplied the old-name
 hosted proof: PR run `35311963364` passed `ANDROID_FULL` and emitted exact-tree
@@ -106,10 +109,11 @@ head `d01f09f547d39ce768e3cbb071d3d711c1026389` ran CI `35324631949`, attempt 1,
 fallback. Development classified the complete range `docs-only / low`, `releaseRequired=false`,
 reported `No build required`, and skipped Release Build, Sign and Publish.
 
-R1 is **COMPLETE / BOTH-NAME HOSTED VALIDATED**. The exact two-name bridge remains installed until
-R4. R2's repository rename is **COMPLETE / VERIFIED**. The R2 canonical Mosaic identity migration
+R1 is **COMPLETE / BOTH-NAME HOSTED VALIDATED** as historical transition evidence. R4 has removed
+the exact two-name bridge locally and awaits hosted acceptance. R2's repository rename is **COMPLETE
+/ VERIFIED**. The R2 canonical Mosaic identity migration
 is **HOSTED VALIDATED**; R3 is **COMPLETE / HOSTED AND REAL-DEVICE VALIDATED**. Historical old-name evidence remains correct, and the old-name authorization
-remains installed until R4.
+is no longer current authorization.
 
 PR #91 passed authoritative `ANDROID_FULL`, protected-main exact-tree reuse, Build, and Sign, and
 produced valid immutable `downstream-build-72`. Rolling publication then exposed two bounded
@@ -186,9 +190,9 @@ to immutable `downstream-build-77` at SHA-256
 Real-device acceptance also completed on Android TV. Mosaic v1.0.76 from PR #95 was installed over
 the existing Mosaic v1.0.73 installation without uninstalling. Android treated it as an in-place
 update; the TV launcher/app menu showed Mosaic, login/session and preferences/local app state
-survived, and normal launch and use remained functional. R3 is closed. The next sequence is R4
-removal of old downstream repository authentication, followed by dedicated documentation/wiki
-consolidation.
+survived, and normal launch and use remained functional. R3 is closed. R4 removal of old downstream
+repository authentication is locally implemented and awaits hosted acceptance; dedicated
+documentation/wiki consolidation follows it.
 
 The external contribution lifecycle is **KEEP / NO SECURITY OR PROVENANCE DEFECT**. A fork PR may
 run approved unprivileged authoritative CI and upload a correctly named policy artifact, but receives

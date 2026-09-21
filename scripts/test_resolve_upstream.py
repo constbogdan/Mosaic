@@ -28,7 +28,7 @@ BRANCH = f"chore/sync-upstream-{UPSTREAM}-{DOWNSTREAM}"
 
 
 class FakeRunner:
-    def __init__(self, *, dirty=False, origin="https://github.com/constbogdan/Wholphin.git",
+    def __init__(self, *, dirty=False, origin="https://github.com/constbogdan/Mosaic.git",
                  state="open", candidate=True, local=False, local_sha=CANDIDATE,
                  tracking=None, artifact=True, ci_bucket="fail", current_branch="chore/test",
                  upstream_rewritten=False):

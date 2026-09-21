@@ -2,18 +2,12 @@
 
 Mosaic is a downstream Android TV client derived from
 [Wholphin](https://github.com/damontecres/Wholphin).
-<p align="center">
-<a href="https://github.com/constbogdan/Mosaic/releases/latest">
-<img alt="Current Mosaic Release" src="https://img.shields.io/github/release/constbogdan/Mosaic.svg"/>
-</a>
-<br/>
-</p>
 
 ## Installation
 
-Mosaic is currently distributed directly through GitHub Releases. Download the versioned APK from
-the [current Stable release](https://github.com/constbogdan/Mosaic/releases/latest). Development builds are available from the
-[`develop` release](https://github.com/constbogdan/Mosaic/releases/tag/develop) for explicit testing.
+Mosaic is currently distributed directly through GitHub Releases. [![Current Mosaic Release](https://img.shields.io/github/release/constbogdan/Mosaic.svg)](https://github.com/constbogdan/Mosaic/releases/latest)
+
+Development builds are available from the [`develop` release](https://github.com/constbogdan/Mosaic/releases/tag/develop) for testing.
 
 1. Enable side-loading "unknown" apps
     - https://androidtvnews.com/unknown-sources-chromecast-google-tv/
@@ -40,4 +34,4 @@ Requires Android 6+ (or Fire TV OS 6+) and Jellyfin server `10.10.x` or `10.11.x
 
 The app is tested on a variety of Android TV/Fire TV OS devices, but if you encounter issues, please file an issue!
 
-Seerr integration is generally tested with the latest stable version. Older versions may not work as expected. The Seerr server should configured with integration to your Jellyfin server for full compatibility.
+Seerr integration is generally tested with the latest stable version. Older versions may not work as expected. The Seerr server should be configured with integration to your Jellyfin server for full compatibility.

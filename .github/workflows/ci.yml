@@ -120,7 +120,7 @@ jobs:
           PY
       - name: Check for reusable PR validation
         if: >-
-          (github.repository == 'constbogdan/Wholphin' || github.repository == 'constbogdan/Mosaic') &&
+          github.repository == 'constbogdan/Mosaic' &&
           github.event_name == 'push' && github.ref == 'refs/heads/main' && github.ref_protected
         id: main-validation-reuse
         continue-on-error: true
@@ -371,7 +371,7 @@ jobs:
     name: Build Development Release
     needs: full-validation
     if: >-
-      (github.repository == 'constbogdan/Wholphin' || github.repository == 'constbogdan/Mosaic') &&
+      github.repository == 'constbogdan/Mosaic' &&
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' && github.ref_protected
     permissions:

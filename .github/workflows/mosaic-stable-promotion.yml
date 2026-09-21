@@ -20,7 +20,7 @@ jobs:
   verify:
     name: Prepare
     if: >-
-      (github.repository == 'constbogdan/Wholphin' || github.repository == 'constbogdan/Mosaic') &&
+      github.repository == 'constbogdan/Mosaic' &&
       github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.ref_protected
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -77,7 +77,7 @@ jobs:
     name: Release
     needs: verify
     if: >-
-      (github.repository == 'constbogdan/Wholphin' || github.repository == 'constbogdan/Mosaic') &&
+      github.repository == 'constbogdan/Mosaic' &&
       github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.ref_protected
     permissions:
       contents: write
