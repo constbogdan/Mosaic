@@ -10,14 +10,31 @@ the [documentation index](README.md).
 - T0-2 bounded authority/bootstrap/diagnostic corrections — complete.
 - T0-3.0 Mosaic identity establishment — complete.
 - T0-3 Documentation, Wiki & Roadmap consolidation — complete through D7.
+- **Baseline T0 — complete.** The final acceptance found no unresolved baseline blocker.
 
-Baseline T0 remains open until its independent final acceptance is performed and authorized.
-Completing T0-3 does not itself declare Baseline T0 complete.
+Baseline closure confirms the current engineering foundation; it does not imply that Mosaic's
+product feature roadmap is complete.
 
 ## Current priorities
 
-1. Perform the separately authorized Baseline T0 final acceptance and closure.
-2. Resume evidence-driven product work from the feature roadmap below after that decision.
+1. Resume evidence-driven Mosaic product development from the feature roadmap below.
+2. Keep infrastructure and cross-repository work demand-driven rather than reopening completed T0
+   programs without new evidence.
+
+## Baseline T0 closure
+
+The final acceptance confirmed T0-1, T0-2, T0-3.0, and T0-3 remain complete and coherent. Current
+operation retains PR-only integration, authoritative hosted validation, exact-tree protected-main
+reuse, independent Development eligibility, isolated signing, exact-byte Stable promotion,
+Hold-plus-forward-fix recovery, Mosaic-only downstream authentication, and human authority over
+upstream REVIEW/conflict Drafts.
+
+Live read-only verification at closure found the protected repository settings, required
+`Full validation`, Environments, configured Sync Bot credential names, and merge-commit-only model
+intact. Recent PR/main CI and scheduled upstream operation were green. Existing upstream Draft PR
+#58 is an authenticated human-review waiting state under the accepted model, not a baseline defect.
+External settings remain manually administered; future UI/device validation, Wiki publication,
+cross-repository standardization, and the feature backlog are non-blocking future responsibilities.
 
 ## Product direction
 

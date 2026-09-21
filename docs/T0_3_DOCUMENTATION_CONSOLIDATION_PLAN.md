@@ -4,8 +4,8 @@ Status: **T0-3 Documentation, Wiki & Roadmap consolidation — COMPLETE. D1-D7 c
 
 This audit describes the documentation set at `main` commit
 `44564901cbdb7ffce4b1c0704aa2d53f93c40fa9`. It does not move, delete, rename, or broadly rewrite
-existing documents. T0-3 is now complete; Baseline T0 remains open and its final acceptance requires
-separate review and authorization.
+existing documents. T0-3 is complete. Baseline T0 was subsequently closed by its separate,
+explicitly authorized final acceptance.
 
 ## Principles
 
@@ -410,5 +410,5 @@ tests, changed-scope pre-commit, whitespace validation, and Fast validation pass
 Wiki, changes no operating contract, and performs no historical restructuring.
 
 All T0-3 completion criteria below are satisfied. **T0-3 Documentation, Wiki & Roadmap
-consolidation is COMPLETE.** Baseline T0 remains open; its independent final acceptance and closure
-is the next checkpoint and is not authorized or performed by D7.
+consolidation is COMPLETE.** At D7 closure, Baseline T0 remained open and its independent final
+acceptance had not yet been performed; that separately authorized checkpoint subsequently closed it.
