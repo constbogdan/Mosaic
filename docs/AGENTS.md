@@ -12,6 +12,9 @@ A fresh Codex session must read the repository-local documents in this order:
 4. `docs/UPSTREAM_SYNC.md`
 5. `docs/PREPARE_PR.md` when preparing a commit or pull request
 
+`docs/README.md` is the role-labelled documentation index. It improves discovery but does not
+replace or reorder the authoritative bootstrap documents above.
+
 These repository-local copies are authoritative. Do not depend on sibling-workspace or other external copies. Before touching files, do not assume the current branch, worktree cleanliness, remotes, or merge state; inspect them from the repository root:
 
 ``` powershell

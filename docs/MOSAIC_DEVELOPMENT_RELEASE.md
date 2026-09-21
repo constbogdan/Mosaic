@@ -13,6 +13,28 @@ For routine Sign or pre-mutation Publish failures, use GitHub **Re-run failed jo
 
 Historical sections below retain migration evidence only; commands and workflows described there are not current operator capabilities.
 
+Current ownership is deliberately split: [validation](VALIDATION.md) proves the protected-main
+source, this document owns Development eligibility and publication, and
+[signing](MOSAIC_SIGNING.md) owns credentials, signer identity, isolation, and APK verification.
+[Stable/Hold](MOSAIC_STABLE.md) owns promotion and containment of already published bytes.
+
+The current public Development identities are:
+
+| Purpose | Identity |
+| --- | --- |
+| Rolling preview channel | Mutable `develop` tag and prerelease |
+| Immutable provenance | Create-only annotated `downstream-build-N` tag and prerelease |
+| Release/version identity | `v1.0.N`; Android `versionName` `1.0.N` and commit-derived `versionCode` N |
+| Canonical assets | `Mosaic-release.apk` and `mosaic-release.json` |
+
+Publication authenticates existing state before mutation, creates immutable provenance without
+replacement, and updates only the rolling channel deterministically. Exact inventory, digest,
+source, version, signer, run/attempt, and repository checks remain fail closed. Routine Sign or
+pre-mutation Publish failures may rerun failed jobs only while their authenticated same-run
+artifacts remain valid; ambiguous, stale, partially published, or expired state requires inspection
+and usually a higher-version forward fix. Historical recovery incidents below explain how these
+rules were established but are not additional operator procedures.
+
 New rolling Development bodies describe the channel as the latest automatically published validated
 build. Publication resolves the newest current Stable release whose annotated Git tag and canonical
 manifest authenticate, then uses that immutable tag only for a Stable-to-Development Compare Changes

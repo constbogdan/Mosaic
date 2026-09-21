@@ -6,7 +6,9 @@ Prepare-pr accepts exactly `constbogdan/Mosaic` as `origin`. Lookalikes, differe
 the retired pre-rename identity, malformed identities, and casing variants are refused. Every `gh`
 target is derived from the exact origin identity after that check.
 
-**CURRENT:** Autonomous PR handoff v2 is integrated on `main` through [PR #9](https://github.com/constbogdan/Mosaic/pull/9). Validation and dogfooding evidence is preserved in [the handoff](CODEX_HANDOFF.md).
+The current workflow is described below. The original PR #9 integration and later acceptance
+records are historical evidence in [the handoff](CODEX_HANDOFF.md), not a prerequisite for using
+the command. See [validation architecture](VALIDATION.md) for the authoritative hosted contract.
 
 ## Normal autonomous workflow
 
@@ -33,7 +35,7 @@ Supply actual focused JVM test patterns when a narrower known seam is useful:
 .\scripts\prepare-pr.ps1 -TestFilter '*RelevantTest*'
 ```
 
-Fast is the autonomous default. It runs changed-scope pre-commit, one narrow existing offline-tooling mapping when one applies, explicitly supplied focused JVM tests, and the cheap whitespace check. If multiple tooling mappings would expand to `test_*.py`, Fast defers that complete suite to authoritative PR CI. A high-risk or unmapped path likewise does not make normal preparation run a broad local fallback. Explicit patterns remain local feedback, not reusable authority.
+Fast is the autonomous default. It runs changed-scope pre-commit, one narrow existing offline-tooling mapping when one applies, explicitly supplied focused JVM tests, and the cheap whitespace check. If multiple tooling mappings would expand to `test_*.py`, Fast defers that complete suite to authoritative PR CI. A high-risk or unmapped path likewise does not make normal preparation run a broad local fallback. Explicit patterns remain local feedback, not reusable authority. The canonical distinction between local feedback and hosted authority is in [validation architecture](VALIDATION.md).
 
 Full remains available as an explicit diagnostic or on-demand regression command, but it is not a normal publication prerequisite:
 

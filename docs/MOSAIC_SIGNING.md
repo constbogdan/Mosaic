@@ -22,7 +22,35 @@ authentication:
 Environment approval proves who authorized an operation. Artifact, source, provenance,
 package, signer, freshness, and conflict checks independently prove what may be acted on.
 
+## Current signing authority
+
+`MOSAIC_SIGNING.md` is the canonical owner for signing and credential custody. Release builds are
+created without secrets. A fresh, isolated job receives only the exact authenticated unsigned
+artifact, verifies its source/run/attempt/hash and unsigned state, then exposes the four
+`release-sign` secrets only to the shared signing step. No checkout, Gradle build, untrusted script,
+cache, publisher token, or upstream-sync credential shares that secret-bearing boundary. Temporary
+private material is removed on every exit.
+
+After signing, public verification requires the pinned permanent certificate, exactly one signer,
+the non-debuggable `io.github.constbogdan.mosaic` package, expected version, alignment, and unchanged
+non-signature payload. Development publishes only that verified result. Stable promotes the exact
+Development bytes and has neither signing credentials nor permission to rebuild or re-sign them.
+Other lifecycle stages may rely on a successful authenticated signing record; they may not infer
+signer trust from a filename or self-reported metadata.
+
+The zero-input **Signing Diagnostic** runs only from protected main. It validates, builds, signs,
+and verifies through the same isolation contract, but cannot publish a GitHub Release or mutate
+Development/Stable. It is a diagnostic for the current signer boundary, not a source-selection or
+recovery bypass.
+
+Credential custody remains external and operator-controlled. Repository documentation records only
+the public certificate fingerprint and secret names; it must never contain or request the keystore,
+encoded key, passwords, or private key material. The creation, first-acceptance, and retired-design
+sections below are historical evidence and do not authorize regenerating or replacing the signer.
+
 ## First permanent Release signing acceptance
+
+> Historical acceptance evidence. Current signing authority is defined above.
 
 The standalone workflow displays **Signing Diagnostic**, retaining
 `mosaic-signing-exercise.yml` and its artifact-prefix/authorization contracts. It performs
