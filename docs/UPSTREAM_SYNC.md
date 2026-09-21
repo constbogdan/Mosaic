@@ -466,16 +466,16 @@ GitHub documents approval-required PR workflow runs for token-created PRs, while
 App installation tokens allow the normal unattended trigger path:
 [GITHUB_TOKEN behavior](https://docs.github.com/en/actions/concepts/security/github_token).
 
-The user confirmed external setup complete on 2026-09-09: **Wholphin Sync Bot** was installed on
-the downstream repository with Contents read/write, Pull requests read/write and Metadata read.
-After R2, the same installation follows repository ID `1351255476` and selects
-`constbogdan/Mosaic`; no App configuration or permission changed. Repository variable
+The user confirmed external setup complete on 2026-09-09: the App then named **Wholphin Sync Bot**
+was installed on the downstream repository with Contents read/write, Pull requests read/write and
+Metadata read. R2 renamed its display metadata to **Mosaic Sync Bot**; the same installation follows
+repository ID `1351255476` and selects `constbogdan/Mosaic` with no permission widening. Repository variable
 `SYNC_BOT_CLIENT_ID` and secret `SYNC_BOT_PRIVATE_KEY` remain configured. The earlier empty-secret
 result is historical.
 
 The pinned official `actions/create-github-app-token` v3 action uses `client-id` and `private-key`,
-restricts `owner`/`repositories` to the current downstream identity only after it authenticates as
-one of the two exact R1 names, and requests only Contents/PR write. The key is supplied only to the
+restricts `owner`/`repositories` to `constbogdan/Mosaic` only after exact current-repository
+authentication, and requests only Contents/PR write. The key is supplied only to the
 token action and only when ready, REVIEW or semantic-conflict state requires a branch/PR mutation.
 Excluded and no-delta paths never mint it. Default job-completion token revocation remains enabled.
 No PAT fallback or additional App permissions are introduced.
