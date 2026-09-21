@@ -27,7 +27,12 @@ UPSTREAM = UPSTREAM_REPOSITORY
 BASE_BRANCH = "main"
 BRANCH_PREFIX = "chore/sync-upstream-"
 EPISODE = re.compile(r"<!-- wholphin-upstream-episode:([0-9a-f]{64}) -->")
-TECHNICAL = re.compile(r"<summary>Technical evidence</summary>\s*```json\s*(\{.*?\})\s*```", re.S)
+TECHNICAL = re.compile(
+    r"<details>\s*<summary>"
+    r"(?:Technical evidence|Technical provenance and upstream history)"
+    r"</summary>.*?```json\s*(\{.*?\})\s*```.*?</details>",
+    re.S,
+)
 RUN_ID = re.compile(r"/actions/runs/(\d+)")
 BRANCH_IDENTITY = re.compile(
     re.escape(BRANCH_PREFIX) + r"([0-9a-f]{40})-([0-9a-f]{40})$"
@@ -107,6 +112,8 @@ def flatten_pages(value) -> list[dict]:
 def validate_observation(observation: dict, pr: dict, episode: str, *, runner=None, root=None,
                          run_id=None, attempt=None, repository=REPOSITORY) -> None:
     repository = authenticate_downstream_repository(repository)
+    if not isinstance(observation, dict):
+        raise Refusal("Machine evidence must be a JSON object.")
     expected = {
         "episode_id": episode,
         "downstream_repo": repository,
@@ -118,8 +125,8 @@ def validate_observation(observation: dict, pr: dict, episode: str, *, runner=No
         expected["run_attempt"] = str(attempt)
     required = ("episode_id", "downstream_repo", "branch", "candidate_sha", "candidate_tree",
                 "upstream_sha", "downstream_sha", "comparison_baseline",
-                "ownership_policy_version", "automation_changes", "classification_range_count",
-                "review_paths", "conflict_paths")
+                "ownership_policy_version", "classification_range_count", "review_paths",
+                "conflict_paths")
     missing = [key for key in required if key not in observation or observation.get(key) is None]
     if missing:
         raise Refusal("Machine evidence is incomplete: " + ", ".join(missing))
@@ -131,8 +138,29 @@ def validate_observation(observation: dict, pr: dict, episode: str, *, runner=No
     if (not branch or observation.get("upstream_sha") != branch.group(1)
             or observation.get("downstream_sha") != branch.group(2)):
         raise Refusal("Machine evidence does not match the candidate branch SHA pair.")
-    if observation.get("classification_range_count") != len(observation.get("automation_changes") or []):
-        raise Refusal("Machine evidence does not account for the complete classified upstream range.")
+    classification_count = observation.get("classification_range_count")
+    automation_changes = observation.get("automation_changes")
+    if automation_changes is not None:
+        if (not isinstance(automation_changes, list)
+                or classification_count != len(automation_changes)):
+            raise Refusal("Machine evidence does not account for the complete classified upstream range.")
+    else:
+        ownership_counts = observation.get("ownership_counts")
+        clean_path_count = observation.get("clean_path_count")
+        valid_counts = (
+            isinstance(ownership_counts, dict)
+            and ownership_counts
+            and all(isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                    for value in ownership_counts.values())
+            and isinstance(classification_count, int)
+            and not isinstance(classification_count, bool)
+            and sum(ownership_counts.values()) == classification_count
+            and isinstance(clean_path_count, int)
+            and not isinstance(clean_path_count, bool)
+            and 0 <= clean_path_count <= classification_count
+        )
+        if not valid_counts:
+            raise Refusal("Machine evidence does not account for the complete classified upstream range.")
     anchor = observation.get("candidate_sha")
     head = pr["head"]["sha"]
     if anchor and anchor != head:

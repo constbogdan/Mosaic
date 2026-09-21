@@ -31,7 +31,7 @@ class FakeRunner:
     def __init__(self, *, dirty=False, origin="https://github.com/constbogdan/Mosaic.git",
                  state="open", candidate=True, local=False, local_sha=CANDIDATE,
                  tracking=None, artifact=True, ci_bucket="fail", current_branch="chore/test",
-                 upstream_rewritten=False):
+                 upstream_rewritten=False, artifact_payload=None):
         self.dirty = dirty
         self.origin = origin
         self.state = state
@@ -43,6 +43,7 @@ class FakeRunner:
         self.ci_bucket = ci_bucket
         self.current_branch = current_branch
         self.upstream_rewritten = upstream_rewritten
+        self.artifact_payload = artifact_payload
         self.main_sha = DOWNSTREAM
         self.compare_map = {}
         self.calls = []
@@ -53,8 +54,9 @@ class FakeRunner:
         return resolve.slug(self.origin)
 
     def pr(self):
-        body = ("<details><summary>Technical evidence</summary>\n\n```json\n" +
-                json.dumps(self.observation()) + "\n```\n</details>\n" +
+        body = ("<details><summary>Technical provenance and upstream history</summary>\n\n"
+                "58 incoming\n\n- Upstream history remains human-readable here.\n\n"
+                "```json\n" + json.dumps(self.durable_evidence()) + "\n```\n</details>\n" +
                 f"<!-- wholphin-upstream-episode:{EPISODE} -->") if self.candidate else "ordinary"
         return {"number": 33, "state": self.state, "draft": True, "body": body,
                 "html_url": "https://github.com/constbogdan/Wholphin/pull/33",
@@ -78,6 +80,13 @@ class FakeRunner:
                 "incoming_commits": [{"sha": "d" * 40,
                                       "subject": "Fix duplicates (#1946)",
                                       "url": "https://github.com/damontecres/Wholphin/commit/" + "d" * 40}]}
+
+    def durable_evidence(self):
+        value = self.observation()
+        value.pop("automation_changes")
+        value["ownership_counts"] = {"REVIEW": 1}
+        value["clean_path_count"] = 1
+        return value
 
     def run(self, args, *, cwd, check=True):
         self.calls.append(list(args))
@@ -115,8 +124,13 @@ class FakeRunner:
         if args[:3] == ["gh", "run", "download"]:
             if not self.artifact:
                 return resolve.Result("", "expired", 1)
+            artifact_name = args[args.index("--name") + 1]
+            if self.artifact == "observation" and artifact_name.startswith("upstream-outcome-"):
+                return resolve.Result("", "outcome unavailable", 1)
             destination = Path(args[args.index("--dir") + 1])
-            (destination / "observation.json").write_text(json.dumps(self.observation()), encoding="utf-8")
+            filename = "outcome.json" if artifact_name.startswith("upstream-outcome-") else "observation.json"
+            payload = self.artifact_payload if self.artifact_payload is not None else self.observation()
+            (destination / filename).write_text(json.dumps(payload), encoding="utf-8")
             return resolve.Result("", "", 0)
         if args[:3] == ["gh", "pr", "checks"]:
             row = {"name": "Full validation", "workflow": "CI", "bucket": self.ci_bucket,
@@ -407,6 +421,51 @@ class ResolveUpstreamTests(unittest.TestCase):
         with self.assertRaisesRegex(resolve.Refusal, "machine-evidence candidate SHA"):
             self.execute(Mismatched())
 
+    def test_current_mosaic_candidate_uses_complete_outcome_artifact(self):
+        runner = FakeRunner()
+        _, summary, _ = self.execute(runner)
+        self.assertIn("Ready for semantic resolution", summary)
+        downloads = [call for call in runner.calls if call[:3] == ["gh", "run", "download"]]
+        self.assertEqual(1, len(downloads))
+        self.assertIn("upstream-outcome-1", downloads[0])
+
+    def test_complete_observation_artifact_is_used_when_outcome_is_unavailable(self):
+        runner = FakeRunner(artifact="observation")
+        _, summary, _ = self.execute(runner)
+        self.assertIn("Ready for semantic resolution", summary)
+        downloads = [call for call in runner.calls if call[:3] == ["gh", "run", "download"]]
+        self.assertEqual(2, len(downloads))
+        self.assertIn("upstream-outcome-1", downloads[0])
+        self.assertIn("upstream-observation-1", downloads[1])
+
+    def test_incomplete_downloaded_artifact_refuses_without_weaker_fallback(self):
+        runner = FakeRunner(artifact_payload={"schema_version": 2})
+        with self.assertRaisesRegex(resolve.Refusal, "Machine evidence is incomplete"):
+            self.execute(runner)
+
+    def test_wrong_downstream_repository_in_artifact_refuses(self):
+        runner = FakeRunner()
+        payload = runner.observation()
+        payload["downstream_repo"] = "other/Mosaic"
+        runner.artifact_payload = payload
+        with self.assertRaisesRegex(resolve.Refusal, "mismatch for downstream_repo"):
+            self.execute(runner)
+
+    def test_mismatched_episode_and_branch_refuse(self):
+        runner = FakeRunner()
+        payload = runner.observation()
+        payload["episode_id"] = "1" * 64
+        runner.artifact_payload = payload
+        with self.assertRaisesRegex(resolve.Refusal, "mismatch for episode_id"):
+            self.execute(runner)
+
+        runner = FakeRunner()
+        payload = runner.observation()
+        payload["branch"] = "chore/sync-upstream-foreign"
+        runner.artifact_payload = payload
+        with self.assertRaisesRegex(resolve.Refusal, "mismatch for branch"):
+            self.execute(runner)
+
     def test_human_edited_draft_head_is_accepted_only_as_proven_descendant(self):
         runner = FakeRunner()
         pr = runner.pr()
@@ -419,9 +478,27 @@ class ResolveUpstreamTests(unittest.TestCase):
         _, summary, _ = self.execute(FakeRunner(ci_bucket="pass"))
         self.assertIn("CI: PASSED", summary)
 
-    def test_expired_artifact_uses_complete_authenticated_pr_evidence(self):
-        _, summary, _ = self.execute(FakeRunner(artifact=False))
+    def test_expired_artifact_uses_current_durable_pr_provenance(self):
+        runner = FakeRunner(artifact=False)
+        _, summary, _ = self.execute(runner)
         self.assertIn("Ready for semantic resolution", summary)
+        self.assertIn("Technical provenance and upstream history", runner.pr()["body"])
+
+    def test_legacy_technical_evidence_heading_remains_supported(self):
+        evidence = FakeRunner().durable_evidence()
+        body = ("<details><summary>Technical evidence</summary>\n\n```json\n"
+                + json.dumps(evidence) + "\n```\n</details>")
+        self.assertEqual(evidence, resolve.technical_evidence(body))
+
+    def test_incomplete_durable_pr_provenance_still_refuses(self):
+        class IncompleteProvenance(FakeRunner):
+            def durable_evidence(self):
+                value = super().durable_evidence()
+                value.pop("ownership_counts")
+                return value
+
+        with self.assertRaisesRegex(resolve.Refusal, "complete classified upstream range"):
+            self.execute(IncompleteProvenance(artifact=False))
 
     def test_logs_are_ignored_and_no_mutating_github_or_destructive_git_commands_exist(self):
         root, _, _ = self.execute(FakeRunner())
