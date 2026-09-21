@@ -23,8 +23,8 @@ C1 is COMPLETE / LIVE VERIFIED; C2 is COMPLETE / HOSTED VALIDATED (PR #84); C3 i
 HOSTED VALIDATED (PR #85); T0-2 is COMPLETE. T0-3.0 R1 is COMPLETE / BOTH-NAME HOSTED VALIDATED
 (old-name PR #87; new-name PR #89). R2's external repository rename is COMPLETE / VERIFIED; the
 [canonical Mosaic identity migration](T0_3_R2_MOSAIC_IDENTITY.md) is HOSTED VALIDATED. Its
-Development publisher correction is COMPLETE / HOSTED RECOVERY VALIDATED. R3 is DEVICE ACCEPTANCE
-IN PROGRESS / FINDINGS OPEN.
+Development publisher correction is COMPLETE / HOSTED RECOVERY VALIDATED. R3 is COMPLETE / HOSTED
+AND REAL-DEVICE VALIDATED. R4 is next.
 The external contribution lifecycle is KEEP /
 DOCUMENTED.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
@@ -373,7 +373,7 @@ default; the surviving mechanisms each protect a reviewed consumer or authority 
 
 Status: **R1 — COMPLETE / BOTH-NAME HOSTED VALIDATED. R2 repository rename — COMPLETE / VERIFIED.
 R2 canonical Mosaic identity migration — HOSTED VALIDATED. Development publisher correction —
-COMPLETE / HOSTED RECOVERY VALIDATED. R3 — DEVICE ACCEPTANCE IN PROGRESS / FINDINGS OPEN.**
+COMPLETE / HOSTED RECOVERY VALIDATED. R3 — COMPLETE / HOSTED AND REAL-DEVICE VALIDATED. R4 — NEXT.**
 
 T0-3 begins by establishing the permanent downstream product identity before the broader
 documentation, wiki, and roadmap consolidation. This record preserves the accepted decisions and
@@ -683,13 +683,13 @@ package, signer, source, tree, run, and version provenance authenticate successf
 Promotion run `35495689386` subsequently promoted `downstream-build-73` unchanged as latest Stable
 `mosaic-v1.0.73`. The immutable candidate, rolling Development, and Stable APKs are byte-identical
 at SHA-256 `1c84efececec51f3b2ae602f1ba5d0d5b2d1334724cbb37760a4c3c455cb04cd`. The publisher correction
-is **COMPLETE / HOSTED RECOVERY VALIDATED**, R2 is **HOSTED VALIDATED**, and R3 is **DEVICE
-ACCEPTANCE IN PROGRESS / FINDINGS OPEN**. The detailed incident and evidence record is in
+is **COMPLETE / HOSTED RECOVERY VALIDATED**, R2 is **HOSTED VALIDATED**, and R3 is **COMPLETE /
+HOSTED AND REAL-DEVICE VALIDATED**. The detailed incident and evidence record is in
 [the R2 identity contract](T0_3_R2_MOSAIC_IDENTITY.md#pr-91-publication-incident-and-hosted-recovery).
 
 ##### R3 — real-device Mosaic acceptance
 
-R2 is complete on the hosted engineering path. R3 is not complete.
+R2 is complete on the hosted engineering path. R3 is complete.
 
 R3 must prove fresh Mosaic installation; Mosaic N to N+1 in-place update; package, signer, and
 version continuity; launcher identity; `mosaic:` routing; Development and Stable discovery where
@@ -704,14 +704,15 @@ to Mosaic; the inherited wordmark in `app/src/main/res/mipmap-xhdpi/ic_banner.pn
 VALIDATED**: both 320×180 assets now preserve the established cube/layout and show Mosaic; the
 defaultDebug compile, unit-test, and APK assembly graph passed; and generated-APK inspection proved
 the manifest/resource mapping and exact packaged bytes. Real Android TV acceptance confirmed the
-Mosaic launcher/banner identity. The remaining sequence is: publish and host-validate the
-presentation-only Stable Promotion/Release cleanup; prove Mosaic N → Mosaic N+1 in-place update;
-prove login/preferences/local state survive; then close R3. R4 remains
-the next T0-3.0 point before the dedicated documentation/wiki consolidation.
+Mosaic launcher/banner identity. The operator then installed v1.0.76 over the existing v1.0.73
+without uninstalling; login/session, preferences/local state, normal launch/use, and the Mosaic TV
+identity survived the in-place update. PR #96 and Stable Promotion run `35571701304` hosted-validated
+the final presentation contract and exact-byte promotion of `downstream-build-77` to
+`mosaic-v1.0.77`. R4 is the next T0-3.0 point before dedicated documentation/wiki consolidation.
 
 ##### R4 — retire the bridge and close T0-3.0
 
-After R3 succeeds:
+With R3 complete:
 
 - remove `constbogdan/Wholphin` from live downstream repository authorization;
 - accept only `constbogdan/Mosaic` for current downstream operation;
