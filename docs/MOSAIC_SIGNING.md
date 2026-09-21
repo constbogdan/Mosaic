@@ -408,7 +408,7 @@ The existing editable Update URL chooses the channel or custom endpoint; there i
 new channel toggle. One resolver converts GitHub web URLs to API metadata requests
 for update checks, the installer APK selection and installed-version notes. Legacy
 bundled stable defaults migrate; other custom URLs remain overrides. See the
-[migration and lookup details](CODEX_HANDOFF.md#mosaic-updater-routing-implemented---pending-live-release-validation).
+[the preserved pre-D5 handoff](history/CODEX_HANDOFF_PRE_D5.txt).
 
 New downstream publication exposes only the canonical universal `Mosaic-release.apk` plus
 `mosaic-release.json`; ABI/debug Gradle outputs are not public updater aliases.

@@ -1,13 +1,13 @@
 # AGENTS.md
 
-## Wholphin Development Guidance
+## Mosaic development guidance
 
 ### Fresh-session bootstrap
 
 A fresh Codex session must read the repository-local documents in this order:
 
 1. `docs/AGENTS.md`
-2. `docs/Wholphin_ROADMAP.md`
+2. `docs/MOSAIC_ROADMAP.md`
 3. `docs/CODEX_HANDOFF.md`
 4. `docs/UPSTREAM_SYNC.md`
 5. `docs/PREPARE_PR.md` when preparing a commit or pull request
@@ -37,9 +37,10 @@ Do not casually swap them. New product, fix, and maintenance work begins on a pu
 
 Preserve all existing user and Codex work. Never reset, restore, clean, checkout over, or otherwise discard unrelated changes merely to make the workspace convenient. If the tree is dirty, first identify which changes belong to the current task and work around everything else.
 
-Before implementing, modifying, or refactoring Wholphin ecosystem features, read:
+Before implementing, modifying, or refactoring Mosaic product features, read:
 
--   `docs/Wholphin_ROADMAP.md`
+-   `docs/MOSAIC_ROADMAP.md`
+-   `docs/ARCHITECTURE.md`
 -   `docs/CODEX_HANDOFF.md`
 
 If `ECOSYSTEM.md` exists and is relevant to the task, read it as well.
@@ -47,7 +48,7 @@ Treat these documents as product, architecture, and development-continuity conte
 
 The roadmap describes:
 
--   the intended long-term Wholphin product direction;
+-   the intended long-term Mosaic product direction;
 -   completed work that should not be accidentally duplicated or regressed;
 -   current architectural decisions;
 -   planned features and dependencies between them;
@@ -55,7 +56,7 @@ The roadmap describes:
 
 ## Product Principle
 
-Wholphin should increasingly behave like one integrated media application rather than a Jellyfin client with disconnected feature add-ons.
+Mosaic should increasingly behave like one integrated media application rather than a Jellyfin client with disconnected feature add-ons.
 
 Jellyfin remains the source of truth for the local/playable library.
 
@@ -115,7 +116,7 @@ For TV seasons, Wholphin may persist trusted released-episode expectations so a 
 
 Do not persist complete/incomplete conclusions, live Jellyfin counts, missing-episode results, or acquisition-adjusted status. Those values are ephemeral and must be calculated from persisted expectations, fresh Jellyfin playability, and current acquisition evidence.
 
-Wholphin provides contextual diagnostics when the user visits or refreshes relevant content. It is not responsible for continuous whole-library auditing, backend repair, or policing historical consistency across Jellyfin, Seerr, and Servarr.
+Mosaic provides contextual diagnostics when the user visits or refreshes relevant content. It is not responsible for continuous whole-library auditing, backend repair, or policing historical consistency across Jellyfin, Seerr, and Servarr.
 
 ## Jellyfin Readiness
 
@@ -158,7 +159,8 @@ Use the repository documents deliberately:
 
 - `docs/AGENTS.md` holds permanent agent and development operating rules.
 - `docs/UPSTREAM_SYNC.md` holds permanent branching and upstream-sync policy.
-- `docs/Wholphin_ROADMAP.md` holds durable product and engineering direction.
+- `docs/MOSAIC_ROADMAP.md` holds durable product and engineering direction.
+- `docs/ARCHITECTURE.md` holds stable application and engineering architecture.
 - `docs/CODEX_HANDOFF.md` holds current and historical implementation continuity, non-obvious discoveries, rejected approaches, merge resolutions, and validation results.
 
 During development, preserve information in this file whenever losing it
@@ -218,7 +220,7 @@ to their replacement where appropriate.
 
 When asked to implement a task:
 
-1. Read `docs/Wholphin_ROADMAP.md` and `docs/CODEX_HANDOFF.md` and `ECOSYSTEM.md` when present and relevant.
+1. Read `docs/MOSAIC_ROADMAP.md`, `docs/ARCHITECTURE.md`, and `docs/CODEX_HANDOFF.md`, plus `ECOSYSTEM.md` when present and relevant.
 2. Inspect the relevant existing implementation before proposing changes.
 3. Identify whether the task should extend an existing shared model instead of adding screen-specific logic.
 4. Preserve existing Jellyfin behavior unless the task explicitly requires changing it.
@@ -227,7 +229,7 @@ When asked to implement a task:
 7. Call out any roadmap conflict or architectural tradeoff before implementing a conflicting design.
 8. Update tests for changed behavior where practical.
 9. Avoid leaving temporary tracing, debug UI, or dead branches behind.
-10. If the implementation materially changes product direction or completes a roadmap item, update `docs/Wholphin_ROADMAP.md`.
+10. If the implementation materially changes product direction or completes a roadmap item, update `docs/MOSAIC_ROADMAP.md`.
 
 ## Refactoring Rules
 
@@ -241,7 +243,7 @@ Preserve working semantics unless the task explicitly changes them.
 
 ## Cross-Feature Thinking
 
-When adding new state or behavior, consider whether other Wholphin surfaces will eventually need it.
+When adding new state or behavior, consider whether other Mosaic surfaces will eventually need it.
 
 Examples:
 
@@ -272,7 +274,7 @@ Do not make the core Jellyfin experience dependent on them.
 
 ## Roadmap Discipline
 
-`docs/Wholphin_ROADMAP.md` is a living document.
+`docs/MOSAIC_ROADMAP.md` is a living document.
 
 When a roadmap item is completed:
 
@@ -318,7 +320,7 @@ Prepare-pr never makes ownership assumptions about a dirty tree. Normal use auto
 
 The normal ordinary-PR human boundary is “ready to publish” before prepare-pr starts; it includes authorization to arm native auto-merge for that exact reviewed head. Prepare-pr never force-pushes, bypasses protection, merges directly, waits for CI, or deletes branches/worktrees. Required `CI / Full validation` and GitHub branch protection remain the merge gates. Upstream attention Drafts retain the separate “ready to merge” human boundary.
 
-Wholphin does not currently need a permanent staging/develop branch. Use PR CI and, once implemented, short-lived PR debug APKs for pre-main device testing; the target sequence and artifact status are in [the roadmap](Wholphin_ROADMAP.md#downstream-repository-maintenance-standardization).
+Mosaic does not currently need a permanent staging/develop branch. Use PR CI and short-lived PR debug APKs for pre-main device testing; the current direction is in [the roadmap](MOSAIC_ROADMAP.md#engineering-direction).
 
 ### Automation design principles
 
@@ -332,7 +334,7 @@ Standardize maintained downstream repositories by safety contract rather than by
 
 Use the roadmap and existing product behavior to infer the intended direction.
 
-Prefer consistency with the unified Wholphin product model.
+Prefer consistency with the unified Mosaic product model.
 
 If multiple implementations are technically valid, favor the one that:
 

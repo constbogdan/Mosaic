@@ -7,9 +7,8 @@ Role labels distinguish current authority from continuity and point-in-time engi
 
 - **Public product entry point** — [Mosaic README](../README.md): what Mosaic is, installation,
   updates, and compatibility.
-- **Product roadmap** — [Mosaic roadmap](Wholphin_ROADMAP.md): current program status, product
-  direction, major completed phases, and remaining work. The inherited filename remains until the
-  reviewed D5 migration.
+- **Product roadmap** — [Mosaic roadmap](MOSAIC_ROADMAP.md): current program status, product
+  direction, major completed phases, and remaining work.
 - **Current continuity** — [Codex handoff](CODEX_HANDOFF.md): current checkpoint, recent continuity,
   non-obvious invariants, risks, and retained engineering history.
 
@@ -28,7 +27,7 @@ Role labels distinguish current authority from continuity and point-in-time engi
 
 ## Current project state
 
-- **Product roadmap** — [Mosaic roadmap](Wholphin_ROADMAP.md): where the product and engineering
+- **Product roadmap** — [Mosaic roadmap](MOSAIC_ROADMAP.md): where the product and engineering
   program are going.
 - **Current continuity** — [Codex handoff](CODEX_HANDOFF.md): what a future engineering session
   cannot safely infer from code alone.
@@ -41,17 +40,17 @@ Role labels distinguish current authority from continuity and point-in-time engi
 
 - **Current architecture / validation authority** — [Validation architecture](VALIDATION.md):
   local Fast feedback, hosted evidence classes, protected-main reuse, and conservative fallback.
-- **Current architecture** — [Canonical Mosaic identity](T0_3_R2_MOSAIC_IDENTITY.md): repository,
+- **Current architecture** — [Application architecture](ARCHITECTURE.md): stable product, state,
+  integration, and engineering authority boundaries.
+- **Current architecture** — [Canonical Mosaic identity](MOSAIC_IDENTITY.md): repository,
   product, package, updater, asset, URI, and intentionally retained identities.
 - **Developer guidance** — [Developer guide](../DEVELOPMENT.md): concise application organization
   and development setup.
-- **Current architecture and direction** — [Mosaic roadmap](Wholphin_ROADMAP.md): current product
-  architecture until a dedicated architecture document is created in a later checkpoint.
+- **Current architecture and direction** — [Mosaic roadmap](MOSAIC_ROADMAP.md): product priorities
+  and future direction.
 - **Current continuity** — [Codex handoff](CODEX_HANDOFF.md): non-obvious implementation constraints
   not yet promoted to a canonical architecture owner.
 
-A dedicated `ARCHITECTURE.md` owner remains planned for a later reviewed checkpoint; it does not
-exist yet.
 
 ## Delivery and security
 
@@ -80,9 +79,8 @@ Current lifecycle boundaries are: [PR preparation](PREPARE_PR.md) →
 
 - **Agent guidance** — [Repository agent instructions](AGENTS.md): authoritative permanent agent and
   development rules, including the required fresh-session bootstrap.
-- **Agent guidance pending consolidation** — [UI agent instructions](UI_AGENTS.md): overlapping
-  UI/product guidance whose unique scope and long-term authority will be resolved in D5. Until then,
-  it does not supersede `AGENTS.md`.
+- **Scoped UI agent guidance** — [UI agent instructions](UI_AGENTS.md): Android TV presentation,
+  navigation, focus, and shared-state UI rules. `AGENTS.md` remains the general authority.
 
 ## Historical decisions and acceptance
 
