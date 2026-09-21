@@ -2,6 +2,9 @@
 
 See the [Contributing](CONTRIBUTING.md) guide for general contribution information and the
 [engineering documentation index](docs/README.md) for repository workflows and architecture.
+Before publishing a change, follow [safe pull-request preparation](docs/PREPARE_PR.md). The
+[validation architecture](docs/VALIDATION.md) defines local feedback and authoritative hosted
+validation; this guide covers development setup rather than those operating contracts.
 
 ##  Overview
 

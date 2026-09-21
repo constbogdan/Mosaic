@@ -2,9 +2,8 @@
 
 ## Current checkpoint
 
-T0-3 documentation consolidation D1–D4 is complete. D5 is implementing canonical architecture,
-identity, roadmap, agent guidance, and bounded continuity. D6 public/Wiki work and D7 final
-consistency remain open. T0-3 and Baseline T0 are not complete.
+T0-3 documentation consolidation D1–D5 is complete. D6 is defining the public/Wiki boundary; D7
+final consistency remains open. T0-3 and Baseline T0 are not complete.
 
 Current repository identity is exactly `constbogdan/Mosaic`; upstream remains
 `damontecres/Wholphin`. Work begins from current protected `origin/main` on a purpose-specific
@@ -31,10 +30,9 @@ not current instruction.
 
 ## Immediate continuity
 
-- D5 must finish consumer-aware documentation path migration and comprehensive link, anchor,
-  classification, prepare-pr, pre-commit, and Fast validation.
-- D6 must not begin in D5. Do not create or publish Wiki content or substantially rewrite public
-  installation/help prose.
+- D6 owns public product guidance, contributor routing, and the rule that optional Wiki content
+  cannot replace versioned engineering authority. Wiki publication remains a separate operator
+  action.
 - D7 will own the final documentation consistency and status audit. Do not declare T0-3 or Baseline
   T0 complete before that separately reviewed acceptance.
 

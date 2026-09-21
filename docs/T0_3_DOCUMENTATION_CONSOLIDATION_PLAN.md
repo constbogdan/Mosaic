@@ -1,6 +1,6 @@
 # T0-3 documentation consolidation audit and plan
 
-Status: **D1-D4 COMPLETE; D5 implemented pending review. D6 has not begun.**
+Status: **D1-D5 COMPLETE; D6 implemented pending review. D7 has not begun.**
 
 This audit describes the documentation set at `main` commit
 `44564901cbdb7ffce4b1c0704aa2d53f93c40fa9`. It does not move, delete, rename, or broadly rewrite
@@ -369,5 +369,24 @@ explicit precedence back to `AGENTS.md`. Roadmap path consumers in agent guidanc
 and `prepare-pr.config.psd1` migrated to `MOSAIC_ROADMAP.md`; architecture and identity are retained
 as high-risk documentation inputs rather than weakening classification.
 
-D5 changes documentation ownership only. D6 public/Wiki work and D7 final consistency remain open;
-T0-3 and Baseline T0 are not complete.
+At D5 closure, D6 public/Wiki work and D7 final consistency remained open; T0-3 and Baseline T0
+were not complete.
+
+## D6 implementation decisions
+
+D6 keeps the root `README.md` as the concise public product entry point and creates
+`USER_GUIDE.md` as the versioned public owner for installation, updates, Stable versus Development,
+optional Seerr integration, bounded troubleshooting, and bug-reporting orientation. Contributor
+entry points now route explicitly to `PREPARE_PR.md`, `VALIDATION.md`, and the documentation index
+instead of restating those contracts.
+
+No `docs/wiki-source/` tree was created. Maintaining parallel Wiki-source pages would duplicate the
+new user guide before a Wiki publication workflow or demonstrated audience need exists. A future
+GitHub Wiki is therefore an optional presentation layer: it may summarize user-facing subjects,
+must link its versioned repository source, cannot own engineering or security contracts, and may be
+published only through a separate explicit operator action.
+
+`docs/README.md` now distinguishes public product documentation, contributor orientation,
+versioned engineering authority, current continuity, history, and the optional Wiki boundary. No
+validation, publication, signing, provenance, Hold, repository-authentication, or upstream contract
+changed. D7 remains the final consistency and status audit; T0-3 and Baseline T0 remain open.
