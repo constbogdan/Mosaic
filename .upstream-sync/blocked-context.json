@@ -1,0 +1,13 @@
+{
+  "conflicts": [
+    ".github/actions/setup/action.yml",
+    ".github/workflows/pr.yml",
+    "app/src/main/java/com/github/damontecres/wholphin/services/IntentService.kt",
+    "app/src/main/java/com/github/damontecres/wholphin/ui/main/HomeViewModel.kt"
+  ],
+  "downstream": "4a6db6df866c4182576a3a9f96e3de697d5596e7",
+  "mergeBase": "4a118b6ddbbbb5b473f3c96011a0ac05781c9b76",
+  "policyVersion": 1,
+  "schemaVersion": 1,
+  "upstream": "365f8f8adacf4dcaf7d05317917830ed3a439668"
+}
