@@ -108,6 +108,8 @@ class FakeRunner:
             return resolve.Result("?? local.txt\n" if self.dirty else "", "", 0)
         if args[:3] == ["git", "branch", "--show-current"]:
             return resolve.Result(self.current_branch + "\n", "", 0)
+        if args[:5] == ["git", "rev-parse", "-q", "--verify", "MERGE_HEAD"]:
+            return resolve.Result("", "", 1)
         if args[:3] == ["gh", "auth", "status"]:
             return resolve.Result("authenticated", "", 0)
         if args[:3] == ["gh", "api", f"repos/{self.repository}/pulls/33"]:
@@ -276,6 +278,90 @@ class ResolveUpstreamTests(unittest.TestCase):
         self.assertNotEqual(0, git("cat-file", "-e", commit + ":.upstream-sync/blocked-context.json",
                                   check=False).returncode)
         self.assertEqual("resolved downstream + upstream", git("show", commit + ":source.kt").stdout.strip())
+
+    def test_reused_draft_reconciliation_produces_exact_b_and_r_topology(self):
+        root = self.root()
+        env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+
+        def git(*args, check=True):
+            return subprocess.run(["git", *args], cwd=root, env=env, text=True,
+                                  capture_output=True, check=check)
+
+        git("init", "-q", "-b", "main")
+        git("config", "user.name", "Fixture")
+        git("config", "user.email", "fixture@example.invalid")
+        (root / "source.kt").write_text("base\n", encoding="utf-8", newline="\n")
+        git("add", "source.kt")
+        git("commit", "-q", "-m", "D")
+        downstream = git("rev-parse", "HEAD").stdout.strip()
+
+        git("switch", "-q", "-c", "upstream")
+        (root / "source.kt").write_text("upstream\n", encoding="utf-8", newline="\n")
+        git("commit", "-qam", "U")
+        upstream = git("rev-parse", "HEAD").stdout.strip()
+        upstream_bare = root / "upstream.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(upstream_bare)], env=env, check=True)
+        git("remote", "add", "upstream", str(upstream_bare))
+        git("push", "-q", "upstream", f"{upstream}:refs/heads/main")
+
+        git("switch", "-q", "--detach", downstream)
+        context_path = root / ".upstream-sync" / "blocked-context.json"
+        context_path.parent.mkdir()
+        context_path.write_text(json.dumps({
+            "schemaVersion": 1, "upstream": upstream, "downstream": downstream,
+            "policyVersion": 1, "conflicts": ["source.kt"],
+        }), encoding="utf-8")
+        git("add", ".upstream-sync/blocked-context.json")
+        git("commit", "-q", "-m", "A")
+        candidate_sha = git("rev-parse", "HEAD").stdout.strip()
+        branch = f"chore/sync-upstream-{upstream}-{downstream}"
+        git("switch", "-q", "-c", branch)
+
+        bare = root / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(bare)], env=env, check=True)
+        git("remote", "add", "origin", str(bare))
+        git("push", "-q", "origin", f"{candidate_sha}:refs/heads/{branch}")
+        git("switch", "-q", "--detach", downstream)
+        (root / "main.txt").write_text("current main\n", encoding="utf-8", newline="\n")
+        git("add", "main.txt")
+        git("commit", "-q", "-m", "M")
+        current_main = git("rev-parse", "HEAD").stdout.strip()
+        git("push", "-q", "origin", f"{current_main}:refs/heads/main")
+        git("switch", "-q", branch)
+
+        observation = {
+            "candidate_sha": candidate_sha,
+            "candidate_tree": git("rev-parse", candidate_sha + "^{tree}").stdout.strip(),
+            "upstream_sha": upstream, "downstream_sha": downstream,
+            "ownership_policy_version": 1, "conflict_paths": ["source.kt"],
+            "review_paths": ["source.kt"],
+        }
+        candidate = resolve.Candidate(
+            {"number": 33, "head": {"ref": branch, "sha": candidate_sha}},
+            observation, {}, current_main=current_main,
+        )
+        runner = resolve.Runner()
+        self.assertEqual("", resolve.begin_main_reconciliation(runner, root, candidate))
+        self.assertEqual(current_main, git("rev-parse", "MERGE_HEAD").stdout.strip())
+        b_commit = resolve.reconciliation_commit(runner, root, candidate)
+        self.assertEqual(
+            [candidate_sha, current_main],
+            git("show", "-s", "--format=%P", b_commit).stdout.split(),
+        )
+        resolve.begin_native_resolution(runner, root, candidate, b_commit)
+        (root / "source.kt").write_text(
+            "resolved downstream + upstream\n", encoding="utf-8", newline="\n"
+        )
+        git("add", "source.kt")
+        r_commit, reviewed_tree = resolve.commit_native_resolution(
+            runner, root, candidate, ["source.kt", ".upstream-sync/blocked-context.json"], b_commit
+        )
+        self.assertEqual([b_commit, upstream], git("show", "-s", "--format=%P", r_commit).stdout.split())
+        self.assertEqual(reviewed_tree, git("rev-parse", r_commit + "^{tree}").stdout.strip())
+        for ancestor in (candidate_sha, current_main, upstream):
+            self.assertEqual(0, git("merge-base", "--is-ancestor", ancestor, r_commit,
+                                    check=False).returncode)
 
     def test_upstream_rewrite_and_incomplete_context_fail_before_merge(self):
         with self.assertRaisesRegex(resolve.Refusal, "no longer belongs"):
@@ -473,6 +559,111 @@ class ResolveUpstreamTests(unittest.TestCase):
         observation = runner.observation()
         runner.compare_map[f"{CANDIDATE}...{'8' * 40}"] = "ahead"
         resolve.validate_observation(observation, pr, EPISODE, runner=runner, root=self.root())
+
+    def test_descendant_draft_scope_must_remain_explainable(self):
+        class Descendant(FakeRunner):
+            def __init__(self, path):
+                super().__init__()
+                self.path = path
+
+            def pr(self):
+                value = super().pr()
+                value["head"]["sha"] = "8" * 40
+                return value
+
+            def _result(self, args):
+                if args[:5] == ["git", "diff", "--no-renames", "--name-only", CANDIDATE]:
+                    return resolve.Result(self.path + "\n", "", 0)
+                return super()._result(args)
+
+        allowed = Descendant("app/SeriesViewModel.kt")
+        candidate = resolve.Candidate(allowed.pr(), allowed.observation(), {})
+        self.assertEqual(
+            ["app/SeriesViewModel.kt"],
+            resolve.validate_draft_extension_scope(allowed, self.root(), candidate),
+        )
+        refused = Descendant("unrelated.txt")
+        with self.assertRaisesRegex(resolve.Refusal, "unexplained paths"):
+            resolve.validate_draft_extension_scope(
+                refused, self.root(),
+                resolve.Candidate(refused.pr(), refused.observation(), {}),
+            )
+
+    def current_reuse_runner(self, *, artifacts=None, runs=None):
+        current_main = "6" * 40
+        current_upstream = "7" * 40
+        deterministic = "8" * 40
+        base = FakeRunner()
+        evidence = base.observation()
+        evidence.update(
+            schema_version=2,
+            branch=f"chore/sync-upstream-{current_upstream}-{current_main}",
+            candidate_sha=deterministic,
+            candidate_tree="5" * 40,
+            upstream_sha=current_upstream,
+            downstream_sha=current_main,
+            run_id="900",
+            run_attempt="1",
+            outcome="existing_draft_pr",
+            existing_pr_number=33,
+            existing_pr_branch=BRANCH,
+            existing_pr_head_sha=CANDIDATE,
+        )
+        artifacts = {900: evidence} if artifacts is None else artifacts
+        runs = ([{
+            "id": run_id, "run_attempt": 1, "head_sha": current_main,
+            "head_branch": "main", "path": resolve.UPSTREAM_WORKFLOW_PATH,
+            "conclusion": "success", "event": "schedule",
+        } for run_id in artifacts] if runs is None else runs)
+
+        class CurrentReuse(FakeRunner):
+            def _result(self, args):
+                if args[:3] == [
+                        "gh", "api",
+                        f"repos/{resolve.REPOSITORY}/actions/workflows/upstream-sync.yml/runs?branch=main&status=success&per_page=100"]:
+                    return resolve.Result(json.dumps({"workflow_runs": runs}), "", 0)
+                if args[:3] == ["gh", "run", "download"] and int(args[3]) in artifacts:
+                    destination = Path(args[args.index("--dir") + 1])
+                    (destination / "outcome.json").write_text(
+                        json.dumps(artifacts[int(args[3])]), encoding="utf-8"
+                    )
+                    return resolve.Result("", "", 0)
+                return super()._result(args)
+
+        return CurrentReuse(), current_main, evidence
+
+    def test_fresh_exact_main_same_episode_reuse_is_fully_authenticated(self):
+        runner, current_main, expected = self.current_reuse_runner()
+        actual = resolve.load_current_reuse_observation(
+            runner, self.root(), runner.pr(), runner.observation(), current_main
+        )
+        self.assertEqual(expected, actual)
+        self.assertTrue(any("actions/workflows/upstream-sync.yml/runs" in " ".join(call)
+                            for call in runner.calls))
+
+    def test_missing_or_expired_fresh_reuse_evidence_refuses(self):
+        runner, current_main, _ = self.current_reuse_runner(artifacts={}, runs=[])
+        with self.assertRaisesRegex(resolve.Refusal, "Run the normal Upstream Synchronization"):
+            resolve.load_current_reuse_observation(
+                runner, self.root(), runner.pr(), runner.observation(), current_main
+            )
+
+    def test_fresh_reuse_binding_mismatch_and_ambiguity_refuse(self):
+        runner, current_main, evidence = self.current_reuse_runner()
+        wrong = dict(evidence, existing_pr_head_sha="9" * 40)
+        wrong_runner, _, _ = self.current_reuse_runner(artifacts={900: wrong})
+        with self.assertRaisesRegex(resolve.Refusal, "No fresh authenticated"):
+            resolve.load_current_reuse_observation(
+                wrong_runner, self.root(), wrong_runner.pr(), wrong_runner.observation(), current_main
+            )
+
+        disagreeing = dict(evidence, run_id="901", upstream_sha="4" * 40,
+                           branch=f"chore/sync-upstream-{'4' * 40}-{current_main}")
+        ambiguous, _, _ = self.current_reuse_runner(artifacts={900: evidence, 901: disagreeing})
+        with self.assertRaisesRegex(resolve.Refusal, "disagree"):
+            resolve.load_current_reuse_observation(
+                ambiguous, self.root(), ambiguous.pr(), ambiguous.observation(), current_main
+            )
 
     def test_ci_success_renders(self):
         _, summary, _ = self.execute(FakeRunner(ci_bucket="pass"))

@@ -33,8 +33,9 @@ not current instruction.
 
 - Public guidance is versioned in the repository. Optional Wiki publication remains a separate
   operator action and cannot replace engineering authority.
-- Existing upstream Draft PR #58 is an expected authenticated human-review waiting state. Do not
-  close, merge, rewrite, or classify it as a platform failure merely to make the queue empty.
+- Current upstream Draft PR #106 is the human-controlled same-episode candidate. Reused-Draft
+  reconciliation requires fresh exact-main hosted evidence and preserves the Draft remote head
+  until the reviewed two-layer merge is ready; do not close, rewrite, or force-update it.
 
 ## Non-obvious invariants and negative knowledge
 

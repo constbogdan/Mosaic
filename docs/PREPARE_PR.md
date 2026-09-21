@@ -145,6 +145,14 @@ Preserved upstream REVIEW/conflict publication is deliberately excluded. Prepare
 and updates the same Draft but neither enables auto-merge nor changes Draft readiness. Human semantic
 review and merge/reject authority remain mandatory for that path.
 
+An upstream Draft reconciled after unrelated `main` movement uses the separate
+`-PreserveReconciledUpstreamMerge` contract. It requires exact original candidate, pre-publication
+remote Draft head, current main, reconciliation commit, final upstream parents, and reviewed final
+tree identities. The reconciliation is either exact `[Draft head, current main]` or current main is
+already contained by the Draft head; the final merge remains exact `[reconciliation, recorded
+upstream]`. Main/head drift refuses before the same no-force fast-forward push, and the Draft remains
+excluded from auto-merge.
+
 Public fork PRs are also outside prepare-pr's auto-merge authority. The script requires an exact
 downstream-owned PR head, so a foreign/fork head cannot pass authentication and Mosaic automation
 does not arm it. A contributor without repository write permission cannot independently enable

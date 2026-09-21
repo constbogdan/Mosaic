@@ -14,10 +14,20 @@ param(
     [switch]$NoFetch,
     [switch]$NonInteractive,
     [switch]$PreserveMergeCommit,
+    [switch]$PreserveReconciledUpstreamMerge,
+    [string]$ExpectedRemoteDraftHead,
+    [string]$ExpectedOriginalCandidate,
+    [string]$ExpectedCurrentMain,
+    [string]$ExpectedReconciliationCommit,
     [string]$ExpectedMergeFirstParent,
     [string]$ExpectedMergeSecondParent,
     [string]$ExpectedMergeTree
 )
+
+if ($PreserveMergeCommit -and $PreserveReconciledUpstreamMerge) {
+    throw 'Choose exactly one upstream merge-preservation mode.'
+}
+$preserveUpstreamCommit = $PreserveMergeCommit -or $PreserveReconciledUpstreamMerge
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -668,7 +678,7 @@ function Resolve-AndSaveScope([object]$Preflight) {
         if ($Files.Count -or $Exclude.Count) {
             throw 'Committed-only publication always uses the complete branch diff; -Files and -Exclude are not applicable.'
         }
-        if ($Preflight.Branch -like $config.UpstreamSyncBranchPattern -and -not $PreserveMergeCommit) {
+        if ($Preflight.Branch -like $config.UpstreamSyncBranchPattern -and -not $preserveUpstreamCommit) {
             throw 'A committed-only upstream-sync branch requires the existing preserved native-merge identity arguments.'
         }
         Write-Section 'AUDIT CHANGES'
@@ -916,7 +926,7 @@ function Invoke-Commit([object]$Preflight, [object]$State) {
         Write-Host "Title: $commitTitle"
         Invoke-Git -Arguments @('diff', '--cached', '--stat') | Select-Object -ExpandProperty Output | ForEach-Object { Write-Host $_ }
     }
-    if ($PreserveMergeCommit) {
+    if ($preserveUpstreamCommit) {
         if ($Preflight.Branch -notlike $config.UpstreamSyncBranchPattern) { throw '-PreserveMergeCommit is restricted to an upstream-sync branch.' }
         foreach ($identity in @($ExpectedMergeFirstParent, $ExpectedMergeSecondParent, $ExpectedMergeTree)) {
             if ($identity -notmatch '^[0-9a-f]{40}$') { throw 'Preserved merge identity requires exact lowercase 40-character Git object IDs.' }
@@ -933,7 +943,36 @@ function Invoke-Commit([object]$Preflight, [object]$State) {
         $remote = Invoke-Git -Arguments @('ls-remote', '--heads', $config.OriginRemote, $remoteRef) -AllowFailure
         if ($remote.ExitCode -ne 0) { throw 'Could not authenticate the existing Draft branch.' }
         $remoteHead = (($remote.Output | Select-Object -First 1) -split '\s+')[0]
-        if ($remoteHead -ne $ExpectedMergeFirstParent) { throw 'Existing Draft branch moved; preserved merge publication is refused.' }
+        if ($PreserveReconciledUpstreamMerge) {
+            foreach ($identity in @($ExpectedRemoteDraftHead, $ExpectedOriginalCandidate,
+                                     $ExpectedCurrentMain, $ExpectedReconciliationCommit)) {
+                if ($identity -notmatch '^[0-9a-f]{40}$') {
+                    throw 'Reconciled upstream preservation requires exact lowercase 40-character Git object IDs.'
+                }
+            }
+            if ($remoteHead -ne $ExpectedRemoteDraftHead) { throw 'Existing Draft branch moved; reconciled publication is refused.' }
+            if ($ExpectedMergeFirstParent -ne $ExpectedReconciliationCommit) { throw 'Final merge first parent is not the authenticated reconciliation commit.' }
+            $anchor = Invoke-Git -Arguments @('merge-base', '--is-ancestor', $ExpectedOriginalCandidate, $ExpectedRemoteDraftHead) -AllowFailure
+            if ($anchor.ExitCode -ne 0) { throw 'Remote Draft head does not descend from the original candidate.' }
+            $reconciliationParents = @((Get-GitText @('show', '-s', '--format=%P', $ExpectedReconciliationCommit)) -split '\s+' | Where-Object { $_ })
+            if ($ExpectedReconciliationCommit -eq $ExpectedRemoteDraftHead) {
+                $containsMain = Invoke-Git -Arguments @('merge-base', '--is-ancestor', $ExpectedCurrentMain, $ExpectedRemoteDraftHead) -AllowFailure
+                if ($containsMain.ExitCode -ne 0) { throw 'Draft head does not contain authenticated current main.' }
+            } elseif ($reconciliationParents.Count -ne 2 -or
+                      $reconciliationParents[0] -ne $ExpectedRemoteDraftHead -or
+                      $reconciliationParents[1] -ne $ExpectedCurrentMain) {
+                throw 'Reconciliation commit does not have exact parents [remote Draft head, current main].'
+            }
+            if ((Get-GitText @('rev-parse', "$($config.OriginRemote)/$($config.BaseBranch)")) -ne $ExpectedCurrentMain) {
+                throw 'Current protected main moved after reconciliation review.'
+            }
+            foreach ($ancestorIdentity in @($ExpectedRemoteDraftHead, $ExpectedCurrentMain, $ExpectedMergeSecondParent)) {
+                $contains = Invoke-Git -Arguments @('merge-base', '--is-ancestor', $ancestorIdentity, 'HEAD') -AllowFailure
+                if ($contains.ExitCode -ne 0) { throw 'Final reconciled merge is missing an authenticated ancestor.' }
+            }
+        } elseif ($remoteHead -ne $ExpectedMergeFirstParent) {
+            throw 'Existing Draft branch moved; preserved merge publication is refused.'
+        }
         $commitTitle = Get-GitText @('show', '-s', '--format=%s', 'HEAD')
         if ($script:conciseMode) { Write-Host 'Preserving reviewed native merge commit.' } else { Write-Host "Preserving existing merge commit: $commit" }
     } else {
@@ -1042,14 +1081,15 @@ function Invoke-Publish([object]$Preflight, [object]$State) {
     $branch = $Preflight.Branch
     $originUrl = Get-GitText @('remote', 'get-url', $config.OriginRemote)
     $slug = Get-RepositorySlug $originUrl
-    if ($PreserveMergeCommit) {
+    if ($preserveUpstreamCommit) {
         $beforeResult = Invoke-Gh -CommandPath $gh.Source -Arguments @('pr', 'list', '--repo', $slug, '--base', $config.BaseBranch, '--head', $branch, '--state', 'open', '--json', 'number,url,isDraft,headRefOid') -AllowFailure
         if ($beforeResult.ExitCode -ne 0) { throw "GitHub CLI could not authenticate the existing Draft PR before push:`n$($beforeResult.Output -join [Environment]::NewLine)" }
         $beforeJson = ($beforeResult.Output -join "`n").Trim()
         $beforePullRequests = if ($beforeJson) { @($beforeJson | ConvertFrom-Json) } else { @() }
         if ($beforePullRequests.Count -ne 1) { throw 'Expected exactly one existing Draft PR before preserved merge publication.' }
         if (-not $beforePullRequests[0].isDraft) { throw 'The existing upstream PR is no longer Draft; no push occurred.' }
-        if ($beforePullRequests[0].headRefOid -ne $ExpectedMergeFirstParent) { throw 'Existing Draft PR moved before publication; no push occurred.' }
+        $expectedBeforeHead = if ($PreserveReconciledUpstreamMerge) { $ExpectedRemoteDraftHead } else { $ExpectedMergeFirstParent }
+        if ($beforePullRequests[0].headRefOid -ne $expectedBeforeHead) { throw 'Existing Draft PR moved before publication; no push occurred.' }
     }
     $remoteRef = "refs/heads/$branch"
     $remoteQuery = Invoke-Git -Arguments @('ls-remote', '--heads', $config.OriginRemote, $remoteRef) -AllowFailure
@@ -1057,6 +1097,13 @@ function Invoke-Publish([object]$Preflight, [object]$State) {
     $remoteExists = [bool](($remoteQuery.Output -join '').Trim())
     if ($remoteExists) {
         $remoteCommit = (($remoteQuery.Output | Select-Object -First 1) -split '\s+')[0]
+        if ($PreserveReconciledUpstreamMerge) {
+            if ($remoteCommit -ne $ExpectedRemoteDraftHead) { throw 'Remote Draft head moved before reconciled publication.' }
+            Invoke-Git -Arguments @('fetch', '--no-tags', $config.OriginRemote, $config.BaseBranch) | Out-Null
+            if ((Get-GitText @('rev-parse', "$($config.OriginRemote)/$($config.BaseBranch)")) -ne $ExpectedCurrentMain) {
+                throw 'Current protected main moved before reconciled publication.'
+            }
+        }
         Invoke-Git -Arguments @('fetch', '--no-tags', $config.OriginRemote, $remoteRef) | Out-Null
         $fastForward = Invoke-Git -Arguments @('merge-base', '--is-ancestor', $remoteCommit, 'HEAD') -AllowFailure
         if ($fastForward.ExitCode -ne 0) { throw 'Remote branch is divergent or ahead; publication would require a force push. Refusing.' }
@@ -1074,7 +1121,7 @@ function Invoke-Publish([object]$Preflight, [object]$State) {
     $existingPullRequests = if ($existingJson) { @($existingJson | ConvertFrom-Json) } else { @() }
     if ($existingPullRequests.Count -gt 1) { throw 'Multiple open PRs match the published branch; refusing ambiguous PR identity.' }
     $existing = @($existingPullRequests | ForEach-Object { "#$($_.number) $($_.url)" })
-    if ($PreserveMergeCommit) {
+    if ($preserveUpstreamCommit) {
         if ($existingPullRequests.Count -ne 1) { throw 'Expected exactly one existing Draft PR for the preserved upstream merge.' }
         if (-not $existingPullRequests[0].isDraft) { throw 'The existing upstream PR is no longer Draft; preserve the human readiness decision.' }
         if ($existingPullRequests[0].headRefOid -ne $State.commit) { throw 'Existing Draft PR head does not match the reviewed upstream merge commit.' }
@@ -1102,7 +1149,7 @@ function Invoke-Publish([object]$Preflight, [object]$State) {
     $pullRequest = $existingPullRequests[0]
     $openLink = Format-MosaicTerminalLink '[open]' ([string]$pullRequest.url) ([string]$pullRequest.url)
     Write-Host "PR #$($pullRequest.number) $prDisposition  $openLink"
-    if ($PreserveMergeCommit) {
+    if ($preserveUpstreamCommit) {
         Write-Host 'Auto-merge: EXCLUDED (upstream Draft requires human review).'
         Write-Host 'Review and resolve Draft readiness in GitHub.'
         $autoMergeResult = 'excluded upstream Draft'
