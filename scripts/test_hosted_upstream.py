@@ -214,7 +214,15 @@ class HostedSyncTests(unittest.TestCase):
         self.github.records = [self.pr(o, draft=True)]
         retry, existing = self.observe()
         self.assertEqual("existing_draft_pr", existing["outcome"])
-        sync.publish(retry, self.github, existing, existing["upstream_sha"], existing["downstream_sha"])
+        self.assertEqual(123, existing["existing_pr_number"])
+        self.assertEqual(existing["branch"], existing["existing_pr_branch"])
+        self.assertEqual(existing["candidate_sha"], existing["existing_pr_head_sha"])
+        sync.publish(
+            retry, self.github, existing, existing["upstream_sha"], existing["downstream_sha"],
+            expected_existing_pr=existing["existing_pr_number"],
+            expected_existing_branch=existing["existing_pr_branch"],
+            expected_existing_head=existing["existing_pr_head_sha"],
+        )
         self.assertFalse(retry.pushes)
 
     def test_invalid_fetch_or_push_identity(self):
@@ -361,7 +369,12 @@ class HostedSyncTests(unittest.TestCase):
         self.retain_pr(git, o)
         retry, result = self.observe()
         self.assertEqual(result["outcome"], "existing_pr")
-        sync.publish(retry, self.github, result, result["upstream_sha"], result["downstream_sha"])
+        sync.publish(
+            retry, self.github, result, result["upstream_sha"], result["downstream_sha"],
+            expected_existing_pr=result["existing_pr_number"],
+            expected_existing_branch=result["existing_pr_branch"],
+            expected_existing_head=result["existing_pr_head_sha"],
+        )
         self.assertFalse(retry.pushes or self.github.created)
         summary = sync.upstream_summary(result, publication=True)
         self.assertIn("### Candidate ready", summary)
@@ -820,8 +833,24 @@ class HostedSyncTests(unittest.TestCase):
                 observed_at=f"2026-09-10T{hour:02}:00:00+00:00",
                 run_url=f"https://github.com/constbogdan/Wholphin/actions/runs/{run}")
             self.assertEqual("existing_draft_pr", observation["outcome"])
-            sync.publish(retry, self.github, observation,
-                         observation["upstream_sha"], observation["downstream_sha"])
+            self.assertEqual(123, observation["existing_pr_number"])
+            self.assertEqual(first["branch"], observation["existing_pr_branch"])
+            self.assertEqual(first["candidate_sha"], observation["existing_pr_head_sha"])
+            with self.assertRaisesRegex(sync.Blocked, "Existing Draft state changed"):
+                sync.publish(
+                    retry, self.github, observation,
+                    observation["upstream_sha"], observation["downstream_sha"],
+                    expected_existing_pr=observation["existing_pr_number"],
+                    expected_existing_branch=observation["existing_pr_branch"],
+                    expected_existing_head="0" * 40,
+                )
+            sync.publish(
+                retry, self.github, observation,
+                observation["upstream_sha"], observation["downstream_sha"],
+                expected_existing_pr=observation["existing_pr_number"],
+                expected_existing_branch=observation["existing_pr_branch"],
+                expected_existing_head=observation["existing_pr_head_sha"],
+            )
             self.assertFalse(retry.pushes)
         self.assertEqual(1, len(self.github.created))
 
@@ -840,8 +869,16 @@ class HostedSyncTests(unittest.TestCase):
         self.assertEqual(first_episode, observation["episode_id"])
         self.assertEqual("existing_draft_pr", observation["outcome"])
         self.assertEqual(first_branch, observation["existing_branch"])
-        sync.publish(retry, self.github, observation,
-                     observation["upstream_sha"], observation["downstream_sha"])
+        self.assertEqual(123, observation["existing_pr_number"])
+        self.assertEqual(first_branch, observation["existing_pr_branch"])
+        self.assertEqual(first["candidate_sha"], observation["existing_pr_head_sha"])
+        sync.publish(
+            retry, self.github, observation,
+            observation["upstream_sha"], observation["downstream_sha"],
+            expected_existing_pr=observation["existing_pr_number"],
+            expected_existing_branch=observation["existing_pr_branch"],
+            expected_existing_head=observation["existing_pr_head_sha"],
+        )
         self.assertEqual(1, len(self.github.created))
 
     def test_new_upstream_same_area_updates_episode_evidence_without_duplicate(self):
@@ -856,8 +893,13 @@ class HostedSyncTests(unittest.TestCase):
         self.assertNotEqual(first_upstream, observation["upstream_sha"])
         self.assertEqual(first["episode_id"], observation["episode_id"])
         self.assertEqual("existing_draft_pr", observation["outcome"])
-        sync.publish(retry, self.github, observation,
-                     observation["upstream_sha"], observation["downstream_sha"])
+        sync.publish(
+            retry, self.github, observation,
+            observation["upstream_sha"], observation["downstream_sha"],
+            expected_existing_pr=observation["existing_pr_number"],
+            expected_existing_branch=observation["existing_pr_branch"],
+            expected_existing_head=observation["existing_pr_head_sha"],
+        )
         self.assertEqual(1, len(self.github.created))
     def test_quiet_pr_and_rich_summary_split_operator_navigation_from_provenance(self):
         path = "app/src/SeriesViewModel.kt"

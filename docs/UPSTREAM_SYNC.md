@@ -258,6 +258,15 @@ This parent shape lets publication fast-forward the same Draft without rewriting
 tree must equal the reviewed index and contain neither blocked context nor conflict markers.
 Ready-for-review, CI, and merge/reject remain explicit human steps.
 
+When unrelated Mosaic main movement leaves an existing same-episode Draft on an older baseline,
+the Draft is actionable only after a fresh successful Upstream Synchronization outcome on exact
+current `main` binds the same episode to the exact PR number, branch, and live head. The resolver
+keeps the original candidate evidence separate from this reuse proof. Starting from authenticated
+Draft head `C`, it reviews an exact `B = merge(C, M)` with parents `[C, M]`; if `M` is already an
+ancestor of `C`, `B = C`. Only then does it resolve the original recorded upstream `U`, producing
+`R` with exact parents `[B, U]`. Reconciliation conflicts and upstream semantic conflicts are shown
+as separate stages. The remote remains at `C` until one reviewed, no-force fast-forward `C -> R`.
+
 The schedule `0 6,15,21 * * *` is UTC: approximately 08:00/17:00/23:00 Bucharest in winter
 and 09:00/18:00/00:00 in summer. GitHub cron does not follow DST and may start late; evidence
 separates configured cron from actual observation time. Complete observations retain excluded
@@ -421,8 +430,11 @@ already exist. Exact attention-path overlap, shared semantic production/ownershi
 ancestry and downstream observation baselines form a deterministic dependency graph. A proven predecessor is `Ready for resolution`; a dependent is
 `Waiting on PR #N`; unrelated candidates are `Independent`. Closed/satisfied candidates are
 `Superseded`. Incomparable ancestry or evidence observed against an older current-main baseline is
-`Dependency ambiguous` and cannot be selected. The next hosted observation must recompute stale
-scope/priority against authoritative main; the local helper never rebases or overwrites a Draft.
+`Dependency ambiguous` and cannot be selected. A stale same-episode Draft becomes
+`Ready for current-main reconciliation` only when a retained fresh outcome authenticates exact
+current main plus the exact live Draft identity. Missing/expired evidence, disagreement, head or
+main drift, non-descendant Draft history, or unexplained Draft scope remains ambiguous/refused. The
+local helper never rebases or overwrites a Draft.
 The current hosted I06 publisher still retains its earlier one-open-sync-PR guard, so normal hosted
 operation does not yet create concurrent independent candidates. Changing that hosted creation
 policy is a separate explicit follow-up, not part of this local operator helper.

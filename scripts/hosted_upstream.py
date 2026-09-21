@@ -354,7 +354,8 @@ def technical_evidence(observation):
             "candidate_parents", "classification_range_count", "ownership_counts", "review_paths",
             "conflict_paths", "clean_path_count", "blocking_pr_number", "blocking_pr_url",
             "blocking_pr_head_sha", "blocking_pr_branch", "blocking_upstream_sha",
-            "blocking_downstream_sha",
+            "blocking_downstream_sha", "existing_pr_number", "existing_pr_branch",
+            "existing_pr_head_sha",
             "configured_schedule_utc", "observed_at", "run_url")
         if observation.get(key) is not None
     }, indent=2, ensure_ascii=True)
@@ -773,7 +774,10 @@ def existing_candidate(git, pulls, observation, candidate, policy_version):
         if observation.get("episode_id") and not same[0].get("draft"):
             raise Blocked("Attention-required candidate is no longer Draft; preserve the human PR decision.")
         observation.update(outcome="existing_draft_pr" if same[0].get("draft") else "existing_pr",
-                           pr_url=same[0]["html_url"], pr_number=same[0]["number"])
+                           pr_url=same[0]["html_url"], pr_number=same[0]["number"],
+                           existing_pr_number=same[0]["number"],
+                           existing_pr_branch=same[0]["head"]["ref"],
+                           existing_pr_head_sha=same[0]["head"]["sha"])
         return True
     if observation.get("episode_id"):
         episode = [pull for pull in pulls if pull_episode(pull) == observation["episode_id"]]
@@ -785,7 +789,10 @@ def existing_candidate(git, pulls, observation, candidate, policy_version):
             if not pull.get("draft"):
                 raise Blocked("The unresolved episode PR is no longer Draft; preserve the human PR decision.")
             observation.update(outcome="existing_draft_pr", pr_url=pull["html_url"],
-                               pr_number=pull["number"], existing_branch=pull["head"]["ref"])
+                               pr_number=pull["number"], existing_branch=pull["head"]["ref"],
+                               existing_pr_number=pull["number"],
+                               existing_pr_branch=pull["head"]["ref"],
+                               existing_pr_head_sha=pull["head"]["sha"])
             return True
         if episode:
             raise Blocked("The unresolved episode has a closed PR decision; do not automatically reopen or recreate it.")
@@ -963,7 +970,8 @@ def inspect(git, github, observation, anchor=INITIAL_ANCHOR):
 
 
 def publish(git, github, observation, expected_up, expected_down,
-            expected_blocking_pr="", expected_blocking_head=""):
+            expected_blocking_pr="", expected_blocking_head="", expected_existing_pr="",
+            expected_existing_branch="", expected_existing_head=""):
     if (observation.get("upstream_sha"), observation.get("downstream_sha")) != (expected_up, expected_down):
         raise Blocked("Refs changed between read and publish jobs; rerun to observe current inputs.")
     expected_wait = bool(str(expected_blocking_pr).strip() or str(expected_blocking_head).strip())
@@ -978,10 +986,25 @@ def publish(git, github, observation, expected_up, expected_down,
         return
     if expected_wait:
         raise Blocked("Blocking PR state changed between read and publish jobs; rerun safely.")
+    expected_existing = tuple(str(value).strip() for value in (
+        expected_existing_pr, expected_existing_branch, expected_existing_head
+    ))
+    has_expected_existing = any(expected_existing)
+    if has_expected_existing and not all(expected_existing):
+        raise Blocked("Observe handoff contains an incomplete existing Draft identity.")
     if observation["outcome"] in {"no_delta", "observed_excluded"}:
+        if has_expected_existing:
+            raise Blocked("Existing Draft state changed between read and publish jobs; rerun safely.")
         return
     if observation["outcome"] in {"existing_pr", "existing_draft_pr"}:
+        actual_existing = tuple(str(observation.get(key) or "") for key in (
+            "existing_pr_number", "existing_pr_branch", "existing_pr_head_sha"
+        ))
+        if not has_expected_existing or actual_existing != expected_existing:
+            raise Blocked("Existing Draft state changed between read and publish jobs; rerun safely.")
         return
+    if has_expected_existing:
+        raise Blocked("Existing Draft state changed between read and publish jobs; rerun safely.")
     if observation["outcome"] not in {"ready", "review_required", "semantic_conflict"}:
         raise Blocked("Observation is not a publishable candidate.")
     token_present = bool(os.environ.get("SYNC_PUBLISH_TOKEN", "").strip())
@@ -1107,10 +1130,13 @@ def main():
     parser.add_argument("--expected-downstream", default="")
     parser.add_argument("--expected-blocking-pr", default="")
     parser.add_argument("--expected-blocking-head", default="")
+    parser.add_argument("--expected-existing-pr", default="")
+    parser.add_argument("--expected-existing-branch", default="")
+    parser.add_argument("--expected-existing-head", default="")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     raw_repository = os.environ.get("GITHUB_REPOSITORY", "")
-    o = {"schema_version": 1, "upstream_repo": UPSTREAM, "upstream_ref": "refs/heads/main",
+    o = {"schema_version": 2, "upstream_repo": UPSTREAM, "upstream_ref": "refs/heads/main",
          "downstream_repo": raw_repository, "downstream_ref": "refs/heads/main",
          "observed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
          "configured_schedule_utc": os.environ.get("CONFIGURED_SCHEDULE") or "manual",
@@ -1140,7 +1166,9 @@ def main():
             inspect(git, github, o)
             if args.publish:
                 publish(git, github, o, args.expected_upstream, args.expected_downstream,
-                        args.expected_blocking_pr, args.expected_blocking_head)
+                        args.expected_blocking_pr, args.expected_blocking_head,
+                        args.expected_existing_pr, args.expected_existing_branch,
+                        args.expected_existing_head)
     except (Blocked, OSError, ValueError, KeyError, subprocess.TimeoutExpired) as exc:
         failed = True
         operation_error = isinstance(exc, OperationError) or not isinstance(exc, Blocked)
@@ -1152,7 +1180,9 @@ def main():
         if os.environ.get("GITHUB_OUTPUT"):
             with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as stream:
                 for key in ("outcome", "upstream_sha", "downstream_sha",
-                            "blocking_pr_number", "blocking_pr_head_sha"):
+                            "blocking_pr_number", "blocking_pr_head_sha",
+                            "existing_pr_number", "existing_pr_branch",
+                            "existing_pr_head_sha"):
                     stream.write(f"{key}={o.get(key, '')}\n")
         if os.environ.get("GITHUB_STEP_SUMMARY"):
             with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as stream:
