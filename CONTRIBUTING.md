@@ -2,6 +2,9 @@
 
 We appreciate your interest in contributing to Mosaic!
 
+Use the [documentation index](docs/README.md) to find the developer guide, pull-request workflow,
+current project state, and engineering contracts.
+
 ## Code of Conduct
 
 We follow Jellyfin's example by adhering to their [Code of Conduct](https://jellyfin.org/docs/general/community-standards/#code-of-conduct).

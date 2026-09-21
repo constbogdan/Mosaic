@@ -7,7 +7,35 @@ VALIDATED. Channel selector and existing-user migration are now LIVE VALIDATED t
 performance work is evidence-driven rather than a pending migration. No stable release was created
 while implementing this contract.
 
+## Current Stable and Hold operation
+
+Stable Promotion is a zero-input manual **Prepare -> Release** workflow. Prepare reads current
+protected-main tooling and authenticates the rolling `develop` release, its immutable
+`downstream-build-N` candidate, source/tree, version, canonical manifest, exact signed APK bytes,
+producer run/attempt, package, and permanent signer. Release alone enters `release-promote`; after
+approval it repeats freshness and identity checks and publishes those exact bytes as
+`Mosaic-vX.Y.Z.apk` and `Mosaic-vX.Y.Z.json` under immutable `mosaic-vX.Y.Z`. It does not build,
+sign, repackage, or select a different candidate.
+
+Hold Release is the separate emergency containment boundary. After `release-hold` approval it can
+mark the currently authenticated Stable release as a prerelease so `/releases/latest` no longer
+advertises it, while preserving its tag, assets, bytes, and provenance. There is no rollback,
+repoint, unhold, or mutation of an old published APK. Recovery is a higher-version forward fix on
+protected main, automatic Development publication, and deliberate promotion of that exact corrected
+build. [I07](I07_PUBLISHED_RELEASE_REMEDIATION.md) owns the decision rationale; this document owns
+the current operation.
+
+Failures remain fail closed. Retry the zero-input promotion only after inspecting the current state;
+matching drafts may resume and completed identical publication is idempotent, but conflicting,
+missing, mutable, stale, newer, or ambiguous release state is never replaced. Signing mechanics and
+credential custody belong to [the signing contract](MOSAIC_SIGNING.md); validation and Development
+candidate production belong to [validation](VALIDATION.md) and
+[Development publication](MOSAIC_DEVELOPMENT_RELEASE.md).
+
 ## Stable promotion acceptance
+
+> Historical acceptance and presentation evidence. Current Stable and Hold operation is defined
+> above.
 
 Current operation supersedes the historical form procedure below. Stable Promotion is a
 zero-input manual **Prepare -> Release** workflow. Prepare resolves the current rolling

@@ -1,6 +1,7 @@
 # Mosaic developer's guide
 
-See also the [Contributing](CONTRIBUTING.md) guide for general information on contributing to the project.
+See the [Contributing](CONTRIBUTING.md) guide for general contribution information and the
+[engineering documentation index](docs/README.md) for repository workflows and architecture.
 
 ##  Overview
 

@@ -1,5 +1,39 @@
 # Repository and upstream synchronization policy
 
+This document is the current operating authority for upstream ownership, observation, candidate
+publication, semantic resolution, and failure behavior. Historical sync episodes and implementation
+acceptance remain below as evidence; they do not create alternate procedures.
+
+## Current hosted lifecycle and authority
+
+Scheduled or manual **Observe** runs read trusted Mosaic `main`, authenticate
+`damontecres/Wholphin`, classify the complete incoming range as `FOLLOW`, `REVIEW`, or
+`DOWNSTREAM-OWNED`, and emit a versioned evidence handoff. **Publish** independently reobserves and
+reauthenticates the exact inputs before it owns the final operator outcome. It creates or reuses the
+deterministic `wholphin-upstream-*` candidate only when the authenticated state authorizes that
+mutation.
+
+- `FOLLOW` produces a normal native-ancestry PR, still subject to required CI and review.
+- `REVIEW` or a textual conflict produces/reuses a human-controlled Draft. The authenticated
+  `resolve-upstream.ps1` lifecycle is the semantic-resolution entry point; it preserves reviewed
+  parent/tree identity and never makes the Draft ready or merges it.
+- `DOWNSTREAM-OWNED` preserves Mosaic's exact bytes or approved absence while retaining evidence of
+  the incoming upstream change.
+- `waiting_on_existing_pr` is green only for exactly one fully authenticated older managed open
+  candidate. Observe retains the newer observation; Publish reauthenticates the blocker and reports
+  waiting without minting an App token or mutating a branch or PR.
+
+Unknown automation paths default to review. Ambiguity, multiple candidates, head/ref drift,
+malformed evidence, ancestry/rewrite uncertainty, API/infrastructure failure, or any authentication
+failure remains red. No force push, automatic conflict resolution, direct main mutation, Draft
+readiness change, or merge authority exists. The GitHub App token is minted only after the exact
+repository/state checks that authorize candidate publication, is limited to Contents and pull
+requests, and is never available to Observe or waiting/no-delta paths.
+
+Ordinary PR mechanics are owned by [prepare-pr](PREPARE_PR.md), and authoritative integration
+checks by [validation architecture](VALIDATION.md). Passing validation never replaces semantic
+review of upstream changes.
+
 This document is the authoritative policy for branch use and synchronization of Mosaic with Wholphin upstream.
 
 ## Remotes and integration baseline
@@ -116,7 +150,7 @@ Conflict-sensitive integration areas currently include:
 
 An automatic merge is only a textual result. If both sides changed related behavior in these areas, inspect the merged semantics even when Git reports no conflict.
 
-## Validation
+## Upstream-specific validation boundary
 
 Manual synchronization and local conflict recovery retain meaningful focused feedback before
 publication. Hosted conflict-free candidates need no workstation validation. Every resulting
@@ -134,6 +168,8 @@ Use `.\scripts\validate-local.ps1` and follow the handoff conventions in `docs/A
 CI requires no Jellyfin, Seerr, Servarr, download-client, extension-repository, or signing credentials. It does not replace deliberate conflict resolution, high-risk auto-merge inspection, or Android TV visual/focus/runtime validation.
 
 ## Reference sync: September 2026
+
+> Historical acceptance evidence. Current policy is defined above.
 
 The first completed lifecycle synchronized six upstream commits through `chore/sync-upstream-2026-09-07`, followed by a pull request into our `main` and a local-main fast-forward.
 

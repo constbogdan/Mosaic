@@ -3,6 +3,8 @@
 Mosaic is a downstream Android TV client derived from
 [Wholphin](https://github.com/damontecres/Wholphin).
 
+See the [documentation index](docs/README.md) for engineering and contributor guidance.
+
 ## Installation
 
 Mosaic is currently distributed directly through GitHub Releases. [![Current Mosaic Release](https://img.shields.io/github/release/constbogdan/Mosaic.svg)](https://github.com/constbogdan/Mosaic/releases/latest)
