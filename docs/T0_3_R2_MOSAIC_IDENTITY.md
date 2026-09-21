@@ -1,7 +1,7 @@
 # T0-3.0 R2 — canonical Mosaic identity
 
 Status: **R2 canonical Mosaic identity — HOSTED VALIDATED. R3 — COMPLETE / HOSTED AND REAL-DEVICE
-VALIDATED. R4 — LOCALLY IMPLEMENTED / HOSTED ACCEPTANCE PENDING.**
+VALIDATED. R4 — COMPLETE / HOSTED VALIDATED. T0-3.0 Mosaic identity establishment — COMPLETE.**
 
 ## Current identity contract
 
@@ -258,9 +258,11 @@ Release `392754451` published `Mosaic-v1.0.77.apk` plus `Mosaic-v1.0.77.json`. T
 immutable candidate share SHA-256
 `207a9d2affb5925ca93aa9276d599709b9daf86fb505140a08ff935767d32d84`.
 
-R3 is therefore **COMPLETE / HOSTED AND REAL-DEVICE VALIDATED**. R4 removal of the old repository
-name from the R1 bridge is locally implemented and awaits hosted acceptance; dedicated
-documentation/wiki consolidation follows R4.
+R3 is therefore **COMPLETE / HOSTED AND REAL-DEVICE VALIDATED**. R4 removed the old repository name
+from current authorization and is **COMPLETE / HOSTED VALIDATED** through PR #98, protected-main
+exact-tree reuse, and manual Upstream check run `35579104934`. Current downstream authentication is
+Mosaic-only; historical old-name evidence remains intentionally unchanged. T0-3.0 Mosaic identity
+establishment is complete, and dedicated documentation/wiki/roadmap consolidation is next.
 
 ## Visual follow-up
 
