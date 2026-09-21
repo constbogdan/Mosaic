@@ -52,11 +52,11 @@
 
 `Development publisher correction - COMPLETE / HOSTED RECOVERY VALIDATED`
 
-`T0-3.0 R3 - DEVICE ACCEPTANCE IN PROGRESS / FINDINGS OPEN`
+`T0-3.0 R3 - COMPLETE / HOSTED AND REAL-DEVICE VALIDATED`
 
 `R3 Android TV banner identity - COMPLETE / HOSTED AND REAL-DEVICE VALIDATED (PR #95)`
 
-`R3 Stable Promotion presentation - IMPLEMENTED / HOSTED ACCEPTANCE PENDING`
+`R3 Stable Promotion presentation - COMPLETE / HOSTED VALIDATED (PR #96; run 35571701304)`
 
 `External contribution lifecycle - KEEP / DOCUMENTED`
 
@@ -108,8 +108,7 @@ reported `No build required`, and skipped Release Build, Sign and Publish.
 
 R1 is **COMPLETE / BOTH-NAME HOSTED VALIDATED**. The exact two-name bridge remains installed until
 R4. R2's repository rename is **COMPLETE / VERIFIED**. The R2 canonical Mosaic identity migration
-is **HOSTED VALIDATED**; R3 is **DEVICE ACCEPTANCE IN PROGRESS / FINDINGS OPEN** and owns the
-remaining real-device and update lifecycle proof. Historical old-name evidence remains correct, and the old-name authorization
+is **HOSTED VALIDATED**; R3 is **COMPLETE / HOSTED AND REAL-DEVICE VALIDATED**. Historical old-name evidence remains correct, and the old-name authorization
 remains installed until R4.
 
 PR #91 passed authoritative `ANDROID_FULL`, protected-main exact-tree reuse, Build, and Sign, and
@@ -164,12 +163,13 @@ and APK inspection confirmed the manifest's `@mipmap/ic_banner` reference, both 
 and exact packaged raster hashes. After merge, real-device acceptance confirmed Mosaic on both
 tablet and Android TV launcher surfaces, closing this finding.
 
-The separate Stable Promotion presentation correction is implemented and its focused Stable,
-delivery-output, Development and Hold tests pass. Prepare leads with
+The Stable Promotion presentation correction is **COMPLETE / HOSTED VALIDATED** through PR #96
+and run `35571701304`, attempt 1. Prepare authenticated `downstream-build-77` and rendered
 `Mosaic v1.0.N pending approval`, followed immediately by collapsed technical details containing
 only `Authenticated immutable build: downstream-build-N`; the build identity carries the candidate
-APK URL, with no explanatory prose or standalone candidate-download action. Successful Release leads with
-`Mosaic v1.0.N released` and the actual Stable APK/Release/comparison actions; source, digest,
+APK URL, with no explanatory prose or standalone candidate-download action. After `release-promote`
+approval, Release reauthenticated the handoff and rendered `Mosaic v1.0.77 released` with the actual
+Stable APK, Release-details, and comparison actions; source, digest,
 candidate and producer-run provenance remain available in the unchanged technical details below.
 The updater-consumed GitHub Release API name remains `v1.0.N`. Development and immutable releases
 retain `Mosaic-release.apk` and `mosaic-release.json`; Stable exposes those authenticated bytes as
@@ -178,13 +178,16 @@ canonical Development manifest and digests, while the updater accepts the fixed 
 or one unambiguous canonical versioned Stable APK. On this workstation, repository Fast
 is currently blocked before test selection because Windows Application Control rejects
 pre-commit's generated `check-yaml` child launcher; direct PyYAML parsing and all other focused
-checks pass. This unrelated local launcher boundary was not folded into the R3 patch. Hosted
-observation of one real Prepare → Release run remains required before closing this presentation
-finding.
+checks pass. This unrelated local launcher boundary was not folded into the R3 patch. The published
+Stable `mosaic-v1.0.77` exposes `Mosaic-v1.0.77.apk` and `Mosaic-v1.0.77.json`; its APK is byte-identical
+to immutable `downstream-build-77` at SHA-256
+`207a9d2affb5925ca93aa9276d599709b9daf86fb505140a08ff935767d32d84`.
 
-R3 must next host-validate the Stable Promotion/Release presentation cleanup, prove Mosaic N →
-Mosaic N+1 in-place update, and prove login/preferences/local state survive. Do not close R3 before
-all of those checks pass; R4 then remains the next T0 point before the dedicated documentation/wiki
+Real-device acceptance also completed on Android TV. Mosaic v1.0.76 from PR #95 was installed over
+the existing Mosaic v1.0.73 installation without uninstalling. Android treated it as an in-place
+update; the TV launcher/app menu showed Mosaic, login/session and preferences/local app state
+survived, and normal launch and use remained functional. R3 is closed. The next sequence is R4
+removal of old downstream repository authentication, followed by dedicated documentation/wiki
 consolidation.
 
 The external contribution lifecycle is **KEEP / NO SECURITY OR PROVENANCE DEFECT**. A fork PR may

@@ -1,7 +1,7 @@
 # T0-3.0 R2 — canonical Mosaic identity
 
-Status: **R2 canonical Mosaic identity — HOSTED VALIDATED. R3 — DEVICE ACCEPTANCE IN PROGRESS /
-FINDINGS OPEN.**
+Status: **R2 canonical Mosaic identity — HOSTED VALIDATED. R3 — COMPLETE / HOSTED AND REAL-DEVICE
+VALIDATED.**
 
 ## Current identity contract
 
@@ -160,9 +160,7 @@ zero `untagged-*` Git refs; specifically, `untagged-0d30e3a083c52d7b0ee5` no lon
 either namespace.
 
 Status: **Publisher correction — COMPLETE / HOSTED RECOVERY VALIDATED. R2 canonical Mosaic
-identity — HOSTED VALIDATED. R3 — DEVICE ACCEPTANCE IN PROGRESS / FINDINGS OPEN.** R3 owns the
-remaining real-device and update acceptance using the actual signed v1.0.73 bytes or a later
-canonical Mosaic Development pair.
+identity — HOSTED VALIDATED. R3 — COMPLETE / HOSTED AND REAL-DEVICE VALIDATED.**
 
 ### Canonical Stable v1.0.73
 
@@ -192,7 +190,8 @@ observations remain valid evidence for the exact Stable v1.0.73 bytes.
 
 ## R3 real-device acceptance
 
-R2 is complete on the hosted engineering path. R3 is not complete.
+R2 is complete on the hosted engineering path. R3 is complete through hosted and physical-device
+acceptance.
 
 The pre-fix physical-device evidence was:
 
@@ -222,8 +221,8 @@ TV launcher/app menu → Mosaic
 tablet launcher      → Mosaic
 ```
 
-This closes the Android TV banner finding. It does not by itself close the wider R3 update and
-state-preservation lifecycle.
+This closes the Android TV banner finding. The wider update and state-preservation lifecycle was
+then closed by the v1.0.73 to v1.0.76 in-place acceptance below.
 
 Repository and hosted evidence cannot close device acceptance. On a fresh Android/Android TV test
 device with neither app installed:
@@ -245,16 +244,21 @@ device with neither app installed:
 7. Confirm no request or downloaded asset requires `constbogdan/Wholphin` or
    `Wholphin-release.apk`.
 
-The remaining R3 order is:
+The operator installed canonical Mosaic v1.0.76 from PR #95 over the existing v1.0.73 installation
+without uninstalling. Package and permanent signer continuity produced a normal Android in-place
+update. The Android TV launcher/app menu showed Mosaic; login/session, preferences and local app
+state survived; and normal launch and use remained functional.
 
-1. publish and host-validate the Stable Promotion/Release presentation cleanup;
-2. publish a normal new Mosaic build;
-3. prove Mosaic N → Mosaic N+1 as an in-place update;
-4. prove login, preferences, database, and other local state survive;
-5. close R3.
+PR #96 then passed authoritative hosted validation and merged the Stable presentation contract.
+Stable Promotion run `35571701304`, attempt 1, authenticated `downstream-build-77`, waited on
+`release-promote`, reauthenticated the exact handoff, and published byte-identical Stable
+`mosaic-v1.0.77`. Prepare and Release summaries rendered the approved pending/released forms, and
+Release `392754451` published `Mosaic-v1.0.77.apk` plus `Mosaic-v1.0.77.json`. The Stable APK and
+immutable candidate share SHA-256
+`207a9d2affb5925ca93aa9276d599709b9daf86fb505140a08ff935767d32d84`.
 
-Only after R3 closes may R4 remove the old repository name from the R1 bridge. The dedicated
-documentation/wiki consolidation remains a later phase.
+R3 is therefore **COMPLETE / HOSTED AND REAL-DEVICE VALIDATED**. R4 removal of the old repository
+name from the R1 bridge is next; dedicated documentation/wiki consolidation follows R4.
 
 ## Visual follow-up
 

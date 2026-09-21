@@ -1,7 +1,7 @@
 # Mosaic Stable channel and promotion
 
-Status: **Stable promotion COMPLETE / LIVE VALIDATED** (through downstream-build-73 / Stable
-v1.0.73). Permanent signing, downstream
+Status: **Stable promotion COMPLETE / LIVE VALIDATED** (through downstream-build-77 / Stable
+v1.0.77). Permanent signing, downstream
 routing, development delivery and in-place updater acceptance remain COMPLETE / LIVE
 VALIDATED. Channel selector and existing-user migration are now LIVE VALIDATED through 1.0.5 -> 1.0.8. T0-1 CI/developer-velocity simplification is COMPLETE / HOSTED VALIDATED; further
 performance work is evidence-driven rather than a pending migration. No stable release was created
@@ -27,7 +27,7 @@ Canonical Mosaic acceptance used run `35495689386`, attempt 1. Prepare authentic
 rolling Development, and Stable APK assets are byte-identical at SHA-256
 `1c84efececec51f3b2ae602f1ba5d0d5b2d1334724cbb37760a4c3c455cb04cd`.
 
-### R3 presentation cleanup — implemented / hosted acceptance pending
+### R3 presentation cleanup — complete / hosted validated
 
 Development and immutable provenance retain the fixed `Mosaic-release.apk` plus
 `mosaic-release.json` inventory. Stable now publishes the same authenticated bytes under exactly
@@ -78,6 +78,15 @@ Stable workflow UX follows **product state first → primary operator action sec
 provenance details secondary but available**. Candidate authentication, exact signed-byte
 promotion, signer and manifest verification, approval authority, exact inventory, Hold, and every
 fail-closed boundary remain unchanged.
+
+Hosted acceptance completed in PR #96 and Stable Promotion run `35571701304`, attempt 1, at tooling
+SHA `12b827c675ad828dc474232650ed628314f03940`. Prepare authenticated `downstream-build-77`, rendered
+`Mosaic v1.0.77 pending approval`, and linked the immutable candidate only within collapsed technical
+details. Release waited on `release-promote`, reauthenticated the same candidate, and rendered
+`Mosaic v1.0.77 released` with Stable download, Release-details, and comparison actions. Published
+Release `392754451` / `mosaic-v1.0.77` has exactly `Mosaic-v1.0.77.apk` and
+`Mosaic-v1.0.77.json`. The Stable APK and immutable Development candidate are byte-identical at
+SHA-256 `207a9d2affb5925ca93aa9276d599709b9daf86fb505140a08ff935767d32d84`.
 
 I07 forward-recovery acceptance promoted `downstream-build-34` unchanged in run
 `34694610864`. Stable release `387569996` / v1.0.34 became latest with APK SHA-256
