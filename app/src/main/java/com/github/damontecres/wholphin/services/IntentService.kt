@@ -56,30 +56,37 @@ class IntentService
                 val query = intent.getStringParam(SearchManager.QUERY)
                 return IntentResult.Target(listOf(Destination.Search(query ?: "")))
             }
-            val itemId =
-                intent.getStringParam("itemId")?.toUUIDOrNull()
-                    ?: return IntentResult.Error("No item id provided")
 
+            val itemId = intent.getStringParam("itemId")?.toUUIDOrNull()
             val item =
-                try {
-                    api.userLibraryApi
-                        .getItem(itemId)
-                        .content
-                        .let { BaseItem(it) }
-                } catch (ex: Exception) {
-                    Timber.w(ex, "Error fetching item %s", itemId)
-                    return IntentResult.Error("Could not fetch item $itemId")
+                itemId?.let {
+                    try {
+                        api.userLibraryApi
+                            .getItem(itemId)
+                            .content
+                            .let { BaseItem(it) }
+                    } catch (ex: Exception) {
+                        Timber.w(ex, "Error fetching item %s", itemId)
+                        return IntentResult.Error("Could not fetch item $itemId")
+                    }
                 }
-
-            val itemDestination = item.destination()
+            val itemDestination = item?.destination()
 
             val destinations =
                 when (action) {
                     Intent.ACTION_VIEW, "view" -> {
-                        listOf(itemDestination)
+                        if (itemDestination != null) {
+                            listOf(itemDestination)
+                        } else {
+                            // Will go to the home page
+                            emptyList()
+                        }
                     }
 
                     "${BuildConfig.APPLICATION_ID}.PLAYBACK", "com.github.damontecres.wholphin.PLAYBACK", "play" -> {
+                        if (itemId == null || itemDestination == null) {
+                            return IntentResult.Error("Cannot start playback with no itemId")
+                        }
                         val position = intent.getLongParam("position")?.coerceAtLeast(0)
                         val shuffle = intent.getBooleanExtra("shuffle", false)
 
@@ -105,7 +112,7 @@ class IntentService
                     }
                 }
 
-            return IntentResult.Target(destinations)
+            return IntentResult.Target(destinations, true)
         }
 
         internal suspend fun prepare(intent: Intent): IntentResult? {
@@ -196,6 +203,8 @@ class IntentService
             const val INTENT_SEASON_ID = "seaId"
             const val INTENT_SERVER_ID = "serverId"
             const val INTENT_USER_ID = "userId"
+
+            const val ACTION_PLAYBACK = "com.github.damontecres.wholphin.PLAYBACK"
         }
     }
 
