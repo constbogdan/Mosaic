@@ -38,6 +38,7 @@ RUN_ID = re.compile(r"/actions/runs/(\d+)")
 BRANCH_IDENTITY = re.compile(
     re.escape(BRANCH_PREFIX) + r"([0-9a-f]{40})-([0-9a-f]{40})$"
 )
+RESOLUTION_HANDOFF = Path(".upstream-sync/resolution-handoff.json")
 
 
 class Refusal(RuntimeError):
@@ -907,6 +908,40 @@ def validate_filter_targets(root: Path, filters: list[str]) -> None:
         raise Refusal("Focused JVM filters do not match source-controlled tests: " + ", ".join(unmatched))
 
 
+def resolution_filters(root: Path, candidate: Candidate, derived: list[str]) -> tuple[list[str], str]:
+    """Use exact semantic filters only when their candidate binding is authenticated."""
+    path = root / RESOLUTION_HANDOFF
+    if not path.is_file():
+        return derived, "No semantic filter handoff found; using deterministic derived filters."
+    try:
+        handoff = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise Refusal(f"Semantic filter handoff is malformed: {error}") from error
+    if not isinstance(handoff, dict) or handoff.get("schema_version") != 1:
+        raise Refusal("Semantic filter handoff must be a schema-version 1 JSON object.")
+    expected = {
+        "pr_number": int(candidate.pr["number"]),
+        "episode_id": marker(candidate.pr.get("body", "")),
+        "branch": candidate.pr["head"]["ref"],
+    }
+    mismatched = [key for key, value in expected.items() if handoff.get(key) != value]
+    if mismatched:
+        raise Refusal("Semantic filter handoff binding mismatch: " + ", ".join(mismatched))
+    filters = handoff.get("test_filters")
+    if (not isinstance(filters, list) or not filters
+            or any(not isinstance(value, str) or not value.strip() for value in filters)):
+        raise Refusal("Semantic filter handoff test_filters must be a non-empty string array.")
+    filters = list(dict.fromkeys(value.strip() for value in filters))
+    missing = sorted(set(derived) - set(filters))
+    if missing:
+        raise Refusal(
+            "Semantic filter handoff would weaken deterministic coverage; missing: "
+            + ", ".join(missing)
+        )
+    validate_filter_targets(root, filters)
+    return filters, f"Authenticated semantic filter handoff: {RESOLUTION_HANDOFF.as_posix()}"
+
+
 def verify_local_descendant(runner: Runner, root: Path, candidate: Candidate) -> None:
     branch = candidate.pr["head"]["ref"]
     remote_sha = candidate.pr["head"]["sha"]
@@ -1051,8 +1086,9 @@ def publication_phase(root: Path, runner: Runner, candidate: Candidate, input_fn
     )
     upstream_paths = sorted(set(paths) - set(reconciliation_paths))
     validate_resolution_scope(upstream_paths, attention)
-    filters = derive_filters(paths, attention)
-    validate_filter_targets(root, filters)
+    derived_filters = derive_filters(paths, attention)
+    validate_filter_targets(root, derived_filters)
+    filters, filter_source = resolution_filters(root, candidate, derived_filters)
     print("\nPublication plan")
     print(f"PR: #{candidate.pr['number']} (same Draft)")
     print("Changes:")
@@ -1061,6 +1097,7 @@ def publication_phase(root: Path, runner: Runner, candidate: Candidate, input_fn
     print("Validation:\n  Focused tests:")
     for test_filter in filters:
         print(f"  - {test_filter}")
+    print(f"  Source: {filter_source}")
     try:
         approved = input_fn("\nReady to PUSH? [y/N]: ").strip().lower()
     except (EOFError, KeyboardInterrupt):
@@ -1099,8 +1136,9 @@ def publication_phase(root: Path, runner: Runner, candidate: Candidate, input_fn
     validate_resolution_scope(
         sorted(set(current_paths) - set(current_reconciliation_paths)), attention
     )
-    current_filters = derive_filters(current_paths, attention)
-    validate_filter_targets(root, current_filters)
+    current_derived_filters = derive_filters(current_paths, attention)
+    validate_filter_targets(root, current_derived_filters)
+    current_filters, _ = resolution_filters(root, current, current_derived_filters)
     if current_paths != paths or current_filters != filters:
         raise Refusal("Resolution scope or focused-test plan changed after approval; rerun and review it.")
     if native_conflict:
@@ -1199,12 +1237,24 @@ Start with compile/runtime blockers exposed by CI, then resolve the remaining
 attention paths semantically. Inspect the linked run when bounded failure evidence
 is unavailable. Run focused validation as you work.
 
-In the final report, provide the exact meaningful JVM test filter values required
-for the later `prepare-pr.ps1 -TestFilter` invocation. Derive them from behavior
-actually changed or preserved during this semantic resolution and prefer the
-narrowest meaningful existing or newly added tests. If no suitable focused JVM
-test exists, say so explicitly and identify the test that must be added before
-publication.
+Write `{RESOLUTION_HANDOFF.as_posix()}` as schema-version 1 JSON containing the
+current PR number, episode ID, branch, and exact meaningful JVM test filters:
+
+```json
+{{
+  "schema_version": 1,
+  "pr_number": {number},
+  "episode_id": "{marker(pr.get('body', ''))}",
+  "branch": "{pr.get('head', {}).get('ref', '')}",
+  "test_filters": ["fully.qualified.TestClass"]
+}}
+```
+
+Derive filters from behavior actually changed or preserved and prefer the
+narrowest meaningful existing or newly added tests. The resolver authenticates
+the binding and source-controlled targets, and refuses a handoff that omits its
+deterministic coverage floor, before passing the exact filters to prepare-pr. If
+no suitable focused JVM test exists, add the required test before publication.
 
 Do not push, commit the active merge, mark the PR Ready, rewrite candidate history,
 or force-update the branch. Resolve and stage the reviewed merge paths; the resolver

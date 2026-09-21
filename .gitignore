@@ -14,6 +14,7 @@ __pycache__/
 
 # Local validation and prepare-pr logs
 .logs/
+.upstream-sync/resolution-handoff.json
 
 # Android Studio generated files and folders
 captures/
@@ -85,6 +86,7 @@ docs/*
 !docs/OBSERVED_MINOR_ISSUES.md
 !docs/UI_AGENTS.md
 !docs/UPSTREAM_SYNC.md
+!docs/UPSTREAM_RESOLUTION_DECISIONS.md
 !docs/PREPARE_PR.md
 !docs/ITEM_6_CONSOLIDATION_CHECKLIST.md
 !docs/ITEM_6_UPSTREAM_AUTOMATION_AUDIT.md

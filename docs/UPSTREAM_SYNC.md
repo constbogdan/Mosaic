@@ -420,10 +420,16 @@ commit, attention-path, provenance and CI evidence.
 
 The terminal does not duplicate that generated prompt. It prints only a concise instruction to
 read `.logs/upstream-resolution/pr-<N>/codex-prompt.md` and carry it out exactly. The prompt requires
-the final semantic-resolution report to provide the narrowest meaningful JVM test filters for the
-later prepare-pr invocation, based on behavior actually changed or preserved. If no suitable test
-exists, Codex must name the test that needs to be added. The resolver does not guess those semantic
-filters before resolution, and prepare-pr enforcement is unchanged.
+Codex to write the ignored ephemeral `.upstream-sync/resolution-handoff.json`, bound to the exact PR,
+episode and managed branch, with the narrowest meaningful JVM test filters based on behavior
+actually changed or preserved. The resolver authenticates that binding, verifies source-controlled
+test targets, and refuses any handoff that removes its deterministic derived coverage floor. An
+absent handoff retains the existing derived-filter fallback. Malformed, stale, or mismatched
+handoffs fail closed before prepare-pr is invoked.
+
+Compact context from completed semantic reviews is retained in the
+[upstream resolution decision log](UPSTREAM_RESOLUTION_DECISIONS.md). Those entries inform future
+review but never authorize reusing an old decision without evaluating the new upstream change.
 
 The local resolver does not impose additional global serialization when multiple durable candidates
 already exist. Exact attention-path overlap, shared semantic production/ownership paths, upstream
