@@ -88,6 +88,8 @@ Current lifecycle boundaries are: [PR preparation](PREPARE_PR.md) →
 
 - **Current operating authority** — [Upstream synchronization](UPSTREAM_SYNC.md): remotes, branching,
   ownership, hosted observation/publication, REVIEW resolution, and failure behavior.
+- **Resolution context** — [Upstream resolution decisions](UPSTREAM_RESOLUTION_DECISIONS.md): compact,
+  non-authoritative context from completed semantic reviews.
 - **Historical decision and acceptance** — [I06 native upstream migration](I06_NATIVE_UPSTREAM_MIGRATION_PLAN.md):
   the completed native-ancestry migration and its proof.
 

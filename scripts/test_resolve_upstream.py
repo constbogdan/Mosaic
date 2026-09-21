@@ -495,8 +495,11 @@ class ResolveUpstreamTests(unittest.TestCase):
         self.assertIn("actions/runs/789", text)
         self.assertIn(UPSTREAM, text)
         self.assertIn(DOWNSTREAM, text)
-        self.assertIn("exact meaningful JVM test filter values", text)
-        self.assertIn("identify the test that must be added", text)
+        self.assertIn(".upstream-sync/resolution-handoff.json", text)
+        self.assertIn('"pr_number": 33', text)
+        self.assertIn(f'"episode_id": "{EPISODE}"', text)
+        self.assertIn(f'"branch": "{BRANCH}"', text)
+        self.assertIn("add the required test before publication", text)
 
     def test_mismatched_machine_evidence_refuses(self):
         class Mismatched(FakeRunner):
@@ -775,6 +778,70 @@ class ResolveUpstreamTests(unittest.TestCase):
         self.assertIn("com.github.damontecres.wholphin.ui.detail.series.*", filters)
         self.assertIn("*SeriesViewModelTest", filters)
 
+    def write_filter_handoff(self, root, candidate, **overrides):
+        payload = {
+            "schema_version": 1,
+            "pr_number": int(candidate.pr["number"]),
+            "episode_id": resolve.marker(candidate.pr["body"]),
+            "branch": candidate.pr["head"]["ref"],
+            "test_filters": ["derived.Filter", "semantic.HomeViewModelTest"],
+        }
+        payload.update(overrides)
+        path = root / resolve.RESOLUTION_HANDOFF
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        return path
+
+    def test_absent_filter_handoff_uses_derived_fallback(self):
+        candidate = self.candidate(33, "app/src/main/SeriesViewModel.kt", "1" * 40)
+        filters, reason = resolve.resolution_filters(self.root(), candidate, ["derived.Filter"])
+        self.assertEqual(["derived.Filter"], filters)
+        self.assertIn("using deterministic derived filters", reason)
+
+    def test_valid_filter_handoff_is_bound_and_validated(self):
+        root = self.root()
+        candidate = self.candidate(33, "app/src/main/SeriesViewModel.kt", "1" * 40)
+        self.write_filter_handoff(root, candidate)
+        tests = root / "app/src/test/java/fixture"
+        tests.mkdir(parents=True)
+        (tests / "Derived.kt").write_text("package derived\nclass Filter\n", encoding="utf-8")
+        (tests / "Semantic.kt").write_text(
+            "package semantic\nclass HomeViewModelTest\n", encoding="utf-8"
+        )
+        filters, reason = resolve.resolution_filters(root, candidate, ["derived.Filter"])
+        self.assertEqual(["derived.Filter", "semantic.HomeViewModelTest"], filters)
+        self.assertIn("Authenticated semantic filter handoff", reason)
+
+    def test_stale_or_mismatched_filter_handoff_refuses(self):
+        candidate = self.candidate(33, "app/src/main/SeriesViewModel.kt", "1" * 40)
+        cases = {
+            "pr_number": 34,
+            "episode_id": "f" * 64,
+            "branch": "chore/sync-upstream-wrong",
+        }
+        for field, value in cases.items():
+            with self.subTest(field=field):
+                root = self.root()
+                self.write_filter_handoff(root, candidate, **{field: value})
+                with self.assertRaisesRegex(resolve.Refusal, field):
+                    resolve.resolution_filters(root, candidate, ["derived.Filter"])
+
+    def test_malformed_filter_handoff_refuses(self):
+        candidate = self.candidate(33, "app/src/main/SeriesViewModel.kt", "1" * 40)
+        root = self.root()
+        path = root / resolve.RESOLUTION_HANDOFF
+        path.parent.mkdir(parents=True)
+        path.write_text("{not-json", encoding="utf-8")
+        with self.assertRaisesRegex(resolve.Refusal, "malformed"):
+            resolve.resolution_filters(root, candidate, ["derived.Filter"])
+
+    def test_filter_handoff_cannot_remove_derived_coverage(self):
+        root = self.root()
+        candidate = self.candidate(33, "app/src/main/SeriesViewModel.kt", "1" * 40)
+        self.write_filter_handoff(root, candidate, test_filters=["semantic.HomeViewModelTest"])
+        with self.assertRaisesRegex(resolve.Refusal, "would weaken deterministic coverage"):
+            resolve.resolution_filters(root, candidate, ["derived.Filter"])
+
     def test_missing_or_unmapped_filters_refuse(self):
         with self.assertRaisesRegex(resolve.Refusal, "No semantic-resolution changes"):
             resolve.derive_filters([], [])
@@ -828,6 +895,14 @@ class ResolveUpstreamTests(unittest.TestCase):
                 return super()._result(args)
 
         runner = PublishRunner()
+        root = self.root()
+        self.write_filter_handoff(
+            root, candidate,
+            test_filters=[
+                "com.github.damontecres.wholphin.ui.detail.series.*",
+                "*HomeViewModelTest",
+            ],
+        )
         paths = ["app/src/main/java/com/github/damontecres/wholphin/ui/detail/series/SeriesViewModel.kt"]
         with (patch.object(resolve, "verify_local_descendant"),
               patch.object(resolve, "assert_native_merge_identity"),
@@ -836,11 +911,14 @@ class ResolveUpstreamTests(unittest.TestCase):
               patch.object(resolve, "open_candidates", return_value=[candidate]),
               patch.object(resolve, "classify_dependencies", return_value=[candidate]),
               patch.object(resolve, "commit_native_resolution", return_value=("d" * 40, "f" * 40))):
-            resolve.publication_phase(self.root(), runner, candidate, lambda _: "y")
+            resolve.publication_phase(root, runner, candidate, lambda _: "y")
         command = next(call for call in runner.calls if call and call[0] == "powershell")
         self.assertEqual("-Command", command[-2])
         self.assertIn("prepare-pr.ps1", command[-1])
-        self.assertIn("-TestFilter @('com.github.damontecres.wholphin.ui.detail.series.*')", command[-1])
+        self.assertIn(
+            "-TestFilter @('com.github.damontecres.wholphin.ui.detail.series.*','*HomeViewModelTest')",
+            command[-1],
+        )
         self.assertNotIn("-Level", command[-1])
         self.assertIn("-PreserveMergeCommit", command[-1])
         self.assertIn(f"-ExpectedMergeFirstParent '{candidate.pr['head']['sha']}'", command[-1])

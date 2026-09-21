@@ -305,6 +305,7 @@ $global:LASTEXITCODE = 0
         pr_mode="create",
         scenario="default",
         list_head_before="",
+        list_head_sequence=(),
     ):
         self.configure_remote_branch(remote_sha)
         fixture_root = self.root / ".logs" / f"fake-publish-{scenario}"
@@ -356,8 +357,11 @@ def remote_head():
 def summary(number=63):
     list_count = bump(list_count_path)
     head = remote_head()
+    sequence = [value for value in os.environ.get(\"FAKE_LIST_HEAD_SEQUENCE\", \"\").split(\",\") if value]
     before = os.environ.get(\"FAKE_LIST_HEAD_BEFORE\", \"\")
-    if before and list_count == 1:
+    if list_count <= len(sequence):
+        head = sequence[list_count - 1]
+    elif before and list_count == 1:
         head = before
     return {
         \"number\": number,
@@ -468,6 +472,7 @@ raise SystemExit(2)
             "FAKE_HEAD": self.git("rev-parse", "HEAD").stdout.strip(),
             "FAKE_BRANCH": self.branch_name(),
             "FAKE_LIST_HEAD_BEFORE": list_head_before,
+            "FAKE_LIST_HEAD_SEQUENCE": ",".join(list_head_sequence),
             "FAKE_REPOSITORY": "/".join(self.origin.parts[-2:]).removesuffix(".git"),
         }
 
@@ -923,6 +928,96 @@ raise SystemExit(2)
         self.assertEqual(final, self.remote_head())
         self.assertIn("Auto-merge: EXCLUDED", result.stdout)
         self.assertFalse(any("--force" in args for args in self.fake_trace("git")))
+
+    def test_preserved_draft_head_accepts_immediate_expected_commit(self):
+        remote, current_main, reconciliation, upstream, final, tree = (
+            self.create_reconciled_upstream_merge()
+        )
+        result = self.prepare(
+            "Guided", "-PreserveReconciledUpstreamMerge",
+            "-ExpectedRemoteDraftHead", remote,
+            "-ExpectedOriginalCandidate", remote,
+            "-ExpectedCurrentMain", current_main,
+            "-ExpectedReconciliationCommit", reconciliation,
+            "-ExpectedMergeFirstParent", reconciliation,
+            "-ExpectedMergeSecondParent", upstream,
+            "-ExpectedMergeTree", tree,
+            "-TestFilter", "*UpstreamFixtureTest*",
+            env=self.fake_publish_env(
+                remote_sha=remote, pr_mode="upstream_draft", scenario="head-immediate",
+                list_head_sequence=(remote, final),
+            ), check=False,
+        )
+        self.assertEqual(0, result.returncode, normalized_native_output(result))
+
+    def test_preserved_draft_head_retries_only_authenticated_stale_head(self):
+        remote, current_main, reconciliation, upstream, final, tree = (
+            self.create_reconciled_upstream_merge()
+        )
+        result = self.prepare(
+            "Guided", "-PreserveReconciledUpstreamMerge",
+            "-ExpectedRemoteDraftHead", remote,
+            "-ExpectedOriginalCandidate", remote,
+            "-ExpectedCurrentMain", current_main,
+            "-ExpectedReconciliationCommit", reconciliation,
+            "-ExpectedMergeFirstParent", reconciliation,
+            "-ExpectedMergeSecondParent", upstream,
+            "-ExpectedMergeTree", tree,
+            "-TestFilter", "*UpstreamFixtureTest*",
+            env=self.fake_publish_env(
+                remote_sha=remote, pr_mode="upstream_draft", scenario="head-stale-once",
+                list_head_sequence=(remote, remote, final),
+            ), check=False,
+        )
+        self.assertEqual(0, result.returncode, normalized_native_output(result))
+        lists = [args for args in self.fake_trace("gh", "head-stale-once") if args[:2] == ["pr", "list"]]
+        self.assertEqual(3, len(lists))
+
+    def test_preserved_draft_head_stale_until_timeout_refuses(self):
+        remote, current_main, reconciliation, upstream, _, tree = (
+            self.create_reconciled_upstream_merge()
+        )
+        result = self.prepare(
+            "Guided", "-PreserveReconciledUpstreamMerge",
+            "-ExpectedRemoteDraftHead", remote,
+            "-ExpectedOriginalCandidate", remote,
+            "-ExpectedCurrentMain", current_main,
+            "-ExpectedReconciliationCommit", reconciliation,
+            "-ExpectedMergeFirstParent", reconciliation,
+            "-ExpectedMergeSecondParent", upstream,
+            "-ExpectedMergeTree", tree,
+            "-TestFilter", "*UpstreamFixtureTest*",
+            env=self.fake_publish_env(
+                remote_sha=remote, pr_mode="upstream_draft", scenario="head-timeout",
+                list_head_sequence=(remote, remote, remote, remote, remote),
+            ), check=False,
+        )
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("bounded retry window", normalized_native_output(result))
+
+    def test_preserved_draft_head_unexpected_third_sha_refuses_immediately(self):
+        remote, current_main, reconciliation, upstream, _, tree = (
+            self.create_reconciled_upstream_merge()
+        )
+        result = self.prepare(
+            "Guided", "-PreserveReconciledUpstreamMerge",
+            "-ExpectedRemoteDraftHead", remote,
+            "-ExpectedOriginalCandidate", remote,
+            "-ExpectedCurrentMain", current_main,
+            "-ExpectedReconciliationCommit", reconciliation,
+            "-ExpectedMergeFirstParent", reconciliation,
+            "-ExpectedMergeSecondParent", upstream,
+            "-ExpectedMergeTree", tree,
+            "-TestFilter", "*UpstreamFixtureTest*",
+            env=self.fake_publish_env(
+                remote_sha=remote, pr_mode="upstream_draft", scenario="head-third",
+                list_head_sequence=(remote, "9" * 40),
+            ), check=False,
+        )
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("unexpected commit", normalized_native_output(result))
+        lists = [args for args in self.fake_trace("gh", "head-third") if args[:2] == ["pr", "list"]]
+        self.assertEqual(2, len(lists))
 
     def test_reconciled_upstream_publication_refuses_main_or_remote_drift(self):
         remote, current_main, reconciliation, upstream, _, tree = (

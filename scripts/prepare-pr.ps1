@@ -1122,9 +1122,25 @@ function Invoke-Publish([object]$Preflight, [object]$State) {
     if ($existingPullRequests.Count -gt 1) { throw 'Multiple open PRs match the published branch; refusing ambiguous PR identity.' }
     $existing = @($existingPullRequests | ForEach-Object { "#$($_.number) $($_.url)" })
     if ($preserveUpstreamCommit) {
-        if ($existingPullRequests.Count -ne 1) { throw 'Expected exactly one existing Draft PR for the preserved upstream merge.' }
-        if (-not $existingPullRequests[0].isDraft) { throw 'The existing upstream PR is no longer Draft; preserve the human readiness decision.' }
-        if ($existingPullRequests[0].headRefOid -ne $State.commit) { throw 'Existing Draft PR head does not match the reviewed upstream merge commit.' }
+        $maximumHeadObservations = 4
+        for ($headObservation = 1; $headObservation -le $maximumHeadObservations; $headObservation++) {
+            if ($existingPullRequests.Count -ne 1) { throw 'Expected exactly one existing Draft PR for the preserved upstream merge.' }
+            if (-not $existingPullRequests[0].isDraft) { throw 'The existing upstream PR is no longer Draft; preserve the human readiness decision.' }
+            $observedHead = [string]$existingPullRequests[0].headRefOid
+            if ($observedHead -eq $State.commit) { break }
+            if ($observedHead -ne $expectedBeforeHead) {
+                throw 'Existing Draft PR head changed to an unexpected commit after publication.'
+            }
+            if ($headObservation -eq $maximumHeadObservations) {
+                throw 'Existing Draft PR head did not expose the reviewed upstream merge commit within the bounded retry window.'
+            }
+            Write-PrepareLog "GitHub still reports authenticated pre-push Draft head $observedHead; retrying PR-head authentication ($headObservation/$maximumHeadObservations)."
+            Start-Sleep -Seconds 1
+            $retryResult = Invoke-Gh -CommandPath $gh.Source -Arguments @('pr', 'list', '--repo', $slug, '--base', $config.BaseBranch, '--head', $branch, '--state', 'open', '--json', 'number,url,isDraft,headRefOid') -AllowFailure
+            if ($retryResult.ExitCode -ne 0) { throw "GitHub CLI could not reauthenticate the existing Draft PR after push:`n$($retryResult.Output -join [Environment]::NewLine)" }
+            $retryJson = ($retryResult.Output -join "`n").Trim()
+            $existingPullRequests = if ($retryJson) { @($retryJson | ConvertFrom-Json) } else { @() }
+        }
     }
     if ($existing.Count) {
         $prResult = 'existing PR reported'
