@@ -1,5 +1,9 @@
 # I07 — Published Release Remediation
 
+> **Historical decision rationale and acceptance record.** Current Hold and forward-fix operation
+> is owned by [MOSAIC_STABLE.md](MOSAIC_STABLE.md). This record explains why that policy exists; it
+> is not a second operating runbook. See the [history index](history/README.md).
+
 ## Status
 
 **COMPLETE / LIVE VALIDATED.**

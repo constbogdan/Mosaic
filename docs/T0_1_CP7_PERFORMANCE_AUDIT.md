@@ -1,5 +1,9 @@
 # T0-1 CP7 performance, latency, and efficiency audit
 
+> **Historical performance evidence.** Measurements and acceptance decisions are point-in-time,
+> not current timing guarantees or operating instructions. Current validation authority is
+> [VALIDATION.md](VALIDATION.md); related history is indexed in [history](history/README.md).
+
 Status: **CP7 COMPLETE / HOSTED VALIDATED**
 Measured: **2026-09-15 through 2026-09-16**
 Closure: **CP8 COMPLETE; T0-1 COMPLETE**. Next roadmap phase: **T0-2**.

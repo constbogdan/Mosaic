@@ -1,5 +1,9 @@
 # Item 6 — Mosaic delivery and tooling consolidation
 
+> **Historical program ledger.** This is point-in-time decision and acceptance evidence, not a
+> current operating runbook. Use the [documentation index](README.md) for current authorities and
+> the [history index](history/README.md) for historical context.
+
 This document is the durable, multi-PR checklist for the 143 numbered requirements in the Item 6 specification. The source specification remains external planning input; this checklist records repository evidence, dependencies, readiness, and completion.
 
 Status terms used below:

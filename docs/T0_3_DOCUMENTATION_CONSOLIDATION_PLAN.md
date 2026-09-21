@@ -1,6 +1,6 @@
 # T0-3 documentation consolidation audit and plan
 
-Status: **D1 and D2 COMPLETE; D3 implemented pending review. D4 has not begun.**
+Status: **D1-D3 COMPLETE; D4 implemented pending review. D5 has not begun.**
 
 This audit describes the documentation set at `main` commit
 `44564901cbdb7ffce4b1c0704aa2d53f93c40fa9`. It does not move, delete, rename, or broadly rewrite
@@ -316,6 +316,38 @@ manuals current-first through concise ownership, boundary, and recovery summarie
 cross-links. Existing acceptance and incident material remains in place and is explicitly secondary
 where it was prominent. No operating behavior changed.
 
-D4 remains next and has not begun: no historical files or large evidence blocks have moved, no
-history index exists, and existing anchors remain preserved. Later D5 work still owns roadmap,
-handoff, architecture, identity-document, and agent-guide reduction or renaming.
+D3 changed no operating behavior and retained existing anchors.
+
+## D4 implementation decisions
+
+D4 created `docs/history/README.md` as the single historical-evidence boundary and replaced the
+temporary flat history list in `docs/README.md` with that grouped index. Historical records now
+state near their top that they are point-in-time evidence, name the current canonical owner, and
+link to the history index where useful.
+
+No existing record moved. Repository inventory found many normal Markdown consumers, including
+heading-level links from the roadmap, handoff, validation and delivery manuals, plus likely external
+GitHub links to these established paths and anchors. No workflow, script, test, or configuration
+consumer required their paths, but relocating the files would create unnecessary anchor and inbound
+link risk for no authority benefit. The flat files therefore remain deliberately stable and are
+classified through navigation rather than duplicated behind pointer stubs.
+
+The in-place decision applies to `ITEM_6_CONSOLIDATION_CHECKLIST.md`,
+`ITEM_6_I05_PRESENTATION.md`, `ITEM_6_UPSTREAM_AUTOMATION_AUDIT.md`,
+`T0_1_OPERATOR_UX_INVENTORY.md`, `T0_1_CP7_PERFORMANCE_AUDIT.md`,
+`I06_NATIVE_UPSTREAM_MIGRATION_PLAN.md`, `I07_PUBLISHED_RELEASE_REMEDIATION.md`, and
+`RELEASE_PIPELINE_SIMPLIFICATION_PLAN.md`. Each is now indexed and has an explicit historical
+boundary near its top; the two Item 6 records that already had accurate historical banners received
+only navigation links.
+
+No long acceptance block was extracted from a current manual. D3 already placed concise current
+contracts first and labelled embedded acceptance sections historical. Those headings have inbound
+links from the roadmap/handoff and may have external references, so D4 preserved them in place and
+used the history index to make their role unambiguous. `T0_3_R2_MOSAIC_IDENTITY.md` likewise remains
+the current identity owner until D5; its acceptance sections are explicitly historical without
+renaming or splitting the file.
+
+D4 is complete pending review: evidence and historical names remain unchanged, established paths
+and anchors are preserved, and current ownership remains with the D3 manuals. D5 has not begun;
+roadmap/handoff reduction, `ARCHITECTURE.md`, roadmap or identity renaming, and agent-guide
+consolidation remain later work.

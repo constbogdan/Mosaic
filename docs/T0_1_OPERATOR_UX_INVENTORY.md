@@ -1,5 +1,10 @@
 # Baseline T0-1 operator UX, workflow, and presentation inventory
 
+> **Historical program ledger.** This completed T0-1 record preserves decisions and hosted
+> acceptance evidence. Current PR and validation operation is owned by
+> [PREPARE_PR.md](PREPARE_PR.md) and [VALIDATION.md](VALIDATION.md); use the
+> [history index](history/README.md) for context.
+
 Status: **T0-1 COMPLETE. CP4B.3 COMPLETE / HOSTED VALIDATED; P04 COMPLETE / HOSTED VALIDATED;
 Validation-plan visibility COMPLETE / HOSTED VALIDATED; prepare-pr terminal UX COMPLETE / HOSTED
 VALIDATED; Operator UX batch COMPLETE / HOSTED VALIDATED**

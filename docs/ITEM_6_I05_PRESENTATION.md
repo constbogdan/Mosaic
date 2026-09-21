@@ -5,6 +5,8 @@
 > are migration evidence, not current operator capabilities.
 > T0-1 CP2 also removed the inherited `Development build` and `Create release` workflows. Their
 > inventory rows remain historical evidence; both paths are now downstream-owned absences.
+> Current authorities are linked from the [documentation index](README.md); related evidence is
+> grouped in the [history index](history/README.md).
 
 Baseline: `27f264ee` before I05 edits. Inventory captured before implementation.
 

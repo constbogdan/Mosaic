@@ -3,6 +3,11 @@
 Status: **R2 canonical Mosaic identity — HOSTED VALIDATED. R3 — COMPLETE / HOSTED AND REAL-DEVICE
 VALIDATED. R4 — COMPLETE / HOSTED VALIDATED. T0-3.0 Mosaic identity establishment — COMPLETE.**
 
+The **Current identity contract** below remains authoritative until D5 decides its permanent form.
+Later R2/R3/R4 implementation, incident, and acceptance sections are historical evidence and do
+not define alternate current identities. They remain in place to preserve established paths and
+anchors; see the [history index](history/README.md).
+
 ## Current identity contract
 
 New downstream state uses one canonical product identity:

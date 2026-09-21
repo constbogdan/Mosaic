@@ -71,6 +71,10 @@ docs/*
 !docs/T0_3_DOCUMENTATION_CONSOLIDATION_PLAN.md
 !docs/README.md
 !docs/VALIDATION.md
+!docs/history/
+!docs/history/README.md
+!docs/history/
+!docs/history/README.md
 !docs/AGENTS.md
 !docs/CODEX_HANDOFF.md
 !docs/OBSERVED_MINOR_ISSUES.md

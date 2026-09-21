@@ -1,5 +1,9 @@
 # I06 native upstream-integration migration plan
 
+> **Historical migration decision and acceptance record.** Current upstream operation is owned by
+> [UPSTREAM_SYNC.md](UPSTREAM_SYNC.md). This file preserves the migration rationale and proof; it is
+> not a current runbook. See the [history index](history/README.md).
+
 ## Purpose and status
 
 This tracks the remaining migration from synthetic I06 integration state to truthful native Git

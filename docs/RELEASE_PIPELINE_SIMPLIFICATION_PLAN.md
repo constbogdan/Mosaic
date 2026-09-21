@@ -1,5 +1,10 @@
 # Release Pipeline Simplification Plan
 
+> **Historical architecture decision record.** Current operation is owned by
+> [VALIDATION.md](VALIDATION.md), [MOSAIC_DEVELOPMENT_RELEASE.md](MOSAIC_DEVELOPMENT_RELEASE.md),
+> [MOSAIC_SIGNING.md](MOSAIC_SIGNING.md), and [MOSAIC_STABLE.md](MOSAIC_STABLE.md). This file
+> preserves the decisions that produced those boundaries. See the [history index](history/README.md).
+
 This document is the authoritative migration tracker for simplifying Mosaic's release pipeline. It records durable decisions and acceptance evidence without treating earlier architecture-review output as a fixed implementation checklist.
 
 ## Standing invariants
