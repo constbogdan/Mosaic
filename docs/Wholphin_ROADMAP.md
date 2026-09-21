@@ -24,7 +24,9 @@ HOSTED VALIDATED (PR #85); T0-2 is COMPLETE. T0-3.0 R1 is COMPLETE / BOTH-NAME H
 (old-name PR #87; new-name PR #89). R2's external repository rename is COMPLETE / VERIFIED; the
 [canonical Mosaic identity migration](T0_3_R2_MOSAIC_IDENTITY.md) is HOSTED VALIDATED. Its
 Development publisher correction is COMPLETE / HOSTED RECOVERY VALIDATED. R3 is COMPLETE / HOSTED
-AND REAL-DEVICE VALIDATED. R4 is LOCALLY IMPLEMENTED / HOSTED ACCEPTANCE PENDING.
+AND REAL-DEVICE VALIDATED. R4 is COMPLETE / HOSTED VALIDATED (PR #98; upstream run 35579104934).
+T0-3.0 Mosaic identity establishment is COMPLETE. The next active phase is T0-3 Documentation,
+Wiki & Roadmap consolidation.
 The external contribution lifecycle is KEEP /
 DOCUMENTED.** Baseline T0 is an
 engineering baseline, not an application release. The ordered program is:
@@ -374,7 +376,7 @@ default; the surviving mechanisms each protect a reviewed consumer or authority 
 Status: **R1 — COMPLETE / BOTH-NAME HOSTED VALIDATED. R2 repository rename — COMPLETE / VERIFIED.
 R2 canonical Mosaic identity migration — HOSTED VALIDATED. Development publisher correction —
 COMPLETE / HOSTED RECOVERY VALIDATED. R3 — COMPLETE / HOSTED AND REAL-DEVICE VALIDATED. R4 —
-LOCALLY IMPLEMENTED / HOSTED ACCEPTANCE PENDING.**
+COMPLETE / HOSTED VALIDATED. T0-3.0 MOSAIC IDENTITY ESTABLISHMENT — COMPLETE.**
 
 T0-3 begins by establishing the permanent downstream product identity before the broader
 documentation, wiki, and roadmap consolidation. This record preserves the accepted decisions and
@@ -651,9 +653,9 @@ Development eligibility independently classified the complete unpublished range 
 with `releaseRequired=false` and `skipped_non_apk` (`No build required`); Release Build, Sign and
 Publish did not run. The `wholphin-pr-policy-v1-*` protocol was neither renamed nor versioned.
 
-R1 is therefore **COMPLETE / BOTH-NAME HOSTED VALIDATED**. Its exact two-name bridge remains
-installed intentionally until R4; do not remove `constbogdan/Wholphin` authorization during the
-next canonical product migration.
+R1 is therefore **COMPLETE / BOTH-NAME HOSTED VALIDATED** as historical transition evidence. Its
+temporary exact two-name bridge was retained through R3 and removed by hosted-validated R4; current
+downstream authorization accepts only exact `constbogdan/Mosaic`.
 
 ##### R2 — canonical Mosaic product and distribution identity
 
@@ -709,7 +711,8 @@ Mosaic launcher/banner identity. The operator then installed v1.0.76 over the ex
 without uninstalling; login/session, preferences/local state, normal launch/use, and the Mosaic TV
 identity survived the in-place update. PR #96 and Stable Promotion run `35571701304` hosted-validated
 the final presentation contract and exact-byte promotion of `downstream-build-77` to
-`mosaic-v1.0.77`. R4 is the next T0-3.0 point before dedicated documentation/wiki consolidation.
+`mosaic-v1.0.77`. R4 subsequently closed the repository-authentication transition before dedicated
+documentation/wiki consolidation.
 
 ##### R4 — retire the bridge and close T0-3.0
 
@@ -721,13 +724,19 @@ With R3 complete:
 - preserve historical old repository values and evidence unchanged;
 - record **T0-3.0 — COMPLETE / LIVE VALIDATED**.
 
-R4 is **LOCALLY IMPLEMENTED / HOSTED ACCEPTANCE PENDING**. Current runtime and workflow
+R4 is **COMPLETE / HOSTED VALIDATED**. Current runtime and workflow
 authentication accepts only exact `constbogdan/Mosaic`; the retired `constbogdan/Wholphin` identity,
 case variants, lookalikes, foreign owners, and malformed identities fail closed before credentials
 or mutation. Historical old-name evidence and upstream `damontecres/Wholphin` remain unchanged.
-T0-3.0 is not closed until the Mosaic-only hosted lifecycle is accepted.
+PR #98 head `491d05e437f6d88ffdff41e380440970de266c8e` passed authoritative `ANDROID_FULL`
+in run `35577374647`. Native merge `cc1113f8054880de20a62ffd124bf98912e90036` reached protected
+main, where run `35578337513` authenticated and reused the exact PR evidence; Development reported
+`No build required`. Manual Upstream check run `35579104934` then authenticated Mosaic-only Observe
+and Publish, retained the newer observation, and finished `Waiting on PR #58` without a duplicate
+candidate or App-token mint. T0-3.0 Mosaic identity establishment is **COMPLETE**.
 
-The permanent T0-3 documentation/knowledge consolidation begins only after R4.
+The next active phase is **T0-3 Documentation, Wiki & Roadmap consolidation**. Baseline T0 remains
+in progress.
 
 #### Explicit exclusions
 
@@ -770,8 +779,8 @@ immediate explanation in Actions, PRs and Releases.
 T0-1 Cleanup & Operator Experience        COMPLETE
 T0-2 Engineering / Process Audit          COMPLETE
 T0-2 blocking findings                    RESOLVED / ACCEPTED
-T0-3.0 Mosaic identity establishment      PENDING — R1 NEXT
-T0-3 Documentation / Wiki / Roadmap       PENDING
+T0-3.0 Mosaic identity establishment      COMPLETE / HOSTED VALIDATED
+T0-3 Documentation / Wiki / Roadmap       NEXT
 I06                                       COMPLETE / LIVE VALIDATED
 I07                                       COMPLETE / LIVE VALIDATED
 No known issue blocks Baseline T0

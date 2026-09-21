@@ -54,7 +54,9 @@
 
 `T0-3.0 R3 - COMPLETE / HOSTED AND REAL-DEVICE VALIDATED`
 
-`T0-3.0 R4 - LOCALLY IMPLEMENTED / HOSTED ACCEPTANCE PENDING`
+`T0-3.0 R4 - COMPLETE / HOSTED VALIDATED (PR #98; upstream run 35579104934)`
+
+`T0-3.0 Mosaic identity establishment - COMPLETE`
 
 `R3 Android TV banner identity - COMPLETE / HOSTED AND REAL-DEVICE VALIDATED (PR #95)`
 
@@ -83,9 +85,8 @@ retained its tested tree; protected-main run `35312694402` authenticated and reu
 independently built, signed, and published Development `v1.0.68` / `downstream-build-68` /
 `develop`. This proves `constbogdan/Wholphin`. R2 then renamed the live repository to
 `constbogdan/Mosaic`; PR #89 and protected-main run `35324869750` supplied the new-name hosted proof
-described below. The frozen order is now R2 canonical product/distribution implementation and
-hosted proof, R3 real-device lifecycle proof, then R4 removal of old repository authentication; do
-not collapse the sequence.
+described below. R2 canonical product/distribution implementation and hosted proof, R3 real-device
+lifecycle proof, and R4 removal of old repository authentication have now completed in that order.
 
 R2's external repository rename is **VERIFIED**. `constbogdan/Wholphin` became the canonical
 `constbogdan/Mosaic` while repository ID `1351255476`, `main` and Git history, public fork relation
@@ -109,11 +110,30 @@ head `d01f09f547d39ce768e3cbb071d3d711c1026389` ran CI `35324631949`, attempt 1,
 fallback. Development classified the complete range `docs-only / low`, `releaseRequired=false`,
 reported `No build required`, and skipped Release Build, Sign and Publish.
 
-R1 is **COMPLETE / BOTH-NAME HOSTED VALIDATED** as historical transition evidence. R4 has removed
-the exact two-name bridge locally and awaits hosted acceptance. R2's repository rename is **COMPLETE
-/ VERIFIED**. The R2 canonical Mosaic identity migration
-is **HOSTED VALIDATED**; R3 is **COMPLETE / HOSTED AND REAL-DEVICE VALIDATED**. Historical old-name evidence remains correct, and the old-name authorization
-is no longer current authorization.
+R1 is **COMPLETE / BOTH-NAME HOSTED VALIDATED** as historical transition evidence. R4 removed the
+exact two-name bridge and is **COMPLETE / HOSTED VALIDATED**. R2's repository rename is **COMPLETE /
+VERIFIED**. The R2 canonical Mosaic identity migration is **HOSTED VALIDATED**; R3 is **COMPLETE /
+HOSTED AND REAL-DEVICE VALIDATED**. Historical old-name evidence remains correct, while current
+downstream authorization accepts only exact `constbogdan/Mosaic`.
+
+PR #98 on `fix/t0-3-r4-mosaic-only-authentication`, head
+`491d05e437f6d88ffdff41e380440970de266c8e`, completed authoritative `ANDROID_FULL` in PR run
+`35577374647`: changed-range pre-commit, the complete offline tooling suite, and Full
+`defaultDebug` validation passed under repository `constbogdan/Mosaic`. Classification remained
+`tooling-only / high`, and reusable evidence retained `wholphin-pr-policy-v1-*`. Native merge
+`cc1113f8054880de20a62ffd124bf98912e90036` then entered protected main. Run `35578337513`
+authenticated PR #98's exact tested tree and reused `ANDROID_FULL`, skipping repeated formatting,
+offline, Android setup, and Gradle Full work. Development eligibility independently reported `No
+build required`; Build, Sign, and Publish remained skipped.
+
+Manual [Upstream check run 35579104934](https://github.com/constbogdan/Mosaic/actions/runs/35579104934),
+attempt 1 (`Upstream check · Manual` #62), executed the same merge commit under the Mosaic-only
+identity. Observe and Publish succeeded, reauthenticated blocker PR #58 and its exact head, retained
+the newer observation, and reported `Waiting on PR #58` without creating a duplicate branch or PR.
+The hosted job record explicitly marks `Mint repository-scoped publication token` as skipped and
+shows an empty `SYNC_PUBLISH_TOKEN`; no App token was minted for the authenticated waiting state.
+T0-3.0 Mosaic identity establishment is therefore **COMPLETE**. The next active phase is **T0-3
+Documentation, Wiki & Roadmap consolidation**; Baseline T0 remains in progress.
 
 PR #91 passed authoritative `ANDROID_FULL`, protected-main exact-tree reuse, Build, and Sign, and
 produced valid immutable `downstream-build-72`. Rolling publication then exposed two bounded
