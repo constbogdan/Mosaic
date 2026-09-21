@@ -2,8 +2,9 @@
 
 ## Current checkpoint
 
-T0-3 Documentation, Wiki & Roadmap consolidation is complete through D7. The next checkpoint is
-the separately authorized Baseline T0 final acceptance and closure. Baseline T0 is not yet complete.
+**Baseline T0 is complete.** T0-1, T0-2, T0-3.0, and T0-3 have passed their accepted closure
+criteria. Resume evidence-driven Mosaic product development from the canonical roadmap; do not
+reopen completed infrastructure programs without new concrete evidence.
 
 Current repository identity is exactly `constbogdan/Mosaic`; upstream remains
 `damontecres/Wholphin`. Work begins from current protected `origin/main` on a purpose-specific
@@ -30,10 +31,10 @@ not current instruction.
 
 ## Immediate continuity
 
-- Do not declare Baseline T0 complete until its independent final acceptance is explicitly
-  performed and authorized.
 - Public guidance is versioned in the repository. Optional Wiki publication remains a separate
   operator action and cannot replace engineering authority.
+- Existing upstream Draft PR #58 is an expected authenticated human-review waiting state. Do not
+  close, merge, rewrite, or classify it as a platform failure merely to make the queue empty.
 
 ## Non-obvious invariants and negative knowledge
 
@@ -78,12 +79,18 @@ rather than silently publishing a rewritten snapshot.
 
 ## Open risks and questions
 
-- Baseline T0 still requires its independent final acceptance and closure decision.
-- External GitHub settings remain manually administered; documentation may describe them, but no
-  configuration doctor or scheduled drift monitor is justified without repeated evidence.
-- Android TV visual/focus/device behavior is not fully proven by hosted compilation and JVM tests.
-- Cross-repository tooling standardization remains evidence-driven; do not copy Mosaic-specific
-  Gradle, PowerShell, branch, artifact, or release assumptions into another repository.
+- **External/manual responsibility:** GitHub settings remain manually administered. Baseline
+  closure reverified the current ruleset, merge settings, Environments, Actions defaults, Sync Bot
+  credential names, and repository identity; no configuration doctor or scheduled monitor is
+  justified without repeated drift evidence.
+- **Known non-blocking limitation:** Android TV visual/focus/device behavior is not fully proven by
+  hosted compilation and JVM tests; future UI changes still require proportionate device checks.
+- **Future work:** Cross-repository tooling standardization remains evidence-driven. Do not copy
+  Mosaic-specific Gradle, PowerShell, branch, artifact, or release assumptions into another
+  repository.
+- **Future product work:** Watchlist, collections/franchises, Discover, suggestions, next-season
+  automation, quality upgrades, playback improvements, and optional integrations remain roadmap
+  work rather than baseline infrastructure debt.
 
 ## Handoff maintenance
 
