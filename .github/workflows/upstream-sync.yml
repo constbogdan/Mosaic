@@ -36,6 +36,9 @@ jobs:
       downstream: ${{ steps.observe.outputs.downstream_sha }}
       blocking_pr: ${{ steps.observe.outputs.blocking_pr_number }}
       blocking_head: ${{ steps.observe.outputs.blocking_pr_head_sha }}
+      existing_pr: ${{ steps.observe.outputs.existing_pr_number }}
+      existing_branch: ${{ steps.observe.outputs.existing_pr_branch }}
+      existing_head: ${{ steps.observe.outputs.existing_pr_head_sha }}
     steps:
       - name: Checkout trusted workflow implementation
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -98,11 +101,17 @@ jobs:
           EXPECTED_DOWNSTREAM: ${{ needs.observe.outputs.downstream }}
           EXPECTED_BLOCKING_PR: ${{ needs.observe.outputs.blocking_pr }}
           EXPECTED_BLOCKING_HEAD: ${{ needs.observe.outputs.blocking_head }}
+          EXPECTED_EXISTING_PR: ${{ needs.observe.outputs.existing_pr }}
+          EXPECTED_EXISTING_BRANCH: ${{ needs.observe.outputs.existing_branch }}
+          EXPECTED_EXISTING_HEAD: ${{ needs.observe.outputs.existing_head }}
           CONFIGURED_SCHEDULE: ${{ github.event.schedule || 'manual' }}
         run: >-
           python3 scripts/hosted_upstream.py --publish
           --expected-upstream "$EXPECTED_UPSTREAM" --expected-downstream "$EXPECTED_DOWNSTREAM"
           --expected-blocking-pr "$EXPECTED_BLOCKING_PR" --expected-blocking-head "$EXPECTED_BLOCKING_HEAD"
+          --expected-existing-pr "$EXPECTED_EXISTING_PR"
+          --expected-existing-branch "$EXPECTED_EXISTING_BRANCH"
+          --expected-existing-head "$EXPECTED_EXISTING_HEAD"
           --output "$RUNNER_TEMP/outcome.json"
       - name: Save complete publication outcome
         if: always()

@@ -509,6 +509,36 @@ raise SystemExit(2)
         self.git("branch", "-m", "chore/sync-upstream-fixture")
         return first, upstream, merge, resolved_tree
 
+    def create_reconciled_upstream_merge(self):
+        remote_head = self.commit_current_worktree("fix: reviewed Draft head")
+        base = self.git("rev-parse", "origin/main").stdout.strip()
+        base_tree = self.git("rev-parse", "origin/main^{tree}").stdout.strip()
+        current_main = subprocess.run(
+            [GIT, "commit-tree", base_tree, "-p", base], cwd=self.root,
+            input="current main fixture\n", check=True, capture_output=True, text=True,
+            env=self.git_environment,
+        ).stdout.strip()
+        self.git("push", "origin", f"{current_main}:refs/heads/main")
+        reconciliation_tree = self.git("rev-parse", remote_head + "^{tree}").stdout.strip()
+        reconciliation = subprocess.run(
+            [GIT, "commit-tree", reconciliation_tree, "-p", remote_head, "-p", current_main],
+            cwd=self.root, input="reconcile fixture\n", check=True, capture_output=True, text=True,
+            env=self.git_environment,
+        ).stdout.strip()
+        upstream = subprocess.run(
+            [GIT, "commit-tree", base_tree, "-p", base], cwd=self.root,
+            input="upstream fixture\n", check=True, capture_output=True, text=True,
+            env=self.git_environment,
+        ).stdout.strip()
+        final = subprocess.run(
+            [GIT, "commit-tree", reconciliation_tree, "-p", reconciliation, "-p", upstream],
+            cwd=self.root, input="resolved upstream fixture\n", check=True,
+            capture_output=True, text=True, env=self.git_environment,
+        ).stdout.strip()
+        self.git("update-ref", "HEAD", final)
+        self.git("branch", "-m", "chore/sync-upstream-reconciled-fixture")
+        return remote_head, current_main, reconciliation, upstream, final, reconciliation_tree
+
     def test_guided_success_is_concise_with_readable_link_fallbacks(self):
         env = {
             **self.fake_publish_env(),
@@ -868,6 +898,57 @@ raise SystemExit(2)
             0,
             self.git("merge-base", "--is-ancestor", first, published_head).returncode,
         )
+
+    def test_reconciled_upstream_publication_authenticates_both_merge_layers(self):
+        remote, current_main, reconciliation, upstream, final, tree = (
+            self.create_reconciled_upstream_merge()
+        )
+        identity = (
+            "-PreserveReconciledUpstreamMerge",
+            "-ExpectedRemoteDraftHead", remote,
+            "-ExpectedOriginalCandidate", remote,
+            "-ExpectedCurrentMain", current_main,
+            "-ExpectedReconciliationCommit", reconciliation,
+            "-ExpectedMergeFirstParent", reconciliation,
+            "-ExpectedMergeSecondParent", upstream,
+            "-ExpectedMergeTree", tree,
+        )
+        result = self.prepare(
+            "Guided", *identity, "-TestFilter", "*UpstreamFixtureTest*",
+            env=self.fake_publish_env(
+                remote_sha=remote, pr_mode="upstream_draft", list_head_before=remote,
+            ), check=False,
+        )
+        self.assertEqual(0, result.returncode, normalized_native_output(result))
+        self.assertEqual(final, self.remote_head())
+        self.assertIn("Auto-merge: EXCLUDED", result.stdout)
+        self.assertFalse(any("--force" in args for args in self.fake_trace("git")))
+
+    def test_reconciled_upstream_publication_refuses_main_or_remote_drift(self):
+        remote, current_main, reconciliation, upstream, _, tree = (
+            self.create_reconciled_upstream_merge()
+        )
+        common = (
+            "-PreserveReconciledUpstreamMerge",
+            "-ExpectedRemoteDraftHead", remote,
+            "-ExpectedOriginalCandidate", remote,
+            "-ExpectedCurrentMain", current_main,
+            "-ExpectedReconciliationCommit", reconciliation,
+            "-ExpectedMergeFirstParent", reconciliation,
+            "-ExpectedMergeSecondParent", upstream,
+            "-ExpectedMergeTree", tree,
+            "-TestFilter", "*UpstreamFixtureTest*",
+        )
+        drifted = list(common)
+        drifted[drifted.index("-ExpectedRemoteDraftHead") + 1] = "9" * 40
+        result = self.prepare(
+            "Guided", *drifted,
+            env=self.fake_publish_env(
+                remote_sha=remote, pr_mode="upstream_draft", list_head_before="9" * 40,
+            ), check=False,
+        )
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("Draft branch moved", normalized_native_output(result))
 
     def test_wrong_repository_base_or_head_identity_refuses(self):
         reviewed_head = self.commit_current_worktree()
