@@ -422,7 +422,16 @@ fun getDownloadUrl(
         if (debug) {
             listOf("$ASSET_NAME-debug$abiSuffix.apk", "$ASSET_NAME-debug.apk")
         } else {
-            listOf(UpdateChecker.RELEASE_APK_NAME)
+            listOf(UpdateChecker.RELEASE_APK_NAME) +
+                assets
+                    .mapNotNull { asset ->
+                        asset.jsonObject["name"]
+                            ?.jsonPrimitive
+                            ?.contentOrNull
+                            ?.takeIf { it.matches(Regex("Mosaic-v[0-9]+\\.[0-9]+\\.[0-9]+\\.apk")) }
+                    }.distinct()
+                    .takeIf { it.size == 1 }
+                    .orEmpty()
         }
     var preferredAsset: JsonObject? = null
     outer@ for (name in preferredNames) {

@@ -12,21 +12,22 @@ New downstream state uses one canonical product identity:
 | Product | Mosaic |
 | Repository | `constbogdan/Mosaic` |
 | Android package | `io.github.constbogdan.mosaic` |
-| Public APK | `Mosaic-release.apk` |
-| Release manifest | `mosaic-release.json` |
+| Development APK | `Mosaic-release.apk` |
+| Development manifest | `mosaic-release.json` |
+| Stable assets | `Mosaic-v1.0.N.apk`, `Mosaic-v1.0.N.json` |
 | Custom URI | `mosaic:` |
 | Root Gradle project | `Mosaic` |
 | Room database for fresh installs | `mosaic` |
 
-Development retains rolling `develop` plus immutable `downstream-build-N`; Stable retains
-`mosaic-v1.0.N`. New Development and Stable releases contain exactly `Mosaic-release.apk` and
-`mosaic-release.json`. They do not publish or accept a second legacy APK alias. Existing historical
-releases and evidence remain untouched.
+Development retains rolling `develop` plus immutable `downstream-build-N` with exactly
+`Mosaic-release.apk` and `mosaic-release.json`; Stable retains `mosaic-v1.0.N` and publishes the
+same authenticated bytes as `Mosaic-v1.0.N.apk` and `Mosaic-v1.0.N.json`. Neither channel publishes
+a legacy Wholphin alias. Existing historical releases and evidence remain untouched.
 
-The updater resolves Stable and Development directly from `constbogdan/Mosaic` and release builds
-select the exact `Mosaic-release.apk`. Package, permanent signer, increasing `versionCode`, digest,
-source, and provenance checks remain authoritative. Store-oriented flavors continue to keep
-self-update disabled.
+The updater resolves Stable and Development directly from `constbogdan/Mosaic`; it selects the
+fixed Development APK or one unambiguous canonical versioned Stable APK. Package, permanent signer,
+increasing `versionCode`, digest, source, and provenance checks remain authoritative. Store-oriented
+flavors continue to keep self-update disabled.
 
 ## Identities intentionally retained
 
@@ -206,24 +207,23 @@ Android TV separately uses `android:banner="@mipmap/ic_banner"`; both
 `app/src/main/res/mipmap-xhdpi/ic_banner_foreground.png` contained the inherited Wholphin
 wordmark.
 
-The source defect is **FIXED / LOCALLY VALIDATED** on
-`fix/t0-3-r3-tv-banner-identity`. Both 320×180 banner paths now preserve the established cube,
+The source defect is **FIXED / HOSTED AND REAL-DEVICE VALIDATED** through PR #95. Both 320×180
+banner paths now preserve the established cube,
 palette, safe layout, opaque fallback background, and transparent adaptive foreground while using
 the Mosaic wordmark. The existing adaptive XML, background color, manifest reference, launcher
 intent filters, and package identity are unchanged. The defaultDebug compile, unit-test, and APK
 assembly graph passed, and inspection of the generated APK authenticated the manifest reference,
 resource table entries, and exact packaged banner bytes. An existing product-identity contract test
 now pins the approved banner dimensions and SHA-256 values so accidental restoration of the old
-rasters fails.
-
-Real Android TV verification remains an **R3 ACCEPTANCE BLOCKER**. The required result is:
+rasters fails. After the fix merged, real-device acceptance confirmed:
 
 ```text
 TV launcher/app menu → Mosaic
 tablet launcher      → Mosaic
 ```
 
-Do not close R3 until the new Mosaic banner is shipped and accepted on a real device.
+This closes the Android TV banner finding. It does not by itself close the wider R3 update and
+state-preservation lifecycle.
 
 Repository and hosted evidence cannot close device acceptance. On a fresh Android/Android TV test
 device with neither app installed:
@@ -247,20 +247,18 @@ device with neither app installed:
 
 The remaining R3 order is:
 
-1. publish the validated Android TV Mosaic presentation fix;
-2. apply the approved Stable Promotion/Release presentation cleanup;
-3. publish a normal new Mosaic build;
-4. repeat real-device acceptance;
-5. prove Mosaic N → Mosaic N+1 as an in-place update;
-6. prove login, preferences, database, and other local state survive;
-7. close R3.
+1. publish and host-validate the Stable Promotion/Release presentation cleanup;
+2. publish a normal new Mosaic build;
+3. prove Mosaic N → Mosaic N+1 as an in-place update;
+4. prove login, preferences, database, and other local state survive;
+5. close R3.
 
 Only after R3 closes may R4 remove the old repository name from the R1 bridge. The dedicated
 documentation/wiki consolidation remains a later phase.
 
 ## Visual follow-up
 
-The existing launcher icon is text-free and remains usable. The Android TV banner contains literal
-Wholphin artwork; no approved Mosaic artwork exists, so R2 deliberately did not invent a logo.
-Replacing both banner assets is now the first bounded R3 implementation point. Reviewing inherited
-README screenshots remains separate and does not alter the canonical functional identity above.
+The existing launcher icon is text-free and remains usable. PR #95 replaced the inherited
+Wholphin banner wordmark in both Android TV banner assets with the approved Mosaic treatment and
+passed real-device acceptance. Reviewing inherited README screenshots remains separate and does
+not alter the canonical functional identity above.

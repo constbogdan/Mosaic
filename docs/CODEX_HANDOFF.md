@@ -54,7 +54,9 @@
 
 `T0-3.0 R3 - DEVICE ACCEPTANCE IN PROGRESS / FINDINGS OPEN`
 
-`R3 Android TV banner identity - FIXED / LOCALLY VALIDATED / DEVICE ACCEPTANCE PENDING`
+`R3 Android TV banner identity - COMPLETE / HOSTED AND REAL-DEVICE VALIDATED (PR #95)`
+
+`R3 Stable Promotion presentation - IMPLEMENTED / HOSTED ACCEPTANCE PENDING`
 
 `External contribution lifecycle - KEEP / DOCUMENTED`
 
@@ -152,20 +154,37 @@ showed **Mosaic**, but the Android TV launcher/app menu showed **Wholphin**. The
 already resolved to Mosaic; the confirmed source was the inherited wordmark in
 `app/src/main/res/mipmap-xhdpi/ic_banner.png` and `ic_banner_foreground.png`.
 
-The source defect is now **FIXED / LOCALLY VALIDATED** on
-`fix/t0-3-r3-tv-banner-identity`. Both approved 320×180 rasters retain the exact established cube
+The source defect is now **COMPLETE / HOSTED AND REAL-DEVICE VALIDATED** through PR #95. Both
+approved 320×180 rasters retain the exact established cube
 pixels and replace only the wordmark treatment with Mosaic. The fallback remains opaque; the
 adaptive foreground remains transparent; XML/background/manifest/launcher structure is unchanged.
 The existing Mosaic product-identity test pins PNG format, dimensions, and approved SHA-256 values.
 Focused identity tests passed, the complete defaultDebug compile/unit-test/assemble graph passed,
 and APK inspection confirmed the manifest's `@mipmap/ic_banner` reference, both resource variants,
-and exact packaged raster hashes. Real Android TV confirmation remains an **R3 ACCEPTANCE BLOCKER**;
-required result: both tablet and TV launcher surfaces show Mosaic.
+and exact packaged raster hashes. After merge, real-device acceptance confirmed Mosaic on both
+tablet and Android TV launcher surfaces, closing this finding.
 
-R3 must next publish this normal APK-facing banner fix, implement the separately scoped Stable
-Promotion/Release presentation cleanup, repeat real-device acceptance, prove Mosaic N → Mosaic N+1
-in-place update, and prove login/preferences/local state survive. Do not close R3 before all of
-those checks pass; R4 then remains the next T0 point before the dedicated documentation/wiki
+The separate Stable Promotion presentation correction is implemented and its focused Stable,
+delivery-output, Development and Hold tests pass. Prepare leads with
+`Mosaic v1.0.N pending approval`, followed immediately by collapsed technical details containing
+only `Authenticated immutable build: downstream-build-N`; the build identity carries the candidate
+APK URL, with no explanatory prose or standalone candidate-download action. Successful Release leads with
+`Mosaic v1.0.N released` and the actual Stable APK/Release/comparison actions; source, digest,
+candidate and producer-run provenance remain available in the unchanged technical details below.
+The updater-consumed GitHub Release API name remains `v1.0.N`. Development and immutable releases
+retain `Mosaic-release.apk` and `mosaic-release.json`; Stable exposes those authenticated bytes as
+`Mosaic-v1.0.N.apk` and `Mosaic-v1.0.N.json`. Stable/Hold compare the versioned assets back to the
+canonical Development manifest and digests, while the updater accepts the fixed Development name
+or one unambiguous canonical versioned Stable APK. On this workstation, repository Fast
+is currently blocked before test selection because Windows Application Control rejects
+pre-commit's generated `check-yaml` child launcher; direct PyYAML parsing and all other focused
+checks pass. This unrelated local launcher boundary was not folded into the R3 patch. Hosted
+observation of one real Prepare → Release run remains required before closing this presentation
+finding.
+
+R3 must next host-validate the Stable Promotion/Release presentation cleanup, prove Mosaic N →
+Mosaic N+1 in-place update, and prove login/preferences/local state survive. Do not close R3 before
+all of those checks pass; R4 then remains the next T0 point before the dedicated documentation/wiki
 consolidation.
 
 The external contribution lifecycle is **KEEP / NO SECURITY OR PROVENANCE DEFECT**. A fork PR may

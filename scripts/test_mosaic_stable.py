@@ -61,7 +61,7 @@ class StableTests(unittest.TestCase):
         stable.promote(api, self.m, self.apk)
         bodies = [release['body'] for release in api.releases.values()]
         self.assertTrue(all('github.com/constbogdan/Mosaic/' in body for body in bodies))
-        self.assertTrue(any(item['name'] == stable.APK_NAME for item in api.uploads.values()))
+        self.assertTrue(any(item['name'] == 'Mosaic-v1.0.5.apk' for item in api.uploads.values()))
         self.assertEqual('Mosaic-release.apk', stable.APK_NAME)
 
     def test_foreign_repository_cannot_reach_asset_download_target(self):
@@ -185,7 +185,7 @@ class StableTests(unittest.TestCase):
                 self.assertEqual('mosaic-v1.0.5', latest['tag_name'])
                 self.assertEqual(
                     'sha256:' + digest(self.apk),
-                    next(item for item in stable_assets if item['name'] == stable.APK_NAME)['digest'],
+                    next(item for item in stable_assets if item['name'] == 'Mosaic-v1.0.5.apk')['digest'],
                 )
                 count = len(self.api.calls)
                 stable.publish_prepared(self.api, ROOT, self.stable_env(), directory)
@@ -205,7 +205,8 @@ class StableTests(unittest.TestCase):
         self.assertEqual(self.api.releases[develop['id']], develop)
         source_assets = self.api.pages('releases/1/assets')
         stable_assets = self.api.pages(f"releases/{latest['id']}/assets")
-        self.assertEqual({a['name']: a['digest'] for a in source_assets}, {a['name']: a['digest'] for a in stable_assets})
+        self.assertEqual({a['digest'] for a in source_assets}, {a['digest'] for a in stable_assets})
+        self.assertEqual({'Mosaic-v1.0.5.apk', 'Mosaic-v1.0.5.json'}, {a['name'] for a in stable_assets})
         count = len(self.api.calls)
         stable.promote(self.api, self.m, self.apk)
         self.assertTrue(all(method == 'GET' for method, _, _ in self.api.calls[count:]))
@@ -381,10 +382,27 @@ class StableTests(unittest.TestCase):
         self.assertNotIn('MOSAIC_BUILD', workflow)
         self.assertNotIn('MOSAIC_SOURCE_SHA', workflow)
         self.assertNotIn('MOSAIC_APK_SHA256', workflow)
-        self.assertIn('## Stable %s ready for approval', verify)
-        self.assertIn('Explicitly promote the authenticated Development build', verify)
-        self.assertIn('Waiting for <code>release-promote</code> approval.', verify)
-        self.assertIn('<summary>Technical details</summary>', verify)
+        self.assertIn('## Mosaic %s pending approval', verify)
+        expected_summary = (
+            "printf '## Mosaic %s pending approval\\n\\n<details>\\n"
+            "<summary>Technical details</summary>\\n\\nAuthenticated immutable build: "
+            "[%s](%s)\\n\\n</details>\\n' \"$VERSION\" \"$BUILD\" \"$APK_URL\" "
+            '>> "$GITHUB_STEP_SUMMARY"'
+        )
+        self.assertIn(expected_summary, verify)
+        self.assertIn('APK_URL: ${{ steps.prepare.outputs.apk_url }}', verify)
+        self.assertNotIn('Explicitly promote the authenticated Development build', verify)
+        self.assertNotIn('Waiting for <code>release-promote</code> approval.', verify)
+        approval = verify.split('- name: Show release approval request', 1)[1]
+        operator_text, technical = approval.split('<summary>Technical details</summary>', 1)
+        self.assertNotIn('Download', operator_text)
+        self.assertIn('Authenticated immutable build: [%s](%s)', technical)
+        for unwanted in (
+                'An authenticated candidate is prepared',
+                'Approval is required before publication',
+                'Download the exact candidate APK',
+                'Download candidate APK'):
+            self.assertNotIn(unwanted, approval)
         self.assertIn('environment: release-promote', publisher)
         self.assertIn('Reauthenticate Development', publisher)
 

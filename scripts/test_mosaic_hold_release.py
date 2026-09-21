@@ -86,7 +86,7 @@ class HoldReleaseTests(unittest.TestCase):
 
     def content(self, asset_id, repository=hold.REPOSITORY):
         item = self.api.uploads[asset_id]
-        return self.apk if item['name'] == hold.APK_NAME else canonical(self.m)
+        return self.apk if item['name'].endswith('.apk') else canonical(self.m)
 
     def add_asset_urls(self):
         for item in self.api.uploads.values():
@@ -175,8 +175,8 @@ class HoldReleaseTests(unittest.TestCase):
             **stable.fields(previous, False),
         })
         assets(self.api, prior, {
-            hold.APK_NAME: self.apk,
-            hold.MANIFEST_NAME: canonical(previous),
+            'Mosaic-v1.0.4.apk': self.apk,
+            'Mosaic-v1.0.4.json': canonical(previous),
         }, allow_upload=True)
         self.add_asset_urls()
         return prior
@@ -205,7 +205,7 @@ class HoldReleaseTests(unittest.TestCase):
         }), patches[-1])
         self.assertEqual(
             next(item['browser_download_url'] for item in assets_before
-                 if item['name'] == hold.APK_NAME),
+                 if item['name'] == 'Mosaic-v1.0.5.apk'),
             evidence['apkUrl'],
         )
 
@@ -250,7 +250,7 @@ class HoldReleaseTests(unittest.TestCase):
     def test_digest_provenance_and_signer_mismatches_refuse(self):
         stable_apk = next(
             asset for asset in self.api.uploads.values()
-            if asset['release'] == self.current['id'] and asset['name'] == hold.APK_NAME
+            if asset['release'] == self.current['id'] and asset['name'] == 'Mosaic-v1.0.5.apk'
         )
         stable_apk['digest'] = 'sha256:' + '0' * 64
         trusted, history, producer, download = self.trusted()
@@ -298,7 +298,7 @@ class HoldReleaseTests(unittest.TestCase):
             values = dict(line.split('=', 1) for line in output.read_text().splitlines())
         expected_url = next(
             item['browser_download_url'] for item in self.api.uploads.values()
-            if item['release'] == previous['id'] and item['name'] == hold.APK_NAME
+            if item['release'] == previous['id'] and item['name'] == 'Mosaic-v1.0.4.apk'
         )
         self.assertEqual(expected_url, values['current_url'])
 
