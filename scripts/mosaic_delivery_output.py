@@ -37,25 +37,30 @@ def release_body(m, channel, *, archive=False, compare_from=None,
                    'update channel.')
         guidance = f'[Open current Development]({current_url}/releases/tag/develop) for normal preview updates.'
     elif channel == 'Stable':
-        title = f'Stable v{version}'
-        purpose = 'Explicitly promoted trusted build for normal consumption.'
+        title = f'Mosaic v{version}'
+        purpose = None
         guidance = 'Choose Stable in the app update channel for normal updates.'
     else:
         title = f'Development v{version}'
         purpose = 'Latest automatically published validated build.'
         guidance = ('Development preview; may contain recently merged changes. Choose Development in the app '
                     'update channel.')
-    links = [f'[Download APK]({current_url}/releases/download/{tag}/Mosaic-release.apk)']
+    download_label = f'Download Mosaic v{version}' if channel == 'Stable' else 'Download APK'
+    apk_name = f'Mosaic-v{version}.apk' if channel == 'Stable' else 'Mosaic-release.apk'
+    manifest_name = f'Mosaic-v{version}.json' if channel == 'Stable' else 'mosaic-release.json'
+    links = [f'[{download_label}]({current_url}/releases/download/{tag}/{apk_name})']
     if comparison:
         links.append(f'[Compare changes]({comparison})')
+    build_label = 'Candidate' if channel == 'Stable' else 'Immutable build'
     details = [
         f'Version: `v{version}`',
-        f'Immutable build: [{build}]({current_url}/releases/tag/{build})',
+        f'{build_label}: [{build}]({current_url}/releases/tag/{build})',
         f'Source: [{source}]({current_url}/commit/{source})',
         f"APK SHA-256: `{m['signedApkSha256']}`",
-        f'Public provenance: [mosaic-release.json]({current_url}/releases/download/{tag}/mosaic-release.json)',
+        f'Public provenance: [{manifest_name}]({current_url}/releases/download/{tag}/{manifest_name})',
     ]
-    return (f'# {title}\n\n{purpose}\n\n' + ' · '.join(links) + f'\n\n{guidance}\n\n'
+    introduction = f'# {title}\n\n' + (f'{purpose}\n\n' if purpose else '')
+    return (introduction + ' · '.join(links) + f'\n\n{guidance}\n\n'
             '<details>\n<summary>Technical provenance</summary>\n\n' + '\n\n'.join(details)
             + '\n\n</details>\n')
 
@@ -65,11 +70,14 @@ def publication_summary(m, operation, env, ci=None, compare_from=None,
     current_url = repository_url(repository)
     version, build, source = m['versionName'], m['immutableIdentity'], m['sourceSha']
     if operation == 'promote':
-        heading = f'Stable v{version} released'
+        heading = f'Mosaic v{version} released'
         tag = 'mosaic-v' + version
-        result = ('Explicitly promoted trusted build for normal consumption.\n\n'
-                  f'[Open Stable release]({current_url}/releases/tag/{tag})')
-        details = ['Channel: Stable', 'Exact Development bytes reused']
+        stable_url = f'{current_url}/releases/tag/{tag}'
+        result = (f'[Download Mosaic v{version}]('
+                  f'{current_url}/releases/download/{tag}/Mosaic-v{version}.apk) · '
+                  f'[Release details]({stable_url})')
+        details = ['Channel: Stable',
+                   f'Candidate: [{build}]({current_url}/releases/tag/{build})']
     elif operation == 'publish':
         heading = f'Development v{version} published'
         tag = source
@@ -82,9 +90,10 @@ def publication_summary(m, operation, env, ci=None, compare_from=None,
     if comparison:
         result += f' · [Compare changes]({comparison})'
     details += [f'Source: [{source}]({current_url}/commit/{source})',
-                f"APK SHA-256: {m['signedApkSha256']}",
-                f'Immutable build record: [{build}]({current_url}/releases/tag/{build})',
-                f"Original build run: {m['buildRunId']} / attempt {m['buildRunAttempt']}"]
+                f"APK SHA-256: {m['signedApkSha256']}"]
+    if operation == 'publish':
+        details.append(f'Immutable build record: [{build}]({current_url}/releases/tag/{build})')
+    details.append(f"Original build run: {m['buildRunId']} / attempt {m['buildRunAttempt']}")
     if ci:
         details.append('Authoritative CI: ' + json.dumps(ci, sort_keys=True))
     return ('## ' + heading + '\n\n' + result + '\n\n<details>\n'

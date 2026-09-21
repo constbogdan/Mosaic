@@ -77,7 +77,8 @@ def apk_url(inventory, repository=REPOSITORY):
     repository = authenticate_downstream_repository(repository)
     url = inventory.get(APK_NAME, {}).get('browser_download_url', '')
     if not re.fullmatch(
-            rf'https://github\.com/{re.escape(repository)}/releases/download/[^\s]+/{APK_NAME}',
+            rf'https://github\.com/{re.escape(repository)}/releases/download/'
+            r'mosaic-v(1\.0\.[1-9][0-9]*)/Mosaic-v\1\.apk',
             str(url)):
         raise ValueError('Authenticated Stable APK URL is missing or malformed')
     return url
@@ -133,7 +134,7 @@ def get_release(api, root, env, directory):
     directory.mkdir(parents=True, exist_ok=False)
     for name, item in inventory.items():
         data = download_asset(item['id'], api.repository)
-        check_asset(item, name, data)
+        check_asset(item, item['name'], data)
         if name == MANIFEST_NAME and data != canonical(manifest):
             raise ValueError('Downloaded Stable manifest differs from its provenance tag')
         (directory / name).write_bytes(data)

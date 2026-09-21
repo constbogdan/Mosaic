@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 import subprocess
 
-from mosaic_development_release import (GitHub, REPOSITORY, APK_NAME, MANIFEST_NAME, canonical,
+from mosaic_development_release import (GitHub, REPOSITORY, APK_NAME, MANIFEST_NAME, canonical, digest,
     _release_assets, check_asset, assets, find_release, historical_identity, trusted_ci,
     published_development_source, validate_original_source, verified_manifest)
 from mosaic_delivery_output import append_summary, publication_summary, release_body
@@ -14,6 +14,12 @@ from mosaic_repository import authenticate_downstream_repository, authenticate_w
 
 WORKFLOW = '.github/workflows/mosaic-stable-promotion.yml'
 EVIDENCE_NAME = 'stable-promotion.json'
+
+
+def stable_asset_names(version):
+    if not re.fullmatch(r'1\.0\.[1-9][0-9]*', str(version)):
+        raise ValueError('Stable asset version is invalid')
+    return f'Mosaic-v{version}.apk', f'Mosaic-v{version}.json'
 
 
 def authorization(env):
@@ -244,9 +250,24 @@ def authenticated_stable_release(api, release):
     if development_manifest != manifest:
         raise ValueError('Stable provenance differs from immutable Development provenance')
     development = find_release(api, manifest['immutableIdentity'])
-    if _release_assets(api, release, manifest) != _release_assets(api, development, manifest):
+    stable_apk, stable_manifest = stable_asset_names(manifest['versionName'])
+    found = api.pages(f"releases/{release['id']}/assets")
+    if len(found) != 2 or {asset.get('name') for asset in found} != {stable_apk, stable_manifest}:
+        raise ValueError('Stable release does not have the exact versioned asset set')
+    stable_assets = {asset['name']: asset for asset in found}
+    for asset in stable_assets.values():
+        if (asset.get('state') != 'uploaded' or type(asset.get('size')) is not int
+                or asset['size'] < 1 or not re.fullmatch(r'sha256:[0-9a-f]{64}', str(asset.get('digest', '')))):
+            raise ValueError('Stable release asset identity is incomplete')
+    if (stable_assets[stable_apk]['digest'] != 'sha256:' + manifest['signedApkSha256']
+            or stable_assets[stable_manifest]['digest'] != 'sha256:' + digest(canonical(manifest))):
         raise ValueError('Stable assets differ from immutable Development assets')
-    return manifest, {item['name']: item for item in api.pages(f"releases/{release['id']}/assets")}
+    development_assets = _release_assets(api, development, manifest)
+    if ({APK_NAME: (stable_assets[stable_apk]['size'], stable_assets[stable_apk]['digest']),
+         MANIFEST_NAME: (stable_assets[stable_manifest]['size'], stable_assets[stable_manifest]['digest'])}
+            != development_assets):
+        raise ValueError('Stable assets differ from immutable Development assets')
+    return manifest, {APK_NAME: stable_assets[stable_apk], MANIFEST_NAME: stable_assets[stable_manifest]}
 
 
 def verify_manifest(m, apk, acceptance, identity, policy):
@@ -282,6 +303,7 @@ def previous_stable_compare(api, candidates):
 
 def promote(api, m, apk, releases=None):
     tag = 'mosaic-v' + m['versionName']
+    stable_apk, stable_manifest = stable_asset_names(m['versionName'])
     # Refuse numeric rollback and unknown stable ownership, even if GitHub ordering differs.
     releases = api.pages('releases') if releases is None else releases
     previous = []
@@ -315,7 +337,7 @@ def promote(api, m, apk, releases=None):
         )
     if stable.get('prerelease') is not False or stable.get('name') != 'v' + m['versionName']:
         raise ValueError('Stable release metadata conflict')
-    assets(api, stable, {APK_NAME: apk, MANIFEST_NAME: canonical(m)}, allow_upload=stable['draft'])
+    assets(api, stable, {stable_apk: apk, stable_manifest: canonical(m)}, allow_upload=stable['draft'])
     if stable['draft']:
         api.call(
             'PATCH',

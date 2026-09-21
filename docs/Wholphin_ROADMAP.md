@@ -700,13 +700,13 @@ compatibility from repository tests.
 Pre-fix device evidence was mixed: the Android tablet launcher reported **Mosaic**, while the
 Android TV launcher/app menu reported **Wholphin**. The manifest/application label already resolved
 to Mosaic; the inherited wordmark in `app/src/main/res/mipmap-xhdpi/ic_banner.png` and
-`ic_banner_foreground.png` caused the TV defect. The source correction is **FIXED / LOCALLY
+`ic_banner_foreground.png` caused the TV defect. PR #95 is **FIXED / HOSTED AND REAL-DEVICE
 VALIDATED**: both 320×180 assets now preserve the established cube/layout and show Mosaic; the
 defaultDebug compile, unit-test, and APK assembly graph passed; and generated-APK inspection proved
-the manifest/resource mapping and exact packaged bytes. Real Android TV confirmation remains an
-**R3 ACCEPTANCE BLOCKER**. The remaining sequence is: publish this normal APK-facing fix; apply the
-presentation-only Stable Promotion/Release cleanup; repeat device acceptance; prove Mosaic N →
-Mosaic N+1 in-place update; prove login/preferences/local state survive; then close R3. R4 remains
+the manifest/resource mapping and exact packaged bytes. Real Android TV acceptance confirmed the
+Mosaic launcher/banner identity. The remaining sequence is: publish and host-validate the
+presentation-only Stable Promotion/Release cleanup; prove Mosaic N → Mosaic N+1 in-place update;
+prove login/preferences/local state survive; then close R3. R4 remains
 the next T0-3.0 point before the dedicated documentation/wiki consolidation.
 
 ##### R4 — retire the bridge and close T0-3.0

@@ -13,8 +13,10 @@ Current operation supersedes the historical form procedure below. Stable Promoti
 zero-input manual **Prepare -> Release** workflow. Prepare resolves the current rolling
 `develop` publication and derives/authenticates protected-main tooling, its immutable
 `downstream-build-N`, source SHA/tree, signed APK hash, version, producer run/attempt,
-tag/release/assets, signer, package and payload. Its compact summary is `Stable v1.0.N ready for
-approval`, links the exact authenticated candidate APK, and explains the `release-promote` action. Release alone uses
+tag/release/assets, signer, package and payload. Its compact summary was historically
+`Stable v1.0.N ready for approval`; the R3 correction now leads with
+`Mosaic v1.0.N pending approval` and keeps the authenticated immutable build link in technical
+details. Release alone uses
 `release-promote`; after approval it reauthenticates protected main and proves rolling
 `develop` still identifies the exact prepared candidate before invoking the unchanged
 exact-byte publisher. Movement or ambiguity refuses instead of selecting another build.
@@ -22,15 +24,17 @@ exact-byte publisher. Movement or ambiguity refuses instead of selecting another
 Canonical Mosaic acceptance used run `35495689386`, attempt 1. Prepare authenticated
 `downstream-build-73`; Release promoted the exact candidate bytes as latest Stable
 `mosaic-v1.0.73` from source `3d2093354090ad81a3d06efbeb98a9d55b6c1b5c`. The immutable,
-rolling Development, and Stable `Mosaic-release.apk` assets are byte-identical at SHA-256
+rolling Development, and Stable APK assets are byte-identical at SHA-256
 `1c84efececec51f3b2ae602f1ba5d0d5b2d1334724cbb37760a4c3c455cb04cd`.
 
-### Approved R3 presentation cleanup — pending implementation
+### R3 presentation cleanup — implemented / hosted acceptance pending
 
-This is presentation-only. The fixed machine-facing inventory remains exactly
-`Mosaic-release.apk` plus `mosaic-release.json`; versioned APK filenames were reviewed and are
-**NOT CURRENTLY REQUIRED**. Present the human action as `Download Mosaic vX.Y.Z` while keeping the
-stable asset name unchanged.
+Development and immutable provenance retain the fixed `Mosaic-release.apk` plus
+`mosaic-release.json` inventory. Stable now publishes the same authenticated bytes under exactly
+`Mosaic-vX.Y.Z.apk` plus `Mosaic-vX.Y.Z.json`. Stable and Hold normalize those public names back to
+the canonical Development identities before comparing sizes, digests, manifest bytes, and signed
+APK provenance. The updater accepts the fixed Development name and one unambiguous canonical
+versioned Stable APK; legacy Wholphin aliases remain rejected.
 
 Before approval, lead with product state:
 
@@ -41,8 +45,9 @@ Mosaic vX.Y.Z pending approval
 Do not show “Explicitly promote the authenticated Development build for normal consumption,” the
 prominent “Download the exact candidate APK,” or “Waiting for `release-promote` approval. Nothing
 has been published by this run.” Put the immutable candidate under **Technical details**, preferably
-as `Candidate: downstream-build-N` with the identity linked to its immutable Release. A direct APK
-link may remain there only when explicitly labeled as a candidate.
+as `Authenticated immutable build: downstream-build-N`, with the build identity itself linked to
+the authenticated candidate APK. Do not add explanatory prose or a standalone candidate-download
+action.
 
 After approval, lead with:
 
@@ -53,9 +58,11 @@ Download Mosaic vX.Y.Z · Release details · Compare changes
 ```
 
 The download must target the APK on the actual Stable Release, never `downstream-build-N`. The
-Stable Release title should be `Mosaic vX.Y.Z`; remove “Explicitly promoted trusted build for normal
-consumption” and “Choose Stable in the app update channel for normal updates.” Preserve detailed
-technical provenance beneath the primary product actions.
+Stable Release body heading is `Mosaic vX.Y.Z`; remove “Explicitly promoted trusted build for
+normal consumption” and retain “Choose Stable in the app update channel for normal updates.” The GitHub
+Release API `name` remains `vX.Y.Z` because the installed updater parses that field as the numeric
+version; changing it would be an updater-contract migration, not presentation-only cleanup. Preserve
+detailed technical provenance beneath the primary product actions.
 
 The durable distinction is:
 
@@ -77,14 +84,17 @@ I07 forward-recovery acceptance promoted `downstream-build-34` unchanged in run
 `1d84dfb922765b28f75e422e25b7fbdc5123beb86fc0148d5e324f5547514e5d`, identical to
 Development. The held v1.0.5 release remains preserved as a prerelease.
 
-The workflow displays **Stable Promotion** and uses the same fixed run identity.
-Prepare leads with `Stable v1.0.N ready for approval`, the exact authenticated APK link, and the pending
-approval action; successful publication leads with `Stable v1.0.N released`. Exact provenance stays in
-collapsed technical details. API title `v1.0.N`, workflow path, verification/publisher separation, manual
-authorization and assets remain unchanged. New bodies use a branded Stable heading;
-historical bodies are not changed. See the [I05 ledger](ITEM_6_I05_PRESENTATION.md).
+The workflow displays **Stable Promotion** and uses the same fixed run identity. Prepare now leads
+with `Mosaic v1.0.N pending approval` and contains no explanatory prose or standalone download
+action. Collapsed technical details contain only `Authenticated immutable build:
+downstream-build-N`, with that identity linked to the authenticated candidate APK.
+Successful publication leads with `Mosaic v1.0.N released`, followed by the actual Stable APK,
+Stable Release and authenticated comparison links. Exact candidate/source/digest/build-run
+provenance stays in collapsed technical details. API name
+`v1.0.N`, workflow path, verification/publisher separation, manual authorization and assets remain
+unchanged. Historical bodies are not changed. See the [I05 ledger](ITEM_6_I05_PRESENTATION.md).
 
-New Stable bodies describe an explicitly promoted trusted build for normal consumption. When an
+New Stable bodies lead with the Mosaic product identity and verified Stable state. When an
 older valid Stable exists, the publisher derives its immutable `mosaic-v1.0.N` tag from the same
 release inventory used for monotonicity/ownership refusal and adds a GitHub Compare Changes link to the
 new immutable Stable tag. The Release API `name`, stable/development tags, APK/manifest assets and
@@ -131,7 +141,7 @@ exists in promotion. Transport archives do not alter the APK file's bytes.
 | Development origin | Existing annotated `downstream-build-N` and its prerelease |
 | Stable tag | Annotated `mosaic-v1.0.N` at the SAME original source commit |
 | Stable release name | `v1.0.N` |
-| Stable assets | Exact `Mosaic-release.apk` and exact `mosaic-release.json` from Development |
+| Stable assets | Exact Development bytes as `Mosaic-v1.0.N.apk` and `Mosaic-v1.0.N.json` |
 | Stable visibility | `prerelease: false`; publish with `make_latest: true` |
 | Development | Remains prerelease; `develop` and its assets are not changed |
 

@@ -290,7 +290,9 @@ class TestUpdateChecker {
             {"name":"Mosaic-debug.apk",
             "browser_download_url":"mosaic-debug"},
             {"name":"Mosaic-debug-arm64-v8a.apk",
-            "browser_download_url":"mosaic-debug-arm64"}]
+            "browser_download_url":"mosaic-debug-arm64"},
+            {"name":"Mosaic-v1.0.5.apk",
+            "browser_download_url":"mosaic-versioned"}]
             """.trimIndent()
         val assets = Json.parseToJsonElement(json).jsonArray
         Assert.assertEquals("mosaic-release", getDownloadUrl(assets, false, emptyList()))
@@ -299,5 +301,18 @@ class TestUpdateChecker {
         Assert.assertEquals("mosaic-debug-arm64", getDownloadUrl(assets, true, listOf("arm64-v8a")))
         val legacyOnly = Json.parseToJsonElement("""[{"name":"Wholphin-release.apk","browser_download_url":"legacy"}]""").jsonArray
         Assert.assertNull(getDownloadUrl(legacyOnly, false, emptyList()))
+        val versionedOnly =
+            Json
+                .parseToJsonElement(
+                    """[{"name":"Mosaic-v1.0.5.apk","browser_download_url":"versioned"}]""",
+                ).jsonArray
+        Assert.assertEquals("versioned", getDownloadUrl(versionedOnly, false, emptyList()))
+        val ambiguousVersioned =
+            Json
+                .parseToJsonElement(
+                    """[{"name":"Mosaic-v1.0.5.apk","browser_download_url":"one"},
+                {"name":"Mosaic-v1.0.6.apk","browser_download_url":"two"}]""",
+                ).jsonArray
+        Assert.assertNull(getDownloadUrl(ambiguousVersioned, false, emptyList()))
     }
 }
