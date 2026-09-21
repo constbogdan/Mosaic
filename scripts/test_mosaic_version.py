@@ -34,7 +34,7 @@ class VersionTests(unittest.TestCase):
     def allocate(self, publication=False):
         return version.allocate(self.root, publication, self.epoch)
 
-    def runtime(self, repository="constbogdan/Wholphin"):
+    def runtime(self, repository="constbogdan/Mosaic"):
         return patch.dict(os.environ, GITHUB_ACTIONS="true", GITHUB_REPOSITORY=repository,
                           GITHUB_REF="refs/heads/main", GITHUB_EVENT_NAME="push",
                           GITHUB_SHA=self.run_git("rev-parse", "HEAD"))

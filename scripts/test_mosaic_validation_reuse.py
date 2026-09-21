@@ -203,7 +203,10 @@ class ValidationReuseTests(unittest.TestCase):
         )
         self.assertTrue(result["reuseValidation"])
         self.assertFalse(
-            self.decide(FakeGitHub(), environment(repository))["reuseValidation"]
+            self.decide(
+                FakeGitHub(repository="constbogdan/Wholphin"),
+                environment(repository),
+            )["reuseValidation"]
         )
 
     def test_actual_ci_workflow_matches_reuse_consumer_contract(self):
@@ -241,8 +244,8 @@ class ValidationReuseTests(unittest.TestCase):
             reuse.UPLOAD_STEP,
         ):
             self.assertEqual(1, step_names.count(name), name)
-        self.assertIn("github.repository == 'constbogdan/Wholphin'", workflow)
         self.assertIn("github.repository == 'constbogdan/Mosaic'", workflow)
+        self.assertNotIn("github.repository == 'constbogdan/Wholphin'", workflow)
         self.assertIn("python -B scripts/run_offline_tests.py --pattern 'test_*.py'", workflow)
         self.assertIn("github.event_name == 'pull_request' || steps.main-validation-reuse.outputs.reuse_validation != 'true'", workflow)
         self.assertIn("steps.pr-validation.outputs.validation_mode != 'non-android'", workflow)

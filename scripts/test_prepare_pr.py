@@ -73,7 +73,7 @@ class PreparePrFixtureTest(unittest.TestCase):
             self.git("remote", "get-url", "origin").stdout.strip(),
         )
         self.assertIn(
-            "/github.com/constbogdan/Wholphin.git",
+            "/github.com/constbogdan/Mosaic.git",
             self.origin.as_posix(),
         )
         self.assertEqual(
@@ -131,7 +131,7 @@ class PreparePrFixtureTest(unittest.TestCase):
         self.fixture_root = Path(self.temporary.name)
         self.root = self.fixture_root / "work"
         self.origin = (
-            self.fixture_root / "github.com" / "constbogdan" / "Wholphin.git"
+            self.fixture_root / "github.com" / "constbogdan" / "Mosaic.git"
         )
         self.global_git_config = self.fixture_root / "global.gitconfig"
         self.global_git_config.write_text("", encoding="utf-8")
@@ -574,7 +574,7 @@ raise SystemExit(2)
         ]
         self.assertTrue(repo_arguments)
         self.assertEqual(
-            ["constbogdan/Wholphin"] * len(repo_arguments),
+            ["constbogdan/Mosaic"] * len(repo_arguments),
             repo_arguments,
         )
 
@@ -909,8 +909,9 @@ raise SystemExit(2)
         self.assertEqual({"constbogdan/Mosaic"}, set(targeted))
         self.assertFalse(any("constbogdan/Wholphin" in " ".join(args) for args in commands))
 
-    def test_repository_transition_allowlist_is_case_sensitive_and_closed(self):
-        for repository in ("constbogdan/Mosaic2", "other/Mosaic", "constbogdan/mosaic"):
+    def test_repository_allowlist_is_mosaic_only_case_sensitive_and_closed(self):
+        for repository in ("constbogdan/Wholphin", "constbogdan/Mosaic2",
+                           "other/Mosaic", "constbogdan/mosaic"):
             with self.subTest(repository=repository):
                 self.git(
                     "remote",

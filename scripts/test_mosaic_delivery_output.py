@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class DeliveryOutputTests(unittest.TestCase):
-    def test_transition_workflow_guards_are_exact_and_machine_names_remain_stable(self):
+    def test_workflow_guards_are_mosaic_only_and_machine_names_remain_stable(self):
         root = Path(__file__).resolve().parent.parent
         workflows = (
             'ci.yml',
@@ -34,8 +34,8 @@ class DeliveryOutputTests(unittest.TestCase):
         for name in workflows:
             text = (root / '.github/workflows' / name).read_text(encoding='utf-8-sig')
             with self.subTest(workflow=name):
-                self.assertIn("github.repository == 'constbogdan/Wholphin'", text)
                 self.assertIn("github.repository == 'constbogdan/Mosaic'", text)
+                self.assertNotIn("github.repository == 'constbogdan/Wholphin'", text)
                 self.assertNotIn('startsWith(github.repository', text)
                 self.assertNotIn('contains(github.repository', text)
         ci = (root / '.github/workflows/ci.yml').read_text(encoding='utf-8-sig')

@@ -1,7 +1,7 @@
 # T0-3.0 R2 — canonical Mosaic identity
 
 Status: **R2 canonical Mosaic identity — HOSTED VALIDATED. R3 — COMPLETE / HOSTED AND REAL-DEVICE
-VALIDATED.**
+VALIDATED. R4 — LOCALLY IMPLEMENTED / HOSTED ACCEPTANCE PENDING.**
 
 ## Current identity contract
 
@@ -35,8 +35,9 @@ flavors continue to keep self-update disabled.
   names, themes, modules, and translation links truthfully identify upstream heritage.
 - `wholphin-pr-policy-v1-*` is the stable exact-tree validation protocol.
 - `wholphin-upstream-*` is the stable managed upstream-candidate protocol.
-- The R1 exact authorization set still contains `constbogdan/Wholphin` and `constbogdan/Mosaic`.
-  R4 removes the old repository name only after hosted and device acceptance.
+- Current downstream authentication accepts only `constbogdan/Mosaic`. R4 removed the temporary R1
+  old-name authorization after hosted and device acceptance; historical old-name evidence remains
+  intentionally unchanged.
 - Historical PRs, runs, Releases, URLs, assets, and checkpoints keep their truthful old identities.
 
 ## Initial installation
@@ -258,7 +259,8 @@ immutable candidate share SHA-256
 `207a9d2affb5925ca93aa9276d599709b9daf86fb505140a08ff935767d32d84`.
 
 R3 is therefore **COMPLETE / HOSTED AND REAL-DEVICE VALIDATED**. R4 removal of the old repository
-name from the R1 bridge is next; dedicated documentation/wiki consolidation follows R4.
+name from the R1 bridge is locally implemented and awaits hosted acceptance; dedicated
+documentation/wiki consolidation follows R4.
 
 ## Visual follow-up
 
