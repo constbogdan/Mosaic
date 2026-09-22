@@ -3,6 +3,12 @@
 Mosaic is a downstream Android TV client derived from
 [Wholphin](https://github.com/damontecres/Wholphin).
 
+## What Mosaic adds
+
+Mosaic extends the Jellyfin experience with optional Seerr-backed requests, acquisition awareness,
+and library-availability features. See the [Mosaic feature catalog](docs/MOSAIC_FEATURES.md) for
+what is implemented and what is planned.
+
 ## Installation
 
 Mosaic is currently distributed directly through GitHub Releases. [![Current Mosaic Release](https://img.shields.io/github/release/constbogdan/Mosaic.svg)](https://github.com/constbogdan/Mosaic/releases/latest)
