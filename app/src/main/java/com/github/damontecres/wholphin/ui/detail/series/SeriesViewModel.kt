@@ -42,6 +42,7 @@ import com.github.damontecres.wholphin.ui.detail.discover.RequestSeason
 import com.github.damontecres.wholphin.ui.detail.discover.SeerrRequestData
 import com.github.damontecres.wholphin.ui.detail.discover.TvRequest
 import com.github.damontecres.wholphin.ui.detail.discover.toRequestSeasons
+import com.github.damontecres.wholphin.ui.detail.discover.isRequestable
 import com.github.damontecres.wholphin.util.ApiRequestPager
 import com.github.damontecres.wholphin.util.BlockingList
 import com.github.damontecres.wholphin.util.DataLoadingState
@@ -268,17 +269,17 @@ class SeriesViewModel
                     viewModelScope.launchIO {
                         seerrService.active.collectLatest { active ->
                             val tv =
-                                if (active) {
-                                    try {
-                                        seerrService.getTvSeries(series)
-                                    } catch (ex: Exception) {
-                                        Timber.e(ex)
-                                        null
-                                    }
-                                } else {
+                                try {
+                                    loadSeerrWhenActive(active) { seerrService.getTvSeries(series) }
+                                } catch (ex: Exception) {
+                                    Timber.e(ex)
                                     null
                                 }
-                            updateSeerrDetails(seasons, tv)
+                            if (active) {
+                                updateSeerrDetails(state.value.seasons, tv)
+                            } else {
+                                publishJellyfinOnlySeasons(state.value.seasons)
+                            }
                         }
                     }
                 }
@@ -304,6 +305,10 @@ class SeriesViewModel
             seasons: List<BaseItem?>,
             tv: TvDetails?,
         ) {
+            if (!seerrService.active.first()) {
+                publishJellyfinOnlySeasons(seasons)
+                return
+            }
             val localSeasons =
                 if (seasons is ApiRequestPager<*>) {
                     List(seasons.size) { seasons.getBlocking(it) }
@@ -316,12 +321,10 @@ class SeriesViewModel
                 if (request4kEnabled.value) tv?.toRequestSeasons(currentUserId, true).orEmpty() else emptyList()
             val localByNumber = localSeasons.associateBy { it.data.indexNumber }
             val seerrByNumber = requestSeasons.associateBy { it.season.seasonNumber }
-            val allNumbers =
-                (localByNumber.keys.filterNotNull() + seerrByNumber.keys.filterNotNull())
-                    .distinct()
-                    .sorted()
+            val allNumbers = mergedSeasonRowIdentities(localByNumber.keys, seerrByNumber.keys)
             val detailsSeasons =
-                allNumbers.map { number ->
+                allNumbers.map { row ->
+                    val number = row.seasonNumber
                     val seerrSeason = seerrByNumber[number]
                     SeriesDetailsSeason(
                         seasonNumber = number,
@@ -350,8 +353,19 @@ class SeriesViewModel
             }
         }
 
+        private suspend fun publishJellyfinOnlySeasons(seasons: List<BaseItem?>) {
+            val localSeasons =
+                if (seasons is ApiRequestPager<*>) {
+                    List(seasons.size) { seasons.getBlocking(it) }
+                } else {
+                    seasons
+                }.filterNotNull()
+            _state.update { it.withJellyfinOnlySeasons(localSeasons) }
+        }
+
         fun requestOnClick() {
             viewModelScope.launchIO {
+                if (!seerrService.active.first()) return@launchIO
                 _state.update { it.copy(profileLoading = LoadingState.Loading) }
                 try {
                     val data =
@@ -369,6 +383,7 @@ class SeriesViewModel
 
         fun request(request: TvRequest) {
             viewModelScope.launchIO {
+                if (!seerrService.active.first()) return@launchIO
                 val tv = state.value.seerrTvDetails ?: return@launchIO
                 try {
                     seerrService.requestTv(tv, request)
@@ -1002,4 +1017,42 @@ data class SeriesDetailsSeason(
     val jellyfinItem: BaseItem?,
     val seerrSeason: RequestSeason?,
     val imageUrl: String?,
+) {
+    fun canRequest(): Boolean = jellyfinItem == null && seerrSeason?.isRequestable() == true
+}
+
+internal data class SeasonRowIdentity(
+    val seasonNumber: Int,
+    val hasJellyfinSeason: Boolean,
+    val hasSeerrSeason: Boolean,
 )
+
+internal fun mergedSeasonRowIdentities(
+    jellyfinNumbers: Collection<Int?>,
+    seerrNumbers: Collection<Int?>,
+): List<SeasonRowIdentity> {
+    val local = jellyfinNumbers.filterNotNull().toSet()
+    val seerr = seerrNumbers.filterNotNull().toSet()
+    return (local + seerr).sorted().map { number ->
+        SeasonRowIdentity(number, number in local, number in seerr)
+    }
+}
+
+internal suspend fun <T> loadSeerrWhenActive(active: Boolean, load: suspend () -> T): T? =
+    if (active) load() else null
+
+internal fun SeriesState.withJellyfinOnlySeasons(localSeasons: List<BaseItem>): SeriesState {
+    val localByNumber = localSeasons.associateBy { it.data.indexNumber }
+    return copy(
+        detailsSeasons =
+            mergedSeasonRowIdentities(localByNumber.keys, emptyList()).map { row ->
+                SeriesDetailsSeason(row.seasonNumber, localByNumber[row.seasonNumber], null, null)
+            },
+        seerrTvDetails = null,
+        requestSeasons = emptyList(),
+        requestSeasons4k = emptyList(),
+        requestData = SeerrRequestData(),
+        profileLoading = LoadingState.Pending,
+        discoverSeries = null,
+    )
+}

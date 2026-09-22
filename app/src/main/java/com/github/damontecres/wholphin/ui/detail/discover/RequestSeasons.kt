@@ -68,12 +68,25 @@ data class RequestSeason(
     val editable: Boolean,
 )
 
-private fun RequestSeason.isRelevantToRequest(): Boolean =
-    editable ||
+internal fun RequestSeason.isRequestable(): Boolean =
+    editable &&
+        status != RequestStatus.PENDING &&
+        status != RequestStatus.APPROVED &&
+        status != RequestStatus.COMPLETED &&
+        (availability == SeerrAvailability.UNKNOWN || availability == SeerrAvailability.DELETED)
+
+internal fun RequestSeason.isRelevantToRequest(): Boolean =
+    isRequestable() ||
         status == RequestStatus.PENDING ||
         status == RequestStatus.APPROVED ||
         availability == SeerrAvailability.PENDING ||
         availability == SeerrAvailability.PROCESSING
+
+internal fun List<RequestSeason>.requestableSeasonNumbers(): Set<Int> =
+    filter { it.isRequestable() }.mapNotNull { it.season.seasonNumber }.toSet()
+
+internal fun List<RequestSeason>.relevantRequestSeasons(excluding: Int?): List<RequestSeason> =
+    filter { it.season.seasonNumber != excluding && it.isRelevantToRequest() }
 
 @Composable
 fun RequestSeasons(
@@ -112,7 +125,7 @@ fun RequestSeasons(
                 *seasons
                     .filter { season ->
                         season.status == RequestStatus.PENDING ||
-                            (season.editable && season.season.seasonNumber == initialSeasonNumber)
+                            (season.isRequestable() && season.season.seasonNumber == initialSeasonNumber)
                     }
                     .mapNotNull { season -> season.season.seasonNumber }
                     .toTypedArray(),
@@ -145,16 +158,12 @@ fun RequestSeasons(
         }
     val remainingSeasons =
         remember(seasons, initialSeasonNumber) {
-            seasons.filter {
-                it.season.seasonNumber != initialSeasonNumber && it.isRelevantToRequest()
-            }
+            seasons.relevantRequestSeasons(initialSeasonNumber)
         }
     val allSeasonNumbers =
         remember(remainingSeasons) {
             remainingSeasons
-                .filter { it.editable }
-                .mapNotNull { it.season.seasonNumber }
-                .toSet()
+                .requestableSeasonNumbers()
         }
     var moreSeasonsExpanded by rememberSaveable(initialSeasonNumber) {
         mutableStateOf(initialSeasonNumber == null)

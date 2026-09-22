@@ -4,6 +4,7 @@ import android.content.res.Resources
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,10 +17,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Text
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.ExtrasItem
 import com.github.damontecres.wholphin.data.model.BaseItem
@@ -123,6 +127,10 @@ fun SeriesDetails(
     var showPlaylistDialog by remember { mutableStateOf<Optional<UUID>>(Optional.absent()) }
     var requestSeasonNumber by remember { mutableStateOf<Int?>(null) }
     val request4kEnabled by viewModel.request4kEnabled.collectAsState()
+
+    LaunchedEffect(state.seerrTvDetails) {
+        if (state.seerrTvDetails == null) requestSeasonNumber = null
+    }
 
     val contextActions =
         remember {
@@ -273,7 +281,7 @@ fun SeriesDetails(
                 },
                 actions = contextActions,
             )
-            requestSeasonNumber?.let { seasonNumber ->
+            requestSeasonNumber?.takeIf { state.seerrTvDetails != null }?.let { seasonNumber ->
                 RequestSeasonsDialog(
                     id = state.seerrTvDetails?.id ?: -1,
                     title = state.seerrTvDetails?.name ?: series.title.orEmpty(),
@@ -543,8 +551,11 @@ fun SeriesDetailsContent(
                         items = seasons,
                         onClickItem = { index, item ->
                             position = SEASONS_ROW
-                            item.jellyfinItem?.let { onClickItem.invoke(index, it) }
-                                ?: onClickMissingSeason(item.seasonNumber)
+                            val jellyfinSeason = item.jellyfinItem
+                            when {
+                                jellyfinSeason != null -> onClickItem.invoke(index, jellyfinSeason)
+                                item.canRequest() -> onClickMissingSeason(item.seasonNumber)
+                            }
                         },
                         onLongClickItem = { index, item ->
                             position = SEASONS_ROW
@@ -598,6 +609,21 @@ fun SeriesDetailsContent(
                                                 PartiallyAvailableIndicator(Modifier.align(Alignment.TopStart))
 
                                             else -> Unit
+                                        }
+                                        if (item.canRequest()) {
+                                            Text(
+                                                text = stringResource(R.string.request),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onPrimary,
+                                                modifier =
+                                                    Modifier
+                                                        .align(Alignment.BottomCenter)
+                                                        .padding(8.dp)
+                                                        .background(
+                                                            MaterialTheme.colorScheme.primary,
+                                                            RoundedCornerShape(4.dp),
+                                                        ).padding(horizontal = 8.dp, vertical = 3.dp),
+                                            )
                                         }
                                     },
                                     modifier = mod,
