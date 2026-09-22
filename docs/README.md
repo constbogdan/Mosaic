@@ -12,6 +12,8 @@ continuity, and point-in-time evidence.
   Stable versus Development, automatic updates, optional Seerr integration, and troubleshooting.
 - **Product roadmap** — [Mosaic roadmap](MOSAIC_ROADMAP.md): current program status, product
   direction, major completed phases, and remaining work.
+- **Product feature catalog** — [What Mosaic adds](MOSAIC_FEATURES.md): implemented, partial, and
+  planned application features relative to upstream Wholphin.
 - **Current continuity** — [Codex handoff](CODEX_HANDOFF.md): current checkpoint, recent continuity,
   non-obvious invariants, risks, and retained engineering history.
 
