@@ -1,0 +1,10 @@
+{
+  "conflicts": [
+    "app/src/main/java/com/github/damontecres/wholphin/ui/main/HomeViewModel.kt"
+  ],
+  "downstream": "60bdac0ea792c529be5001a8c10d9ad4ea78f3a4",
+  "mergeBase": "365f8f8adacf4dcaf7d05317917830ed3a439668",
+  "policyVersion": 1,
+  "schemaVersion": 1,
+  "upstream": "65954a99eb0aa318d9f88813d49768bd95cf37ee"
+}
