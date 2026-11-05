@@ -68,8 +68,21 @@ data class RequestSeason(
     val editable: Boolean,
 )
 
+internal fun RequestSeason.isRequestable(): Boolean =
+    editable &&
+        status !in setOf(RequestStatus.PENDING, RequestStatus.APPROVED, RequestStatus.COMPLETED) &&
+        availability in setOf(SeerrAvailability.UNKNOWN, SeerrAvailability.DELETED)
+
+internal fun List<RequestSeason>.initialRequestSeasonNumbers(initialSeasonNumber: Int?): Set<Int> =
+    filter { it.status == RequestStatus.PENDING || (it.isRequestable() && it.season.seasonNumber == initialSeasonNumber) }
+        .mapNotNull { it.season.seasonNumber }
+        .toSet()
+
+internal fun List<RequestSeason>.requestableSeasonNumbers(): Set<Int> =
+    filter { it.isRequestable() }.mapNotNull { it.season.seasonNumber }.toSet()
+
 private fun RequestSeason.isRelevantToRequest(): Boolean =
-    editable ||
+    isRequestable() ||
         status == RequestStatus.PENDING ||
         status == RequestStatus.APPROVED ||
         availability == SeerrAvailability.PENDING ||
@@ -109,12 +122,7 @@ fun RequestSeasons(
     val selectedSeasons =
         remember(seasons, initialSeasonNumber) {
             mutableStateSetOf<Int>(
-                *seasons
-                    .filter { season ->
-                        season.status == RequestStatus.PENDING ||
-                            (season.editable && season.season.seasonNumber == initialSeasonNumber)
-                    }.mapNotNull { season -> season.season.seasonNumber }
-                    .toTypedArray(),
+                *seasons.initialRequestSeasonNumbers(initialSeasonNumber).toTypedArray(),
             )
         }
 
@@ -150,10 +158,7 @@ fun RequestSeasons(
         }
     val allSeasonNumbers =
         remember(remainingSeasons) {
-            remainingSeasons
-                .filter { it.editable }
-                .mapNotNull { it.season.seasonNumber }
-                .toSet()
+            remainingSeasons.requestableSeasonNumbers()
         }
     var moreSeasonsExpanded by rememberSaveable(initialSeasonNumber) {
         mutableStateOf(initialSeasonNumber == null)
