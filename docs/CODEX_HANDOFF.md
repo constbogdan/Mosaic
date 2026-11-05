@@ -64,6 +64,11 @@ not current instruction.
   lifecycle do not prove playback readiness. Persist expectations, not live integrity conclusions.
 - Normal Movies and Series grids remain Jellyfin-local. Acquiring/non-local content belongs on
   explicit transient, watchlist, or discovery surfaces.
+- Missing-season new-request eligibility is separate from editability of an owned pending request:
+  bulk selection must not remove existing pending seasons. Seerr metadata loss must invalidate
+  request dialogs and pending profile reads without replacing Mosaic's cached-expectation/fresh
+  Jellyfin integrity evaluation with the upstream contribution's simpler fallback. The PR #1919
+  Request badge is deliberately excluded from Mosaic.
 - Historical names, repository URLs, assets, workflows, SHAs, failures, and rejected approaches are
   intentionally preserved in the D4 history boundary. Do not modernize evidence.
 
