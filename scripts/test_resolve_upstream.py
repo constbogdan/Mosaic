@@ -159,8 +159,11 @@ class FakeRunner:
             return resolve.Result("f" * 40 + "\n", "", 0)
         if args[:3] == ["git", "show", CANDIDATE + ":.upstream-sync/blocked-context.json"]:
             context = {"schemaVersion": 1, "upstream": UPSTREAM, "downstream": DOWNSTREAM,
+                       "mergeBase": "9" * 40,
                        "policyVersion": 1, "conflicts": ["app/SeriesViewModel.kt"]}
             return resolve.Result(json.dumps(context), "", 0)
+        if args == ["git", "rev-parse", "FETCH_HEAD"]:
+            return resolve.Result(CANDIDATE + "\n", "", 0)
         if args[:3] == ["git", "rev-parse", "HEAD"]:
             return resolve.Result(CANDIDATE + "\n", "", 0)
         if args[:2] == ["git", "cat-file"]:
@@ -649,6 +652,139 @@ class ResolveUpstreamTests(unittest.TestCase):
         with self.assertRaisesRegex(resolve.Refusal, "Run the normal Upstream Synchronization"):
             resolve.load_current_reuse_observation(
                 runner, self.root(), runner.pr(), runner.observation(), current_main
+            )
+
+    def waiting_runner(self, **changes):
+        _, current_main, evidence = self.current_reuse_runner()
+        for key in ("existing_pr_number", "existing_pr_branch", "existing_pr_head_sha"):
+            evidence.pop(key)
+        evidence.update(
+            outcome="waiting_on_existing_pr", episode_id="d" * 64, incoming_count=103,
+            blocking_pr_number=33, blocking_pr_branch=BRANCH,
+            blocking_pr_head_sha=CANDIDATE, blocking_upstream_sha=UPSTREAM,
+            blocking_downstream_sha=DOWNSTREAM,
+        )
+        evidence.update(changes)
+        runner, _, _ = self.current_reuse_runner(artifacts={900: evidence})
+        runner.main_sha = current_main
+        runner.compare_map[f"{DOWNSTREAM}...{current_main}"] = "ahead"
+        runner.compare_map[f"{UPSTREAM}...{evidence['upstream_sha']}"] = "ahead"
+        return runner, current_main, evidence
+
+    def test_newer_waiting_observation_authenticates_original_blocked_episode(self):
+        runner, current_main, evidence = self.waiting_runner()
+        original = runner.durable_evidence()  # Original hosted artifact may have expired.
+        candidate = resolve.Candidate(runner.pr(), original, {})
+        result = resolve.classify_dependencies(runner, self.root(), [candidate])[0]
+        self.assertEqual("Ready for current-main reconciliation", result.state)
+        self.assertEqual(current_main, result.current_main)
+        self.assertEqual(evidence, result.current_observation)
+        self.assertEqual(EPISODE, result.observation["episode_id"])
+        self.assertEqual(UPSTREAM, result.observation["upstream_sha"])
+        self.assertEqual(103, result.current_observation["incoming_count"])
+        self.assertNotEqual(original["episode_id"], evidence["episode_id"])
+        self.assertFalse(any(call[:2] in (["git", "switch"], ["git", "merge"],
+                                         ["git", "push"], ["gh", "pr"])
+                             for call in runner.calls))
+
+    def test_waiting_proof_rejects_changed_pr_identity_and_original_marker(self):
+        for key, wrong in (
+                ("blocking_pr_number", 34), ("blocking_pr_head_sha", "1" * 40),
+                ("blocking_pr_branch", BRANCH + "-other"),
+                ("blocking_upstream_sha", "2" * 40),
+                ("blocking_downstream_sha", "3" * 40),
+                ("downstream_repo", "other/Mosaic"), ("downstream_sha", "4" * 40)):
+            with self.subTest(key=key):
+                runner, current_main, _ = self.waiting_runner(**{key: wrong})
+                with self.assertRaises(resolve.Refusal):
+                    resolve.load_current_reuse_observation(
+                        runner, self.root(), runner.pr(), runner.observation(), current_main
+                    )
+        runner, current_main, _ = self.waiting_runner()
+        pr = runner.pr()
+        pr["body"] = pr["body"].replace(EPISODE, "1" * 64)
+        with self.assertRaisesRegex(resolve.Refusal, "episode_id"):
+            resolve.load_current_reuse_observation(
+                runner, self.root(), pr, runner.observation(), current_main
+            )
+
+    def test_waiting_proof_rejects_unrelated_pr_and_nondraft_or_foreign_pr(self):
+        for mutate in (
+                lambda pr: pr.update(number=34),
+                lambda pr: pr.update(draft=False),
+                lambda pr: pr["head"]["repo"].update(full_name="other/Mosaic"),
+                lambda pr: pr["base"].update(ref="other")):
+            runner, current_main, _ = self.waiting_runner()
+            pr = runner.pr()
+            mutate(pr)
+            with self.assertRaises(resolve.Refusal):
+                resolve.load_current_reuse_observation(
+                    runner, self.root(), pr, runner.observation(), current_main
+                )
+
+    def test_waiting_proof_rejects_upstream_rewrite_and_nonancestral_inputs(self):
+        for failure in ("upstream_rewritten", "old_upstream", "old_downstream"):
+            with self.subTest(failure=failure):
+                runner, current_main, evidence = self.waiting_runner()
+                if failure == "upstream_rewritten":
+                    runner.upstream_rewritten = True
+                else:
+                    pair = (f"{UPSTREAM}...{evidence['upstream_sha']}" if failure == "old_upstream"
+                            else f"{DOWNSTREAM}...{current_main}")
+                    runner.compare_map[pair] = "diverged"
+                with self.assertRaises(resolve.Refusal):
+                    resolve.load_current_reuse_observation(
+                        runner, self.root(), runner.pr(), runner.observation(), current_main
+                    )
+
+    def test_waiting_proof_rejects_context_tree_parent_and_fetch_head_mismatch(self):
+        context_command = ["git", "show", CANDIDATE + ":.upstream-sync/blocked-context.json"]
+        context = {"schemaVersion": 1, "upstream": UPSTREAM, "downstream": DOWNSTREAM,
+                   "mergeBase": "9" * 40, "policyVersion": 1,
+                   "conflicts": ["app/SeriesViewModel.kt"]}
+        for args, replacement in (
+                (context_command, "{}"),
+                (context_command, json.dumps(dict(context, mergeBase="1" * 40))),
+                (context_command, json.dumps(dict(context, conflicts=["app/Other.kt"]))),
+                (["git", "rev-parse", CANDIDATE + "^{tree}"], "1" * 40),
+                (["git", "show", "-s", "--format=%P", CANDIDATE], "1" * 40),
+                (["git", "rev-parse", "FETCH_HEAD"], "1" * 40)):
+            with self.subTest(args=args):
+                runner, current_main, _ = self.waiting_runner()
+                original_result = runner._result
+
+                def changed(command):
+                    return (resolve.Result(replacement, "", 0) if command == args
+                            else original_result(command))
+
+                with patch.object(runner, "_result", side_effect=changed):
+                    with self.assertRaises(resolve.Refusal):
+                        resolve.load_current_reuse_observation(
+                            runner, self.root(), runner.pr(), runner.observation(), current_main
+                        )
+
+    def test_waiting_proof_preserves_run_authentication_and_rejects_conflicting_observations(self):
+        _, current_main, evidence = self.waiting_runner()
+        run = {"id": 900, "run_attempt": 1, "head_sha": current_main, "head_branch": "main",
+               "path": resolve.UPSTREAM_WORKFLOW_PATH, "conclusion": "success", "event": "schedule"}
+        for key, wrong in (("head_sha", DOWNSTREAM), ("head_branch", "other"),
+                           ("path", ".github/workflows/other.yml"), ("conclusion", "failure"),
+                           ("event", "pull_request"), ("run_attempt", 2)):
+            with self.subTest(key=key):
+                runner, _, _ = self.current_reuse_runner(
+                    artifacts={900: evidence}, runs=[dict(run, **{key: wrong})]
+                )
+                with self.assertRaises(resolve.Refusal):
+                    resolve.load_current_reuse_observation(
+                        runner, self.root(), runner.pr(), runner.observation(), current_main
+                    )
+        runner, _, evidence = self.waiting_runner()
+        conflicting = dict(evidence, run_id="901", episode_id="1" * 64)
+        ambiguous, _, _ = self.current_reuse_runner(artifacts={900: evidence, 901: conflicting})
+        ambiguous.compare_map = runner.compare_map
+        with self.assertRaisesRegex(resolve.Refusal, "disagree"):
+            resolve.load_current_reuse_observation(
+                ambiguous, self.root(), ambiguous.pr(), ambiguous.observation(), current_main
             )
 
     def test_fresh_reuse_binding_mismatch_and_ambiguity_refuse(self):
