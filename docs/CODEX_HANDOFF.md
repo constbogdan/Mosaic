@@ -39,6 +39,13 @@ not current instruction.
 
 ## Non-obvious invariants and negative knowledge
 
+- Stage C combines Mosaic schema 36 with upstream track persistence as Mosaic schema 37,
+  not upstream schema 40 (which lacks the integrity table). Keep every older schema fixture
+  and the 2-to-3 migration. Legacy track-choice conversion belongs in the 36-to-37 Room
+  transaction: Mosaic app versions cannot safely use the upstream 1.0.10 gate, and a
+  global non-empty destination check would skip partially converted data. Retain the legacy
+  table, disabled subtitles with no language, and newer choices on repeated conversion.
+  Blank legacy languages must stay absent so ordinary profile defaults still apply.
 - Stage B's session/HDR preference migrations cannot use upstream Wholphin version thresholds:
   Mosaic versions advance independently. Migrate from the legacy fields idempotently, retaining
   a newer remembered session and explicit HDR override, and preserve server-only restoration.

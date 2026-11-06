@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import androidx.room.migration.AutoMigrationSpec
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.github.damontecres.wholphin.data.model.GetItemsFilter
@@ -20,6 +21,7 @@ import com.github.damontecres.wholphin.data.model.RememberedTab
 import com.github.damontecres.wholphin.data.model.SeasonIntegrityExpectationCache
 import com.github.damontecres.wholphin.data.model.SeerrServer
 import com.github.damontecres.wholphin.data.model.SeerrUser
+import com.github.damontecres.wholphin.data.model.SeriesTrackChoice
 import com.github.damontecres.wholphin.ui.components.ViewOptions
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -50,8 +52,9 @@ import java.util.UUID
         SeerrUser::class,
         RememberedTab::class,
         SeasonIntegrityExpectationCache::class,
+        SeriesTrackChoice::class,
     ],
-    version = 36,
+    version = 37,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(3, 4),
@@ -71,6 +74,7 @@ import java.util.UUID
         AutoMigration(33, 34),
         AutoMigration(34, 35),
         AutoMigration(35, 36),
+        AutoMigration(36, 37, spec = Migrations.Migrate36to37::class),
     ],
 )
 @TypeConverters(Converters::class)
@@ -92,6 +96,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun rememberedTabDao(): RememberedTabDao
 
     abstract fun seasonIntegrityDao(): SeasonIntegrityDao
+
+    abstract fun seriesTrackChoiceDao(): SeriesTrackChoiceDao
 }
 
 class Converters {
@@ -177,6 +183,38 @@ class ZonedDateTimeSerializer : KSerializer<ZonedDateTime> {
 }
 
 object Migrations {
+    /**
+     * Mosaic's version history is independent of Wholphin's. Convert legacy choices in the
+     * schema migration transaction, not an app-version-gated, partially retryable startup loop.
+     * Keep the old table and never replace a newer choice if the conversion is repeated.
+     */
+    class Migrate36to37 : AutoMigrationSpec {
+        override fun onPostMigrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                INSERT OR IGNORE INTO SeriesTrackChoice
+                    (userId, parentId, type, parentType, itemId, language, activation, trackFlags,
+                     codec, relativeTrackIndex, title, audioChannels)
+                SELECT userId, seriesId, 'AUDIO', 'DEPRECATED', itemId, audioLanguage, 'ACTIVATED',
+                       0, NULL, NULL, NULL, NULL
+                FROM PlaybackLanguageChoice WHERE NULLIF(TRIM(audioLanguage), '') IS NOT NULL
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                INSERT OR IGNORE INTO SeriesTrackChoice
+                    (userId, parentId, type, parentType, itemId, language, activation, trackFlags,
+                     codec, relativeTrackIndex, title, audioChannels)
+                SELECT userId, seriesId, 'SUBTITLE', 'DEPRECATED', itemId, subtitleLanguage,
+                       CASE WHEN subtitlesDisabled = 1 THEN 'DISABLED' ELSE 'ACTIVATED' END,
+                       0, NULL, NULL, NULL, NULL
+                FROM PlaybackLanguageChoice
+                WHERE NULLIF(TRIM(subtitleLanguage), '') IS NOT NULL OR subtitlesDisabled = 1
+                """.trimIndent(),
+            )
+        }
+    }
+
     val Migrate2to3 =
         object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {

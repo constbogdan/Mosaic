@@ -40,6 +40,8 @@ operation belongs to [Safe pull-request preparation](../PREPARE_PR.md).
 
 ## Upstream migration
 
+- [Stage C track persistence and image tags](UPSTREAM_STAGE_C.md) — bounded local native
+  integration, Mosaic schema reconciliation and migration acceptance evidence.
 - [I06 native upstream migration](../I06_NATIVE_UPSTREAM_MIGRATION_PLAN.md) — completed design,
   migration, and native-ancestry acceptance evidence.
 

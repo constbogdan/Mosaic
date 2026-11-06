@@ -4,6 +4,32 @@ This compact log preserves useful context from completed semantic reviews. Previ
 context, not authority: every future `REVIEW` path must be evaluated against its new upstream
 change, current Mosaic behavior, and the authenticated candidate evidence.
 
+## Stage C — upstream `621686d8` (local native merge, uncommitted)
+
+See the [bounded Stage C review](history/UPSTREAM_STAGE_C.md). Its parents are protected
+Mosaic main `b8cf0529` and exact upstream `621686d8`; only the two commits after `55960c24`
+are included. PR #114 and the later Stage D range remain untouched.
+
+- Combine the conflicting entity, DAO and production/test DI declarations. Keep database
+  name `mosaic`, integrity expectations/converters, every historical schema and the existing
+  manual 2-to-3 migration. Reject upstream schema 40 as the installed Mosaic schema: it
+  omits Mosaic's integrity table. Export Mosaic schema 37 with both entities instead.
+- Add 36-to-37 to the existing migration graph. Room generates the additive track table;
+  an AutoMigrationSpec copies legacy preferences in that same migration transaction.
+  Keep the old table. Reject upstream's app-version-gated, global-count startup conversion:
+  Mosaic versions are independent, and interrupted conversion must not suppress remaining
+  preferences. Disabled subtitles with no language remain a disabled choice; empty settings
+  do not invent a choice. Repeated copying never overwrites newer selections.
+- Retain upstream's per-user series/season track choices, precedence/scoring, relative track
+  metadata, forced/disabled states and compatible consumer adaptations. Keep per-item playback
+  overrides and delays. Correct two incoming swapped-type lookups: audio fallback must fetch
+  AUDIO preferences, and playback's subtitle branch must fetch SUBTITLE preferences. Focused
+  regressions fail against the incoming code and exercise both corrected paths.
+  Image cache tags must belong to the selected image owner; do not put
+  a season's image tag on a series image URL.
+- Home Acquiring, stable reload, session/startup guards, Downloads, Missing Seasons hardening,
+  Seerr authorization, playability and enhancement/update identities are not replaced.
+
 ## Stage B — upstream `55960c24` (local native merge, uncommitted)
 
 See the [bounded Stage B review](history/UPSTREAM_STAGE_B.md) for all 37 commits,
