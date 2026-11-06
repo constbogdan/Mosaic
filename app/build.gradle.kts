@@ -166,6 +166,9 @@ configure<ApplicationExtension> {
         getByName("main") {
             kotlin.directories += "$buildDir/generated/seerr_api/src/main/kotlin"
         }
+        getByName("test") {
+            resources.directories += "$projectDir/schemas"
+        }
     }
 
     testOptions {

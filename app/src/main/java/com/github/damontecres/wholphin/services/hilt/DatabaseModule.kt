@@ -19,6 +19,7 @@ import com.github.damontecres.wholphin.data.PlaybackLanguageChoiceDao
 import com.github.damontecres.wholphin.data.RememberedTabDao
 import com.github.damontecres.wholphin.data.SeasonIntegrityDao
 import com.github.damontecres.wholphin.data.SeerrServerDao
+import com.github.damontecres.wholphin.data.SeriesTrackChoiceDao
 import com.github.damontecres.wholphin.data.ServerPreferencesDao
 import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.preferences.AppPreferencesSerializer
@@ -83,6 +84,10 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun seasonIntegrityDao(db: AppDatabase): SeasonIntegrityDao = db.seasonIntegrityDao()
+
+    @Provides
+    @Singleton
+    fun seriesTrackChoiceTabDao(db: AppDatabase): SeriesTrackChoiceDao = db.seriesTrackChoiceDao()
 
     @Provides
     @Singleton
