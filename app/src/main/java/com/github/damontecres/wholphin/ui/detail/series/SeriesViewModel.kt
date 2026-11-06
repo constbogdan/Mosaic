@@ -168,10 +168,18 @@ class SeriesViewModel
                 Timber.v("Start")
                 addCloseable { themeSongPlayer.stop() }
                 val series =
-                    api.userLibraryApi
-                        .getItem(seriesId)
-                        .content
-                        .let { BaseItem(it) }
+                    try {
+                        api.userLibraryApi
+                            .getItem(seriesId)
+                            .content
+                            .let { BaseItem(it) }
+                    } catch (ex: CancellationException) {
+                        throw ex
+                    } catch (ex: Exception) {
+                        Timber.e(ex, "Error fetching series %s", seriesId)
+                        _state.update { it.copy(series = DataLoadingState.Error(ex)) }
+                        return@launchIO
+                    }
                 viewModelScope.launchDefault {
                     mediaManagementService.collectCanDelete(flowOf(series)) { canDelete ->
                         _state.update { it.copy(canDeleteSeries = canDelete) }
@@ -919,11 +927,10 @@ class SeriesViewModel
         ) {
             viewModelScope.launchIO {
                 val prefs = userPreferencesService.getCurrent()
-                val plc = streamChoiceService.getPlaybackLanguageChoice(item.data)
                 val result = itemPlaybackRepository.savePlayVersion(item.id, sourceId)
                 val chosen =
                     result?.let {
-                        itemPlaybackRepository.getChosenItemFromPlayback(item, result, plc, prefs)
+                        itemPlaybackRepository.getChosenItemFromPlayback(item, result, prefs)
                     }
                 _state.update { it.copy(chosenStreams = chosen) }
             }
@@ -937,7 +944,6 @@ class SeriesViewModel
         ) {
             viewModelScope.launchIO {
                 val prefs = userPreferencesService.getCurrent()
-                val plc = streamChoiceService.getPlaybackLanguageChoice(item.data)
                 val result =
                     itemPlaybackRepository.saveTrackSelection(
                         item = item,
@@ -945,10 +951,7 @@ class SeriesViewModel
                         trackIndex = trackIndex,
                         type = type,
                     )
-                val chosen =
-                    result?.let {
-                        itemPlaybackRepository.getChosenItemFromPlayback(item, result, plc, prefs)
-                    }
+                val chosen = itemPlaybackRepository.getChosenItemFromPlayback(item, result, prefs)
                 _state.update { it.copy(chosenStreams = chosen) }
             }
         }

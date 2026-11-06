@@ -276,6 +276,7 @@ dependencies {
     implementation(libs.androidx.tvprovider)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)
+    implementation(libs.androidx.profileinstaller)
 
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.session)
@@ -285,6 +286,7 @@ dependencies {
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.ui.compose)
     implementation(libs.ass.media)
+    implementation(libs.exoplayerhdrutils)
 
     implementation(libs.coil.core)
     implementation(libs.coil.compose)
