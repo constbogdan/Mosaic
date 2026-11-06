@@ -39,6 +39,10 @@ not current instruction.
 
 ## Non-obvious invariants and negative knowledge
 
+- A newer `waiting_on_existing_pr` observation is not the older Draft's episode. The resolver can
+  bind its exact blocker identity to independently verified original blocked-context evidence and
+  current main, but must still resolve only the original upstream target. Missing fresh hosted
+  proof or mismatched identity remains a refusal; see [Upstream integration](UPSTREAM_SYNC.md).
 - Local Fast feedback is not hosted validation authority. Every PR receives complete offline
   tooling; uncertain Android/build scope selects `ANDROID_FULL`. Protected main reuses evidence only
   for an exactly authenticated tested tree and otherwise runs the complete conservative fallback.
@@ -64,6 +68,11 @@ not current instruction.
   lifecycle do not prove playback readiness. Persist expectations, not live integrity conclusions.
 - Normal Movies and Series grids remain Jellyfin-local. Acquiring/non-local content belongs on
   explicit transient, watchlist, or discovery surfaces.
+- Missing-season new-request eligibility is separate from editability of an owned pending request:
+  bulk selection must not remove existing pending seasons. Seerr metadata loss must invalidate
+  request dialogs and pending profile reads without replacing Mosaic's cached-expectation/fresh
+  Jellyfin integrity evaluation with the upstream contribution's simpler fallback. The PR #1919
+  Request badge is deliberately excluded from Mosaic.
 - Historical names, repository URLs, assets, workflows, SHAs, failures, and rejected approaches are
   intentionally preserved in the D4 history boundary. Do not modernize evidence.
 

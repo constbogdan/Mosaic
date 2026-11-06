@@ -48,6 +48,7 @@ import com.github.damontecres.wholphin.ui.cards.tvSeasonCardPresentation
 import com.github.damontecres.wholphin.ui.detail.discover.RequestSeason
 import com.github.damontecres.wholphin.ui.detail.discover.SeerrRequestData
 import com.github.damontecres.wholphin.ui.detail.discover.TvRequest
+import com.github.damontecres.wholphin.ui.detail.discover.isRequestable
 import com.github.damontecres.wholphin.ui.detail.discover.toRequestSeasons
 import com.github.damontecres.wholphin.ui.equalsNotNull
 import com.github.damontecres.wholphin.ui.gt
@@ -79,7 +80,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -151,6 +154,7 @@ class SeriesViewModel
 
         private val _state = MutableStateFlow(SeriesState())
         val state: StateFlow<SeriesState> = _state
+        val seerrActive = seerrService.active
 
         val position = MutableStateFlow(SeriesOverviewPosition(0, 0))
 
@@ -289,25 +293,14 @@ class SeriesViewModel
                     }
                     viewModelScope.launchIO {
                         combine(
-                            seerrService.active,
+                            seerrActive,
                             enhancedFeatureGate.observe(EnhancedCapability.MISSING_SEASONS),
                         ) { active, enhanced -> active to enhanced }.collectLatest { (active, enhanced) ->
                             if (!enhanced) {
                                 publishBaseDetailsSeasons(state.value.seasons)
                                 return@collectLatest
                             }
-                            val tv =
-                                if (active) {
-                                    try {
-                                        seerrService.getTvSeries(series)
-                                    } catch (ex: Exception) {
-                                        Timber.e(ex)
-                                        null
-                                    }
-                                } else {
-                                    null
-                                }
-                            updateSeerrDetails(state.value.seasons, tv)
+                            refreshSeerrDetails(series, active)
                         }
                     }
                 }
@@ -329,15 +322,37 @@ class SeriesViewModel
             }
         }
 
+        internal suspend fun refreshSeerrDetails(
+            series: BaseItem,
+            active: Boolean,
+        ) {
+            val tv =
+                if (active) {
+                    try {
+                        seerrService.getTvSeries(series)
+                    } catch (ex: CancellationException) {
+                        throw ex
+                    } catch (ex: Exception) {
+                        Timber.e(ex)
+                        null
+                    }
+                } else {
+                    null
+                }
+            updateSeerrDetails(state.value.seasons, tv)
+        }
+
         private suspend fun updateSeerrDetails(
             seasons: List<BaseItem?>,
-            tv: TvDetails?,
+            seerrDetails: TvDetails?,
             refreshExpectations: Boolean = false,
         ) {
             if (!enhancedFeatureGate.isEnabled(EnhancedCapability.MISSING_SEASONS)) {
                 publishBaseDetailsSeasons(seasons)
                 return
             }
+            val tv = seerrDetails?.takeIf { it.id != null && it.id > 0 && seerrActive.first() }
+            if (tv == null) clearRequestState()
             val localSeasons =
                 if (seasons is ApiRequestPager<*>) {
                     List(seasons.size) { seasons.getBlocking(it) }
@@ -454,8 +469,16 @@ class SeriesViewModel
         }
 
         private var productStateJob: Job? = null
+        private var requestDataJob: Job? = null
+
+        private fun clearRequestState() {
+            requestDataJob?.cancel()
+            requestDataJob = null
+            _state.update { it.copy(requestData = SeerrRequestData(), profileLoading = LoadingState.Pending) }
+        }
 
         private fun publishBaseDetailsSeasons(seasons: List<BaseItem?>) {
+            clearRequestState()
             productStateJob?.cancel()
             productStateJob = null
             val detailsSeasons =
@@ -524,25 +547,40 @@ class SeriesViewModel
 
         fun requestOnClick() {
             if (!enhancedFeatureGate.isEnabled(EnhancedCapability.SERIES_REQUEST_ENHANCEMENTS)) return
-            viewModelScope.launchIO {
-                _state.update { it.copy(profileLoading = LoadingState.Loading) }
-                try {
-                    val data =
-                        seerrService.getProfilesAndFolders(
-                            com.github.damontecres.wholphin.data.model.SeerrItemType.TV,
-                        )
-                    _state.update { it.copy(profileLoading = LoadingState.Success, requestData = data) }
-                } catch (ex: Exception) {
-                    Timber.e(ex, "Error getting profiles & folders")
-                    showToast(context, "Error getting profiles & folders: ${ex.localizedMessage}")
-                    _state.update { it.copy(profileLoading = LoadingState.Error(ex)) }
+            requestDataJob?.cancel()
+            requestDataJob =
+                viewModelScope.launchIO {
+                    val mediaId = state.value.requestMediaId(seerrActive.first())
+                    if (mediaId == null) {
+                        clearRequestState()
+                        return@launchIO
+                    }
+                    _state.update { it.copy(profileLoading = LoadingState.Loading) }
+                    try {
+                        val data =
+                            seerrService.getProfilesAndFolders(
+                                com.github.damontecres.wholphin.data.model.SeerrItemType.TV,
+                            )
+                        currentCoroutineContext().ensureActive()
+                        if (state.value.requestMediaId(seerrActive.first()) != mediaId) {
+                            clearRequestState()
+                            return@launchIO
+                        }
+                        _state.update { it.copy(profileLoading = LoadingState.Success, requestData = data) }
+                    } catch (ex: CancellationException) {
+                        throw ex
+                    } catch (ex: Exception) {
+                        Timber.e(ex, "Error getting profiles & folders")
+                        showToast(context, "Error getting profiles & folders: ${ex.localizedMessage}")
+                        _state.update { it.copy(profileLoading = LoadingState.Error(ex)) }
+                    }
                 }
-            }
         }
 
         fun request(request: TvRequest) {
             if (!enhancedFeatureGate.isEnabled(EnhancedCapability.SERIES_REQUEST_ENHANCEMENTS)) return
             viewModelScope.launchIO {
+                if (state.value.requestMediaId(seerrActive.first()) != request.tvId) return@launchIO
                 val tv = state.value.seerrTvDetails ?: return@launchIO
                 try {
                     val submitted = seerrService.requestTv(tv, request)
@@ -1232,7 +1270,11 @@ data class SeriesDetailsSeason(
     val imageUrl: String?,
     val integrity: IntegrityState? = null,
     val mediaPresentation: CardMediaPresentation? = null,
-)
+) {
+    fun canRequest(): Boolean = jellyfinItem == null && seerrSeason?.isRequestable() == true
+}
+
+internal fun SeriesState.requestMediaId(seerrActive: Boolean): Int? = seerrTvDetails?.id?.takeIf { seerrActive && it > 0 }
 
 internal fun List<SeriesDetailsSeason>.withProductState(
     productState: Map<MediaKey, MediaProductState>,

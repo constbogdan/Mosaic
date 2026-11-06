@@ -213,9 +213,42 @@ def load_observation(runner: Runner, root: Path, pr: dict, episode: str,
     return observation, run_url
 
 
+def authenticate_waiting_blocker(runner: Runner, root: Path, pr: dict, original: dict,
+                                evidence: dict, repository: str) -> None:
+    """Bind a newer observation's blocker to its own original blocked episode."""
+    episode = validate_pr(pr, int(pr["number"]), repository)
+    validate_observation(original, pr, episode, runner=runner, root=root, repository=repository)
+    expected = {
+        "blocking_pr_number": int(pr["number"]),
+        "blocking_pr_branch": pr["head"]["ref"],
+        "blocking_pr_head_sha": pr["head"]["sha"],
+        "blocking_upstream_sha": original["upstream_sha"],
+        "blocking_downstream_sha": original["downstream_sha"],
+    }
+    if any(evidence.get(key) != value for key, value in expected.items()):
+        raise Refusal("Current-main waiting evidence does not match the selected original Draft.")
+    if not pr.get("draft") or not original.get("conflict_paths"):
+        raise Refusal("Cross-episode waiting proof requires an original blocked Draft workspace.")
+    if (not is_ancestor(runner, root, repository, original["downstream_sha"], evidence["downstream_sha"])
+            or not is_ancestor(runner, root, UPSTREAM, original["upstream_sha"], evidence["upstream_sha"])):
+        raise Refusal("Original blocked inputs are not ancestors of the current observation.")
+    # Fetch objects only: never switch branches, start a merge or change the index.
+    # Check the live pull ref as well as the API/artifact head to fence movement.
+    runner.run(["git", "fetch", "--quiet", "--no-tags", "origin",
+                f"refs/pull/{int(pr['number'])}/head"], cwd=root)
+    if git_text(runner, root, "rev-parse", "FETCH_HEAD") != pr["head"]["sha"]:
+        raise Refusal("Selected Draft head changed during waiting-proof authentication.")
+    authenticate_upstream_history(runner, root, evidence["upstream_sha"])
+    candidate = Candidate(pr, original, {})
+    context = blocked_context(runner, root, candidate)
+    if context.get("mergeBase") != original["comparison_baseline"]:
+        raise Refusal("Blocked candidate comparison baseline differs from original evidence.")
+    validate_draft_extension_scope(runner, root, candidate)
+
+
 def load_current_reuse_observation(runner: Runner, root: Path, pr: dict, original: dict,
                                    current_main: str, repository=REPOSITORY) -> dict:
-    """Authenticate fresh hosted proof that one stale Draft remains the same episode."""
+    """Authenticate fresh hosted reuse or a newer episode's exact blocking Draft."""
     repository = authenticate_downstream_repository(repository)
     original_run = RUN_ID.search(str(original.get("run_url") or ""))
     original_run_id = int(original_run.group(1)) if original_run else 0
@@ -256,15 +289,20 @@ def load_current_reuse_observation(runner: Runner, root: Path, pr: dict, origina
                 "schema_version": 2,
                 "downstream_repo": repository,
                 "downstream_sha": current_main,
-                "episode_id": marker(pr.get("body", "")),
                 "ownership_policy_version": original.get("ownership_policy_version"),
-                "outcome": "existing_draft_pr",
-                "existing_pr_number": int(pr["number"]),
-                "existing_pr_branch": pr["head"]["ref"],
-                "existing_pr_head_sha": pr["head"]["sha"],
                 "run_id": str(run_id),
                 "run_attempt": str(attempt),
             }
+            waiting = evidence.get("outcome") == "waiting_on_existing_pr"
+            if waiting:
+                expected["blocking_pr_number"] = int(pr["number"])
+            else:
+                expected.update(
+                    episode_id=marker(pr.get("body", "")), outcome="existing_draft_pr",
+                    existing_pr_number=int(pr["number"]),
+                    existing_pr_branch=pr["head"]["ref"],
+                    existing_pr_head_sha=pr["head"]["sha"],
+                )
             if all(str(evidence.get(key)) == str(value) for key, value in expected.items()):
                 observed_candidate = {
                     "head": {
@@ -273,9 +311,11 @@ def load_current_reuse_observation(runner: Runner, root: Path, pr: dict, origina
                     }
                 }
                 validate_observation(
-                    evidence, observed_candidate, expected["episode_id"], runner=runner, root=root,
+                    evidence, observed_candidate, evidence.get("episode_id"), runner=runner, root=root,
                     run_id=run_id, attempt=attempt, repository=repository,
                 )
+                if waiting:
+                    authenticate_waiting_blocker(runner, root, pr, original, evidence, repository)
                 original_anchor = original.get("candidate_sha")
                 live_head = pr.get("head", {}).get("sha")
                 if (not original_anchor or not live_head
@@ -286,7 +326,7 @@ def load_current_reuse_observation(runner: Runner, root: Path, pr: dict, origina
                 matches.append(evidence)
     if not matches:
         raise Refusal(
-            "No fresh authenticated same-episode Upstream Synchronization outcome exists for "
+            "No fresh authenticated reuse or blocking-PR Upstream Synchronization outcome exists for "
             "current origin/main. Run the normal Upstream Synchronization workflow and retry."
         )
     critical = {
@@ -295,7 +335,10 @@ def load_current_reuse_observation(runner: Runner, root: Path, pr: dict, origina
          item.get("existing_pr_branch"), item.get("existing_pr_head_sha"),
          item.get("candidate_sha"), item.get("candidate_tree"),
          item.get("comparison_baseline"), item.get("classification_range_count"),
-         tuple(item.get("review_paths") or ()), tuple(item.get("conflict_paths") or ()))
+         tuple(item.get("review_paths") or ()), tuple(item.get("conflict_paths") or ()),
+         item.get("outcome"), item.get("blocking_pr_number"), item.get("blocking_pr_branch"),
+         item.get("blocking_pr_head_sha"), item.get("blocking_upstream_sha"),
+         item.get("blocking_downstream_sha"))
         for item in matches
     }
     if len(critical) != 1:
@@ -1121,6 +1164,8 @@ def publication_phase(root: Path, runner: Runner, candidate: Candidate, input_fn
         keys = (
             "episode_id", "downstream_sha", "upstream_sha", "ownership_policy_version",
             "existing_pr_number", "existing_pr_branch", "existing_pr_head_sha",
+            "outcome", "blocking_pr_number", "blocking_pr_branch", "blocking_pr_head_sha",
+            "blocking_upstream_sha", "blocking_downstream_sha",
             "candidate_sha", "candidate_tree", "comparison_baseline",
             "classification_range_count", "review_paths", "conflict_paths",
         )

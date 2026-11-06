@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -131,6 +132,11 @@ fun SeriesDetails(
     var showPlaylistDialog by remember { mutableStateOf<Optional<UUID>>(Optional.absent()) }
     var requestSeasonNumber by remember { mutableStateOf<Int?>(null) }
     val request4kEnabled by viewModel.request4kEnabled.collectAsState()
+    val seerrActive by viewModel.seerrActive.collectAsState(initial = false)
+    val requestMediaId = state.requestMediaId(seerrActive)
+    LaunchedEffect(requestMediaId) {
+        if (requestMediaId == null) requestSeasonNumber = null
+    }
 
     val contextActions =
         remember {
@@ -237,8 +243,10 @@ fun SeriesDetails(
                         )
                 },
                 onClickMissingSeason = { seasonNumber ->
-                    viewModel.requestOnClick()
-                    requestSeasonNumber = seasonNumber
+                    if (requestMediaId != null) {
+                        viewModel.requestOnClick()
+                        requestSeasonNumber = seasonNumber
+                    }
                 },
                 overviewOnClick = {
                     overviewDialog = ItemDetailsDialogInfo(series)
@@ -281,9 +289,9 @@ fun SeriesDetails(
                 },
                 actions = contextActions,
             )
-            requestSeasonNumber?.let { seasonNumber ->
+            requestSeasonNumber?.takeIf { requestMediaId != null }?.let { seasonNumber ->
                 RequestSeasonsDialog(
-                    id = state.seerrTvDetails?.id ?: -1,
+                    id = requireNotNull(requestMediaId),
                     title = state.seerrTvDetails?.name ?: series.title.orEmpty(),
                     seasons = state.requestSeasons,
                     seasons4k = state.requestSeasons4k,
@@ -551,8 +559,11 @@ fun SeriesDetailsContent(
                         items = seasons,
                         onClickItem = { index, item ->
                             position = SEASONS_ROW
-                            item.jellyfinItem?.let { onClickItem.invoke(index, it) }
-                                ?: onClickMissingSeason(item.seasonNumber)
+                            val localSeason = item.jellyfinItem
+                            when {
+                                localSeason != null -> onClickItem.invoke(index, localSeason)
+                                item.canRequest() -> onClickMissingSeason(item.seasonNumber)
+                            }
                         },
                         onLongClickItem = { index, item ->
                             position = SEASONS_ROW

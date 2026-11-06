@@ -15,6 +15,7 @@ import unittest
 from unittest.mock import patch
 
 import hosted_upstream as sync
+import resolve_upstream as resolve
 
 
 class GitHubFake:
@@ -457,6 +458,67 @@ class HostedSyncTests(unittest.TestCase):
         )
         self.assertFalse(retry_git.pushes)
         self.assertEqual(published_count, len(self.github.created))
+
+    def test_advanced_main_and_new_episode_reauthenticate_original_blocked_draft(self):
+        upstream = self.upstream("base.txt", "upstream\n")
+        self.g("checkout", "--detach", self.anchor)
+        downstream = self.commit("base.txt", "downstream\n")
+        self.g("push", str(self.remotes["origin"]), "HEAD:refs/heads/main")
+        original_git, original = self.observe()
+        self.retain_pr(original_git, original, draft=True)
+        original_pr = self.github.records[0]
+
+        current_main = self.commit("local-only.txt", "unrelated main movement\n")
+        self.g("push", str(self.remotes["origin"]), "HEAD:refs/heads/main")
+        self.g("checkout", "--detach", upstream)
+        current_upstream = self.upstream(".github/workflows/later.yml", "new review area\n")
+        waiting_git, waiting = self.observe()
+        self.assertEqual("waiting_on_existing_pr", waiting["outcome"])
+        self.assertNotEqual(original["episode_id"], waiting["episode_id"])
+        self.assertEqual(current_main, waiting["downstream_sha"])
+        self.assertEqual(current_upstream, waiting["upstream_sha"])
+        self.assertEqual(upstream, waiting["blocking_upstream_sha"])
+        self.assertEqual(downstream, waiting["blocking_downstream_sha"])
+        self.assertEqual(original["candidate_sha"], waiting["blocking_pr_head_sha"])
+        self.assertFalse(waiting_git.pushes or self.github.created)
+        waiting.update(schema_version=2, run_id="900", run_attempt="1")
+
+        class WaitingRunner(resolve.Runner):
+            def run(inner, args, *, cwd, check=True):
+                if args[:2] == ["gh", "api"]:
+                    route = args[2]
+                    if "/actions/workflows/" in route:
+                        result = {"workflow_runs": [{
+                            "id": 900, "run_attempt": 1, "head_sha": current_main,
+                            "head_branch": "main", "path": resolve.UPSTREAM_WORKFLOW_PATH,
+                            "conclusion": "success", "event": "schedule",
+                        }]}
+                    elif "/compare/" in route:
+                        pair = route.split("/compare/")[1].split("...")
+                        result = {"status": "ahead" if waiting_git.ancestor(*pair) else "diverged"}
+                    else:
+                        raise AssertionError(args)
+                    return resolve.Result(json.dumps(result), "", 0)
+                if args[:3] == ["gh", "run", "download"]:
+                    destination = Path(args[args.index("--dir") + 1])
+                    (destination / "outcome.json").write_text(json.dumps(waiting), encoding="utf-8")
+                    return resolve.Result("", "", 0)
+                if args[:2] == ["git", "fetch"]:
+                    if "origin" in args:
+                        waiting_git.run("fetch", "--quiet", "--no-tags",
+                                        str(self.remotes["origin"]), args[-1])
+                    else:
+                        waiting_git.fetch("upstream", "refs/heads/main", "refs/remotes/upstream/main")
+                    return resolve.Result("", "", 0)
+                self.assertEqual("git", args[0])
+                return waiting_git.run(*args[1:], check=check)
+
+        result = resolve.load_current_reuse_observation(
+            WaitingRunner(), waiting_git.path, original_pr, original, current_main
+        )
+        self.assertEqual(waiting, result)
+        self.assertEqual(upstream, original["upstream_sha"])
+        self.assertFalse(waiting_git.pushes or self.github.created)
 
     def test_waiting_blocker_head_change_between_jobs_refuses(self):
         self.upstream(".github/workflows/first.yml", "review first\n")
