@@ -258,10 +258,31 @@ This parent shape lets publication fast-forward the same Draft without rewriting
 tree must equal the reviewed index and contain neither blocked context nor conflict markers.
 Ready-for-review, CI, and merge/reject remain explicit human steps.
 
-When unrelated Mosaic main movement leaves an existing same-episode Draft on an older baseline,
-the Draft is actionable only after a fresh successful Upstream Synchronization outcome on exact
-current `main` binds the same episode to the exact PR number, branch, and live head. The resolver
-keeps the original candidate evidence separate from this reuse proof. Starting from authenticated
+When Mosaic main movement leaves a Draft on an older baseline, the resolver requires a fresh
+successful Upstream Synchronization outcome on exact current `main`. Two evidence paths are
+supported:
+
+- `existing_draft_pr` binds the same episode to the exact PR number, branch, and live head.
+- `waiting_on_existing_pr` may describe a **different, newer** episode. Its `blocking_pr_number`,
+  `blocking_pr_branch`, `blocking_pr_head_sha`, `blocking_upstream_sha`, and
+  `blocking_downstream_sha` must bind the selected original blocked Draft exactly. The resolver
+  separately validates the original episode marker and complete candidate evidence (original
+  artifact or durable PR provenance), sole parent, tree, blocked context, comparison baseline,
+  and any human descendant's allowed scope. The original downstream must be an ancestor of
+  current main, and the original upstream target an ancestor of the observed and current upstream
+  main. The fetched pull ref must still equal the API/artifact head. A different PR, changed head,
+  conflicting proof, rewritten ancestry, or missing/expired current-main artifact is refused.
+
+Both paths retain the existing repository, workflow, successful run/attempt, exact-main and policy
+identity checks. Cross-episode proof currently supports blocked single-parent Draft workspaces,
+not clean REVIEW candidates. It consumes the existing schema-2 artifact: no workflow dispatch
+input, new publication mode, or producer format is needed. Waiting remains a non-publishing state;
+the newer observation and its complete backlog are **not** substituted for the original episode
+or accepted upstream range. Authenticate with the existing `resolve-upstream.ps1 -PrNumber`
+entry point only when starting the separately authorized resolution task; it also starts local
+reconciliation, so it is not an authentication-only command.
+
+The resolver keeps the original candidate evidence separate from this current-main proof. Starting from authenticated
 Draft head `C`, it reviews an exact `B = merge(C, M)` with parents `[C, M]`; if `M` is already an
 ancestor of `C`, `B = C`. Only then does it resolve the original recorded upstream `U`, producing
 `R` with exact parents `[B, U]`. Reconciliation conflicts and upstream semantic conflicts are shown

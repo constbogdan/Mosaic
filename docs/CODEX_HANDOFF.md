@@ -39,6 +39,10 @@ not current instruction.
 
 ## Non-obvious invariants and negative knowledge
 
+- A newer `waiting_on_existing_pr` observation is not the older Draft's episode. The resolver can
+  bind its exact blocker identity to independently verified original blocked-context evidence and
+  current main, but must still resolve only the original upstream target. Missing fresh hosted
+  proof or mismatched identity remains a refusal; see [Upstream integration](UPSTREAM_SYNC.md).
 - Local Fast feedback is not hosted validation authority. Every PR receives complete offline
   tooling; uncertain Android/build scope selects `ANDROID_FULL`. Protected main reuses evidence only
   for an exactly authenticated tested tree and otherwise runs the complete conservative fallback.
