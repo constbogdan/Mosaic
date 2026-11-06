@@ -211,7 +211,7 @@ val CollectionType.baseItemKinds: List<BaseItemKind>
             }
 
             CollectionType.HOMEVIDEOS -> {
-                listOf(BaseItemKind.VIDEO)
+                listOf(BaseItemKind.VIDEO, BaseItemKind.PHOTO, BaseItemKind.PHOTO_ALBUM)
             }
 
             CollectionType.MUSIC -> {

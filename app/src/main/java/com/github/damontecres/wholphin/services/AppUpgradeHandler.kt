@@ -6,7 +6,10 @@ import android.os.Build
 import androidx.core.content.edit
 import androidx.datastore.core.DataStore
 import androidx.preference.PreferenceManager
+import com.github.damontecres.wholphin.data.CurrentUser
 import com.github.damontecres.wholphin.data.JellyfinServerDao
+import com.github.damontecres.wholphin.data.MostRecentServer
+import com.github.damontecres.wholphin.data.MostRecentServerProvider
 import com.github.damontecres.wholphin.data.RememberedTabDao
 import com.github.damontecres.wholphin.data.SeerrServerDao
 import com.github.damontecres.wholphin.data.model.JellyfinUser
@@ -14,6 +17,7 @@ import com.github.damontecres.wholphin.data.model.RememberedTab
 import com.github.damontecres.wholphin.preferences.AppPreference
 import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.preferences.ExperimentalPreference
+import com.github.damontecres.wholphin.preferences.HdrOverrideMode
 import com.github.damontecres.wholphin.preferences.ScreensaverPreference
 import com.github.damontecres.wholphin.preferences.update
 import com.github.damontecres.wholphin.preferences.updateAdvancedPreferences
@@ -36,6 +40,7 @@ import com.github.damontecres.wholphin.ui.setup.seerr.migrateSeerrUrl
 import com.github.damontecres.wholphin.util.Version
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.serializer.toUUIDOrNull
 import timber.log.Timber
@@ -56,6 +61,7 @@ class AppUpgradeHandler
         private val seerrServerDao: SeerrServerDao,
         private val serverDao: JellyfinServerDao,
         private val rememberedTabDao: RememberedTabDao,
+        private val mostRecentServerProvider: MostRecentServerProvider,
     ) {
         val pkgInfo: PackageInfo get() = context.packageManager.getPackageInfo(context.packageName, 0)
         val currentVersion: Version get() = Version.fromString(pkgInfo.versionName!!)
@@ -440,6 +446,43 @@ class AppUpgradeHandler
                     } else {
                         it
                     }
+                }
+            }
+
+            // Mosaic versions advance independently of Wholphin. Legacy fields, not
+            // upstream version thresholds, identify these one-time migrations.
+            if (mostRecentServerProvider.get() == MostRecentServer.None) {
+                val prefs = appPreferences.data.firstOrNull()
+                val serverId = prefs?.currentServerId?.toUUIDOrNull()
+                val userId = prefs?.currentUserId?.toUUIDOrNull()
+                if (serverId != null) {
+                    val server = serverDao.getServer(serverId)
+                    val user = server?.users?.firstOrNull { it.id == userId }
+                    if (server != null && user != null) {
+                        Timber.i("Migrating most recent server")
+                        mostRecentServerProvider.save(CurrentUser(server.server, user))
+                    } else if (server != null) {
+                        mostRecentServerProvider.saveServer(server.server)
+                    }
+                }
+            }
+            appPreferences.updateData {
+                it.update {
+                    currentServerId = ""
+                    currentUserId = ""
+                }
+            }
+            // directPlayDolbyVisionEL was replaced by doviProfile7Override; carry the setting forward
+            appPreferences.updateData {
+                if (it.playbackPreferences.overrides.directPlayDolbyVisionEL) {
+                    it.updatePlaybackOverrides {
+                        if (doviProfile7Override == HdrOverrideMode.HDR_OVERRIDE_AUTO) {
+                            doviProfile7Override = HdrOverrideMode.HDR_OVERRIDE_ENABLE
+                        }
+                        directPlayDolbyVisionEL = false
+                    }
+                } else {
+                    it
                 }
             }
         }
