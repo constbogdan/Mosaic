@@ -39,6 +39,11 @@ not current instruction.
 
 ## Non-obvious invariants and negative knowledge
 
+- Home refresh uses timestamp-independent `ServerUserConfig`; valid same-user/server refreshes
+  retain loaded rows and Acquiring instead of resetting the entire state. Ordinary rows reset on
+  invalid context or user/server changes, including a reused user UUID on another server.
+  Acquiring still follows its authoritative provider's session clearing, not Home's row lifecycle.
+  See the [PR #111 resolution decision](UPSTREAM_RESOLUTION_DECISIONS.md).
 - A newer `waiting_on_existing_pr` observation is not the older Draft's episode. The resolver can
   bind its exact blocker identity to independently verified original blocked-context evidence and
   current main, but must still resolve only the original upstream target. Missing fresh hosted
