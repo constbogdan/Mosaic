@@ -5,8 +5,10 @@ import androidx.work.Data
 import androidx.work.ListenableWorker
 import androidx.work.WorkerParameters
 import com.github.damontecres.wholphin.data.CurrentUser
+import com.github.damontecres.wholphin.data.RestoredSession
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.preferences.AppPreferences
+import com.github.damontecres.wholphin.test.currentUser
 import com.github.damontecres.wholphin.util.GetItemsRequestHandler
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -113,17 +115,33 @@ class SuggestionsWorkerTest {
             val mockUser = mockk<CurrentUser>()
             var restored = false
             every { mockServerRepository.current } answers { MutableStateFlow(if (restored) mockUser else null) }
-            coEvery { mockServerRepository.restoreSession(testServerId, testUserId) } coAnswers {
+            coEvery { mockServerRepository.restoreLastSession() } coAnswers {
                 restored = true
-                mockUser
+                RestoredSession.Success(currentUser(testServerId, testUserId))
             }
             every { mockPreferences.data } returns flowOf(mockPrefs())
             coEvery { mockUserViewsApi.getUserViews(userId = testUserId) } returns mockQueryResult()
 
             val result = createWorker().doWork()
 
-            coVerify { mockServerRepository.restoreSession(testServerId, testUserId) }
+            coVerify { mockServerRepository.restoreLastSession() }
             assertEquals(ListenableWorker.Result.success(), result)
+        }
+
+    @Test
+    fun stale_worker_cannot_use_a_different_restored_user_or_server() =
+        runTest {
+            every { mockApi.baseUrl } returns null
+            every { mockApi.accessToken } returns null
+            for (session in listOf(
+                currentUser(UUID.randomUUID(), testUserId),
+                currentUser(testServerId, UUID.randomUUID()),
+            )) {
+                coEvery { mockServerRepository.restoreLastSession() } returns RestoredSession.Success(session)
+                assertEquals(ListenableWorker.Result.failure(), createWorker().doWork())
+            }
+            coVerify(exactly = 0) { mockUserViewsApi.getUserViews(userId = any()) }
+            coVerify(exactly = 0) { mockCache.put(any(), any(), any(), any()) }
         }
 
     @Test

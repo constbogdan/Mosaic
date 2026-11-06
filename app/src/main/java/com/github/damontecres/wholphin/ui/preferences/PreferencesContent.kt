@@ -51,6 +51,7 @@ import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.preferences.AppSwitchPreference
 import com.github.damontecres.wholphin.preferences.ExoPlayerPreferences
 import com.github.damontecres.wholphin.preferences.ExperimentalPreference
+import com.github.damontecres.wholphin.preferences.HdrFormatPreferences
 import com.github.damontecres.wholphin.preferences.MpvPreferences
 import com.github.damontecres.wholphin.preferences.PlayerBackend
 import com.github.damontecres.wholphin.preferences.ScreensaverPreference
@@ -160,6 +161,7 @@ fun PreferencesContent(
             PreferenceScreenOption.SCREENSAVER -> screensaverPreferences
             PreferenceScreenOption.SKIP_SEGMENTS -> SkipSegmentPreferences
             PreferenceScreenOption.EXPERIMENTAL -> experimentalPreferences
+            PreferenceScreenOption.HDR_FORMATS -> HdrFormatPreferences
         }
     val screenTitle =
         when (preferenceScreenOption) {
@@ -170,6 +172,7 @@ fun PreferencesContent(
             PreferenceScreenOption.SCREENSAVER -> R.string.screensaver_settings
             PreferenceScreenOption.SKIP_SEGMENTS -> R.string.skip_behavior
             PreferenceScreenOption.EXPERIMENTAL -> R.string.experimental_settings
+            PreferenceScreenOption.HDR_FORMATS -> R.string.hdr_formats
         }
 
     var visible by remember { mutableStateOf(false) }
@@ -230,6 +233,8 @@ fun PreferencesContent(
             ) {
                 if (showUpdate) {
                     item {
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val focused = interactionSource.collectIsFocusedAsState().value
                         val updateFocusRequester = remember { FocusRequester() }
                         LaunchedEffect(Unit) {
                             if (focusedIndex.first == 0 && focusedIndex.second == 0) {
@@ -244,11 +249,20 @@ fun PreferencesContent(
                                 viewModel.navigationManager.navigateTo(Destination.UpdateApp)
                             },
                             summary = release?.version?.toString(),
+                            interactionSource = interactionSource,
                             modifier =
                                 Modifier
                                     .focusRequester(updateFocusRequester)
                                     .focusRequester(firstFocusRequester)
-                                    .playSoundOnFocus(movementSounds),
+                                    .playSoundOnFocus(movementSounds)
+                                    .lazyListWrapScrolling(
+                                        state = state,
+                                        focused = focused,
+                                        isFirst = true,
+                                        isLast = false,
+                                        firstFocusRequester = firstFocusRequester,
+                                        lastFocusRequester = lastFocusRequester,
+                                    ),
                         )
                     }
                 }
@@ -861,6 +875,7 @@ fun PreferencesPage(
             PreferenceScreenOption.SCREENSAVER,
             PreferenceScreenOption.SKIP_SEGMENTS,
             PreferenceScreenOption.EXPERIMENTAL,
+            PreferenceScreenOption.HDR_FORMATS,
             -> {
                 PreferencesContent(
                     initialPreferences,

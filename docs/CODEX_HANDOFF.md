@@ -39,6 +39,12 @@ not current instruction.
 
 ## Non-obvious invariants and negative knowledge
 
+- Stage B's session/HDR preference migrations cannot use upstream Wholphin version thresholds:
+  Mosaic versions advance independently. Migrate from the legacy fields idempotently, retaining
+  a newer remembered session and explicit HDR override, and preserve server-only restoration.
+  The new user-switch deduplication must include server identity, not only user UUID/language;
+  cancelled Seerr authentication and old-server metadata must not publish into a replacement
+  session. Keep Mosaic's exact signed updater asset contract rather than upstream APK aliases.
 - Home refresh uses timestamp-independent `ServerUserConfig`; valid same-user/server refreshes
   retain loaded rows and Acquiring instead of resetting the entire state. Ordinary rows reset on
   invalid context or user/server changes, including a reused user UUID on another server.

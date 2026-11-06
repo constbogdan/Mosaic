@@ -4,6 +4,16 @@ This compact log preserves useful context from completed semantic reviews. Previ
 context, not authority: every future `REVIEW` path must be evaluated against its new upstream
 change, current Mosaic behavior, and the authenticated candidate evidence.
 
+## Stage B — upstream `55960c24` (local native merge, uncommitted)
+
+See the [bounded Stage B review](history/UPSTREAM_STAGE_B.md) for all 37 commits,
+actual conflicts, clean semantic overlaps, validation and acceptance limitations.
+The parent pair is protected main `8c800002` plus exact upstream `55960c24`, not PR #114's
+later target. Retain retired workflow absences and Mosaic's updater/signing contract.
+Adapt legacy session/HDR migration to Mosaic's independent versions; preserve server identity
+through user-switch deduplication, cancelled Seerr authentication and metadata refresh.
+Do not substitute Stage C track persistence or the Stage D candidate tree.
+
 ## PR #111 — upstream `65954a99` (local resolution, publication pending)
 
 - Original episode: `08119bd3875ca9d34e4699978add5864cad7a7b0e0e0c712ffa8ed194aa7aa1a`.

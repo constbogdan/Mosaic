@@ -15,6 +15,9 @@ import com.github.damontecres.wholphin.ui.launchIO
 import com.github.damontecres.wholphin.util.WholphinDispatchers
 import dagger.hilt.android.qualifiers.ActivityContext
 import dagger.hilt.android.scopes.ActivityScoped
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
@@ -38,14 +41,17 @@ class UserSwitchListener
         init {
             context as AppCompatActivity
             context.lifecycleScope.launchDefault {
-                serverRepository.currentUserFlow.collect { user ->
-                    Timber.d("New user")
-                    seerrServerRepository.clear()
-                    homeSettingsService.currentSettings.update { HomePageResolvedSettings.EMPTY }
-                    if (user != null) {
-                        switchUser(user)
+                serverRepository.currentUserFlow
+                    .distinctUntilChanged { old, new ->
+                        old?.serverId == new?.serverId && old?.id == new?.id && old?.uiLanguage == new?.uiLanguage
+                    }.collectLatest { user ->
+                        Timber.d("UserSwitch: %s", user?.id)
+                        seerrServerRepository.clear()
+                        homeSettingsService.currentSettings.update { HomePageResolvedSettings.EMPTY }
+                        if (user != null) {
+                            switchUser(user)
+                        }
                     }
-                }
             }
         }
 
@@ -93,6 +99,8 @@ class UserSwitchListener
                                             seerrUser,
                                             userConfig,
                                         )
+                                    } catch (ex: CancellationException) {
+                                        throw ex
                                     } catch (ex: Exception) {
                                         Timber.w(
                                             ex,
