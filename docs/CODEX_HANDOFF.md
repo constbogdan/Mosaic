@@ -61,6 +61,11 @@ not current instruction.
   bind its exact blocker identity to independently verified original blocked-context evidence and
   current main, but must still resolve only the original upstream target. Missing fresh hosted
   proof or mismatched identity remains a refusal; see [Upstream integration](UPSTREAM_SYNC.md).
+- Resolver dependency scope is deliberately limited to the existing request-dialog caller and the
+  next Mosaic Room export, proved from immutable authenticated sources. Use the remaining native
+  range, not the original episode's full backlog, to justify a producer change: otherwise already
+  accepted Stage B/C work could incorrectly authorize a new adaptation. This does not grant an
+  editable handoff, neighboring source, or arbitrary schema export any publication authority.
 - Local Fast feedback is not hosted validation authority. Every PR receives complete offline
   tooling; uncertain Android/build scope selects `ANDROID_FULL`. Protected main reuses evidence only
   for an exactly authenticated tested tree and otherwise runs the complete conservative fallback.
