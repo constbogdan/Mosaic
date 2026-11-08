@@ -4,16 +4,29 @@ import com.github.damontecres.wholphin.api.seerr.model.DownloadStatus
 import com.github.damontecres.wholphin.api.seerr.model.DownloadStatusEpisode
 import com.github.damontecres.wholphin.api.seerr.model.MediaInfo
 import com.github.damontecres.wholphin.api.seerr.model.MediaRequest
+import com.github.damontecres.wholphin.api.seerr.model.PublicSettings
 import com.github.damontecres.wholphin.api.seerr.model.Season
+import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.JellyfinAcquisitionReadiness
 import com.github.damontecres.wholphin.data.model.SeerrAcquisitionState
+import com.github.damontecres.wholphin.data.model.SeerrAuthMethod
 import com.github.damontecres.wholphin.data.model.SeerrAvailability
+import com.github.damontecres.wholphin.data.model.SeerrPluginLogin
+import com.github.damontecres.wholphin.data.model.SeerrPluginSettings
 import com.github.damontecres.wholphin.data.model.SeerrRequestAcquisition
+import com.github.damontecres.wholphin.data.model.SeerrServer
+import com.github.damontecres.wholphin.data.model.SeerrUser
 import com.github.damontecres.wholphin.data.model.authoritativelyRepresentedSeasons
 import com.github.damontecres.wholphin.data.model.toSeerrRequestAcquisition
 import com.github.damontecres.wholphin.ui.downloads.destination
 import com.github.damontecres.wholphin.ui.downloads.toDownloadSections
 import com.github.damontecres.wholphin.ui.nav.Destination
+import com.github.damontecres.wholphin.util.WholphinDispatchers
+import com.github.damontecres.wholphin.util.configure
+import com.github.damontecres.wholphin.util.reset
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +34,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -30,6 +44,99 @@ import java.util.UUID
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SeerrAcquisitionTrackerTest {
+    @Test
+    fun repositoryWrapperDrivesInjectedTrackerAcrossPluginManualAndDisconnectedStates() =
+        runTest {
+            WholphinDispatchers.configure(StandardTestDispatcher(testScheduler))
+            val api = mockk<SeerrApi>(relaxed = true)
+            coEvery { api.api.settingsApi.settingsPublicGet() } returns PublicSettings()
+            coEvery { api.api.usersApi.authMeGet() } returns SeerrUserConfig(id = 42)
+            var jfUser =
+                com.github.damontecres.wholphin.test
+                    .user(UUID.randomUUID())
+            val jf = mockk<ServerRepository> { every { currentUser } answers { jfUser } }
+            val repository = SeerrServerRepository(api, mockk(relaxed = true), jf, OkHttpClient())
+            val service = mockk<SeerrService>()
+            coEvery { service.getRequestAcquisitions() } returns listOf(movieRequest(99, 100.0, 25.0))
+            coEvery { service.enrichRequestAcquisitions(any()) } answers { firstArg() }
+            val readiness = mockk<JellyfinAcquisitionReadinessService>()
+            coEvery { readiness.enrich(any()) } answers { firstArg() }
+            val gate = mockk<EnhancedFeatureGate> { every { isEnabled(any()) } returns true }
+            val tracker = SeerrAcquisitionTracker(service, repository, readiness, gate)
+            try {
+                tracker.startForeground()
+                runCurrent()
+                assertEquals(null, tracker.state.value.session)
+                assertTrue(
+                    repository.usePluginProvidedServer(
+                        SeerrPluginSettings(serverUrl = "http://plugin-a.invalid", login = SeerrPluginLogin.ApiKey("fixture")),
+                    ),
+                )
+                runCurrent()
+                assertEquals(SeerrAcquisitionSession(-1, 42, "http://plugin-a.invalid", jfUser.rowId), tracker.state.value.session)
+                assertEquals(1, tracker.state.value.requests.size)
+                tracker.registerQueueing(movieRequest(100, null, null))
+
+                // Same numeric plugin/user IDs on a different endpoint must reset queueing.
+                assertTrue(
+                    repository.usePluginProvidedServer(
+                        SeerrPluginSettings(serverUrl = "http://plugin-b.invalid", login = SeerrPluginLogin.ApiKey("fixture")),
+                    ),
+                )
+                runCurrent()
+                assertEquals(
+                    "http://plugin-b.invalid",
+                    tracker.state.value.session
+                        ?.serverUrl,
+                )
+                assertTrue(
+                    tracker.state.value.queueingRequests
+                        .isEmpty(),
+                )
+                tracker.registerQueueing(movieRequest(101, null, null))
+                jfUser = jfUser.copy(rowId = 2)
+                assertTrue(
+                    repository.usePluginProvidedServer(
+                        SeerrPluginSettings(serverUrl = "http://plugin-b.invalid", login = SeerrPluginLogin.ApiKey("fixture")),
+                    ),
+                )
+                runCurrent()
+                assertEquals(
+                    2,
+                    tracker.state.value.session
+                        ?.jellyfinUserRowId,
+                )
+                assertTrue(
+                    tracker.state.value.queueingRequests
+                        .isEmpty(),
+                )
+
+                val server = SeerrServer(1, "http://manual.invalid")
+                val user = SeerrUser(2, 1, SeerrAuthMethod.API_KEY, null, null, "fixture")
+                repository.error(server, user, IllegalStateException("offline"))
+                runCurrent()
+                assertEquals(null, tracker.state.value.session)
+                assertTrue(
+                    tracker.state.value.requests
+                        .isEmpty(),
+                )
+                repository.set(server, user, SeerrUserConfig(id = 7))
+                runCurrent()
+                assertEquals(SeerrAcquisitionSession(1, 7, server.url, 2), tracker.state.value.session)
+                assertEquals(1, tracker.state.value.requests.size)
+                repository.clear()
+                runCurrent()
+                assertEquals(null, tracker.state.value.session)
+                assertTrue(
+                    tracker.state.value.requests
+                        .isEmpty(),
+                )
+            } finally {
+                tracker.stopForeground()
+                WholphinDispatchers.reset()
+            }
+        }
+
     @Test
     fun disabledTrackerRejectsForegroundAndQueueingSideEffects() =
         runTest {

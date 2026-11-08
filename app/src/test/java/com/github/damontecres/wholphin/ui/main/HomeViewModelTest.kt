@@ -9,7 +9,9 @@ import com.github.damontecres.wholphin.preferences.UserPreferences
 import com.github.damontecres.wholphin.services.BackdropService
 import com.github.damontecres.wholphin.services.DatePlayedService
 import com.github.damontecres.wholphin.services.FavoriteWatchManager
+import com.github.damontecres.wholphin.services.HomeDataService
 import com.github.damontecres.wholphin.services.HomePageResolvedSettings
+import com.github.damontecres.wholphin.services.HomePageSettingsSource
 import com.github.damontecres.wholphin.services.HomeRowConfigDisplay
 import com.github.damontecres.wholphin.services.HomeSettingsService
 import com.github.damontecres.wholphin.services.LatestNextUpService
@@ -103,6 +105,7 @@ class HomeViewModelTest {
                     serverReportService = mockk<ServerReportService>(relaxed = true),
                     navDrawerService = navDrawerService,
                     homeSettingsService = homeSettingsService,
+                    homeDataService = mockk<HomeDataService>(relaxed = true),
                     favoriteWatchManager = mockk<FavoriteWatchManager>(relaxed = true),
                     datePlayedService = mockk<DatePlayedService>(relaxed = true),
                     backdropService = mockk<BackdropService>(relaxed = true),
@@ -115,7 +118,7 @@ class HomeViewModelTest {
             advanceUntilIdle()
             assertEquals(listOf(acquiringItem), viewModel.state.value.acquiringItems)
 
-            val reloadedSettings = HomePageResolvedSettings(userId, emptyList())
+            val reloadedSettings = HomePageResolvedSettings(userId, HomePageSettingsSource.LOCAL, emptyList())
             currentSettings.value = reloadedSettings
             advanceUntilIdle()
 
@@ -154,7 +157,7 @@ class HomeViewModelTest {
             advanceUntilIdle()
             val rows = fixture.viewModel.state.value.homeRows
             val replacement = CompletableDeferred<HomeRowLoadingState>()
-            coEvery { fixture.homeSettings.fetchDataForRow(any(), any(), any(), any(), any(), any(), any(), any()) } coAnswers {
+            coEvery { fixture.homeData.fetchDataForRow(any(), any(), any(), any(), any(), any(), any(), any()) } coAnswers {
                 replacement.await()
             }
 
@@ -167,7 +170,7 @@ class HomeViewModelTest {
             assertEquals(LoadingState.Success, fixture.viewModel.state.value.loadingState)
             assertEquals(LoadingState.Loading, fixture.viewModel.state.value.refreshState)
             assertEquals(listOf(fixture.acquiringItem), fixture.viewModel.state.value.acquiringItems)
-            coVerify { fixture.homeSettings.fetchDataForRow(any(), any(), any(), any(), any(), any(), true, any()) }
+            coVerify { fixture.homeData.fetchDataForRow(any(), any(), any(), any(), any(), any(), true, any()) }
 
             val newRow = HomeRowLoadingState.Success(EmptyStringProvider, listOf(mockk()))
             replacement.complete(newRow)
@@ -182,7 +185,7 @@ class HomeViewModelTest {
             val fixture = Fixture()
             advanceUntilIdle()
             val replacement = CompletableDeferred<HomeRowLoadingState>()
-            coEvery { fixture.homeSettings.fetchDataForRow(any(), any(), any(), any(), any(), any(), any(), any()) } coAnswers {
+            coEvery { fixture.homeData.fetchDataForRow(any(), any(), any(), any(), any(), any(), any(), any()) } coAnswers {
                 replacement.await()
             }
             fixture.settings.value = fixture.settings.value.copy(rows = listOf(fixture.row.copy(id = 2)))
@@ -231,7 +234,7 @@ class HomeViewModelTest {
             val fixture = Fixture()
             advanceUntilIdle()
             val replacement = CompletableDeferred<HomeRowLoadingState>()
-            coEvery { fixture.homeSettings.fetchDataForRow(any(), any(), any(), any(), any(), any(), any(), any()) } coAnswers {
+            coEvery { fixture.homeData.fetchDataForRow(any(), any(), any(), any(), any(), any(), any(), any()) } coAnswers {
                 replacement.await()
             }
             fixture.currentUser.value = fixture.user.copy(serverId = UUID.randomUUID())
@@ -241,7 +244,7 @@ class HomeViewModelTest {
                 fixture.viewModel.state.value.homeRows
                     .single() is HomeRowLoadingState.Pending,
             )
-            coVerify(exactly = 0) { fixture.homeSettings.fetchDataForRow(any(), any(), any(), any(), any(), any(), true, any()) }
+            coVerify(exactly = 0) { fixture.homeData.fetchDataForRow(any(), any(), any(), any(), any(), any(), true, any()) }
             replacement.complete(fixture.loadedRow)
             advanceUntilIdle()
         }
@@ -252,7 +255,7 @@ class HomeViewModelTest {
             val fixture = Fixture()
             advanceUntilIdle()
             val stale = CompletableDeferred<HomeRowLoadingState>()
-            coEvery { fixture.homeSettings.fetchDataForRow(any(), any(), any(), any(), any(), any(), any(), any()) } coAnswers {
+            coEvery { fixture.homeData.fetchDataForRow(any(), any(), any(), any(), any(), any(), any(), any()) } coAnswers {
                 stale.await()
             }
             fixture.currentUser.value = fixture.user.copy(name = "updated name")
@@ -266,7 +269,7 @@ class HomeViewModelTest {
             )
 
             val newRow = HomeRowLoadingState.Success(EmptyStringProvider, listOf(mockk()))
-            coEvery { fixture.homeSettings.fetchDataForRow(any(), any(), any(), any(), any(), any(), any(), any()) } returns newRow
+            coEvery { fixture.homeData.fetchDataForRow(any(), any(), any(), any(), any(), any(), any(), any()) } returns newRow
             fixture.settings.value = fixture.settings.value.copy(userId = newUser.id)
             advanceUntilIdle()
             stale.complete(fixture.loadedRow)
@@ -291,7 +294,7 @@ class HomeViewModelTest {
         val user = ServerUserConfig(UUID.randomUUID(), "test-user", UUID.randomUUID())
         val currentUser = MutableStateFlow<ServerUserConfig?>(user)
         val row = HomeRowConfigDisplay(1, EmptyStringProvider, HomeRowConfig.ContinueWatching())
-        val settings = MutableStateFlow(HomePageResolvedSettings(user.id, listOf(row)))
+        val settings = MutableStateFlow(HomePageResolvedSettings(user.id, HomePageSettingsSource.LOCAL, listOf(row)))
         val acquiringItem = mockk<HomeAcquiringItem>()
         val acquisition = MutableStateFlow(HomeAcquiringState(listOf(acquiringItem)))
         val loadedRow = HomeRowLoadingState.Success(EmptyStringProvider, listOf(mockk()))
@@ -302,6 +305,9 @@ class HomeViewModelTest {
         val homeSettings =
             mockk<HomeSettingsService>(relaxed = true) {
                 every { currentSettings } returns settings
+            }
+        val homeData =
+            mockk<HomeDataService>(relaxed = true) {
                 coEvery { fetchDataForRow(any(), any(), any(), any(), any(), any(), any(), any()) } returns loadedRow
             }
         val viewModel =
@@ -316,6 +322,7 @@ class HomeViewModelTest {
                 serverReportService = mockk<ServerReportService>(relaxed = true),
                 navDrawerService = navDrawer,
                 homeSettingsService = homeSettings,
+                homeDataService = homeData,
                 favoriteWatchManager = mockk<FavoriteWatchManager>(relaxed = true),
                 datePlayedService = mockk<DatePlayedService>(relaxed = true),
                 backdropService = mockk<BackdropService>(relaxed = true),

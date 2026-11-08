@@ -1,12 +1,43 @@
 package com.github.damontecres.wholphin.test
 
+import com.github.damontecres.wholphin.api.seerr.model.PublicSettings
+import com.github.damontecres.wholphin.data.model.SeerrAuthMethod
 import com.github.damontecres.wholphin.data.model.SeerrPermission
+import com.github.damontecres.wholphin.data.model.SeerrServer
+import com.github.damontecres.wholphin.data.model.SeerrUser
+import com.github.damontecres.wholphin.data.model.canRequestMovies
+import com.github.damontecres.wholphin.data.model.canRequestTv
 import com.github.damontecres.wholphin.data.model.hasPermission
+import com.github.damontecres.wholphin.services.CurrentSeerr
 import com.github.damontecres.wholphin.services.SeerrUserConfig
 import org.junit.Assert
 import org.junit.Test
 
 class TestSeerrPermission {
+    @Test
+    fun `standard and 4K permissions remain independent and honor server capabilities`() {
+        for (standard in listOf(false, true)) {
+            for (fourK in listOf(false, true)) {
+                for (server4k in listOf(false, true)) {
+                    val user = SeerrUserConfig(id = 7, permissions = (if (standard) 32 else 0) or (if (fourK) 1024 else 0))
+                    val current =
+                        CurrentSeerr(
+                            SeerrServer(1, "http://seerr.invalid"),
+                            SeerrUser(1, 1, SeerrAuthMethod.API_KEY, null, null, "fixture"),
+                            user,
+                            PublicSettings(movie4kEnabled = server4k, series4kEnabled = server4k),
+                        )
+                    Assert.assertEquals(standard, current.requestMovieEnabled)
+                    Assert.assertEquals(standard, current.requestTvEnabled)
+                    Assert.assertEquals(fourK && server4k, current.request4kMovieEnabled)
+                    Assert.assertEquals(fourK && server4k, current.request4kTvEnabled)
+                    Assert.assertEquals(standard || fourK, user.canRequestMovies)
+                    Assert.assertEquals(standard || fourK, user.canRequestTv)
+                }
+            }
+        }
+    }
+
     @Test
     fun `Is Admin`() {
         val user =

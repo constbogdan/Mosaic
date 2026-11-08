@@ -78,6 +78,8 @@ class DiscoverMovieViewModel
         val state: StateFlow<DiscoverMovieState> = _state
 
         val userConfig = seerrServerRepository.current.map { it?.config }
+        val requestEnabled =
+            seerrServerRepository.current.map { it?.requestMovieEnabled ?: false }
         val request4kEnabled =
             seerrServerRepository.current.map { it?.request4kMovieEnabled ?: false }
 

@@ -54,7 +54,7 @@ import java.util.UUID
         SeasonIntegrityExpectationCache::class,
         SeriesTrackChoice::class,
     ],
-    version = 37,
+    version = 38,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(3, 4),
@@ -75,6 +75,7 @@ import java.util.UUID
         AutoMigration(34, 35),
         AutoMigration(35, 36),
         AutoMigration(36, 37, spec = Migrations.Migrate36to37::class),
+        AutoMigration(37, 38),
     ],
 )
 @TypeConverters(Converters::class)

@@ -41,7 +41,7 @@ fun TvDetails.toRequestSeasons(
                     }
                     editable[seasonNumber] =
                         currentUserId == request.requestedBy?.id &&
-                        request.status == RequestStatus.PENDING.status
+                        request.status in setOf(RequestStatus.PENDING.status, RequestStatus.DECLINED.status)
                 }
             }
         }
