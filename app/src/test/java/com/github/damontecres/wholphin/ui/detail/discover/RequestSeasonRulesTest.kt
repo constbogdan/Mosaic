@@ -1,6 +1,10 @@
 package com.github.damontecres.wholphin.ui.detail.discover
 
+import com.github.damontecres.wholphin.api.seerr.model.MediaInfo
+import com.github.damontecres.wholphin.api.seerr.model.MediaRequest
+import com.github.damontecres.wholphin.api.seerr.model.RequestUser
 import com.github.damontecres.wholphin.api.seerr.model.Season
+import com.github.damontecres.wholphin.api.seerr.model.TvDetails
 import com.github.damontecres.wholphin.data.model.RequestStatus
 import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import org.junit.Assert.assertEquals
@@ -9,6 +13,36 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RequestSeasonRulesTest {
+    @Test
+    fun upstreamDeclinedEditabilityUsesSharedProjectionWithoutReopeningProtectedSeasons() {
+        for (status in listOf(RequestStatus.PENDING, RequestStatus.APPROVED, RequestStatus.DECLINED, RequestStatus.COMPLETED)) {
+            val tv =
+                TvDetails(
+                    id = 42,
+                    seasons = listOf(Season(seasonNumber = 2)),
+                    mediaInfo =
+                        MediaInfo(
+                            id = 1,
+                            requests =
+                                listOf(
+                                    MediaRequest(
+                                        id = 5,
+                                        status = status.status,
+                                        is4k = false,
+                                        requestedBy = RequestUser(id = 7),
+                                        seasons = listOf(Season(seasonNumber = 2, status = status.status)),
+                                    ),
+                                ),
+                        ),
+                )
+            val owned = tv.toRequestSeasons(7, false).single()
+            assertEquals(status in setOf(RequestStatus.PENDING, RequestStatus.DECLINED), owned.editable)
+            assertEquals(status == RequestStatus.DECLINED, owned.isRequestable())
+            assertFalse(tv.toRequestSeasons(8, false).single().editable)
+            assertEquals(RequestStatus.UNKNOWN, tv.toRequestSeasons(7, true).single().status)
+        }
+    }
+
     @Test
     fun onlyMissingEditableSeasonsAreNewRequests() {
         assertTrue(season(1).isRequestable())

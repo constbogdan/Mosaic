@@ -385,11 +385,11 @@ class DeliveryOutputTests(unittest.TestCase):
         # Keep the approved URL/digest independent of the file under test;
         # deriving the expected pin from that file would authenticate it against itself.
         self.assertEqual(
-            r'https\://services.gradle.org/distributions/gradle-9.8.1-bin.zip',
+            r'https\://services.gradle.org/distributions/gradle-9.8.2-bin.zip',
             properties['distributionUrl'],
         )
         self.assertEqual(
-            'dce76f55f8e251a3a1f130eb120f30b3d271de2b76c9b0729d316b5a1b6dc01f',
+            '21bd5da2de49b642904077f38c0efdc7778e92b3ed0889392dca61b97e389607',
             properties['distributionSha256Sum'],
         )
 

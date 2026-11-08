@@ -54,6 +54,8 @@ data class SeerrAcquisitionTrackerState(
 data class SeerrAcquisitionSession(
     val serverId: Int,
     val userId: Int,
+    val serverUrl: String? = null,
+    val jellyfinUserRowId: Int? = null,
 )
 
 @Singleton
@@ -81,10 +83,13 @@ class SeerrAcquisitionTracker internal constructor(
         sessions =
             seerrServerRepository.connection
                 .map { connection ->
-                    (connection as? SeerrConnectionStatus.Success)?.current?.let { current ->
+                    (connection.connection as? SeerrConnectionStatus.Success)?.current?.let { current ->
                         SeerrAcquisitionSession(
                             serverId = current.server.id,
                             userId = current.config.id,
+                            // Plugin-provided servers all use -1; IDs alone do not fence owners.
+                            serverUrl = current.server.url,
+                            jellyfinUserRowId = current.user.jellyfinUserRowId,
                         )
                     }
                 }.distinctUntilChanged(),

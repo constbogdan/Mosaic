@@ -158,6 +158,11 @@ class SeriesViewModel
 
         val position = MutableStateFlow(SeriesOverviewPosition(0, 0))
 
+        val requestEnabled =
+            seerrServerRepository.current
+                .map { it?.requestTvEnabled ?: false }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
         val request4kEnabled =
             seerrServerRepository.current
                 .map { it?.request4kTvEnabled ?: false }

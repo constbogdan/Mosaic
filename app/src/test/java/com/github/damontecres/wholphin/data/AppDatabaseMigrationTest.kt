@@ -163,7 +163,7 @@ class AppDatabaseMigrationTest {
         }
 
     private fun assertHealthy(db: SupportSQLiteDatabase) {
-        assertEquals(37, db.version)
+        assertEquals(38, db.version)
         assertEquals(listOf(listOf("ok")), rows(db, "PRAGMA integrity_check"))
         assertTrue(rows(db, "PRAGMA foreign_key_check").isEmpty())
     }
@@ -204,7 +204,10 @@ class AppDatabaseMigrationTest {
             val room = open(name)
             val db = room.openHelper.writableDatabase
             assertHealthy(db)
-            before.forEach { (table, values) -> assertEquals(table, values, rows(db, "SELECT * FROM `$table`")) }
+            before.forEach { (table, values) ->
+                val expected = if (table == "users") values.map { it + "UNSET" } else values
+                assertEquals(table, expected, rows(db, "SELECT * FROM `$table`"))
+            }
             val expected = room.seasonIntegrityDao().getSeries(1, seriesId).single()
             assertEquals(setOf(1, 2, 4), expected.expectedEpisodeNumbers)
             assertEquals(1700000000000L, expected.lastUpdatedEpochMillis)
@@ -222,10 +225,11 @@ class AppDatabaseMigrationTest {
 
     @Test
     fun `every supported historical schema upgrades without losing server or user identity`() {
-        for (version in listOf(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 20, 30, 31, 32, 33, 34, 35, 36)) {
+        for (version in listOf(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 20, 30, 31, 32, 33, 34, 35, 36, 37)) {
             val name = fixture(version) { seedIdentity(it, version) }
             val db = open(name).openHelper.writableDatabase
             assertHealthy(db)
+            assertEquals(listOf(listOf("UNSET")), rows(db, "SELECT c_homeSettingsSource FROM users"))
             assertEquals(
                 listOf(listOf(serverId.key(), "fixture", "http://jellyfin.invalid")),
                 rows(db, "SELECT id, name, url FROM servers"),
@@ -236,6 +240,51 @@ class AppDatabaseMigrationTest {
             )
         }
     }
+
+    @Test
+    fun `schema 37 adds only Home source while preserving integrity tracks credentials and preferences`() =
+        runTest {
+            val name =
+                fixture(37) { db ->
+                    seedIdentity(db)
+                    seedPlayback(db)
+                    db.execSQL("UPDATE users SET pin='3210', requireLogin=1, uiLanguage='ro'")
+                    db.execSQL(
+                        "INSERT INTO season_integrity_expectations VALUES (1, ?, 2, 123, '1,2,4', 1700000000000)",
+                        arrayOf(seriesId.key()),
+                    )
+                    db.execSQL(
+                        "INSERT INTO SeriesTrackChoice (userId, parentId, type, parentType, language, activation, trackFlags) VALUES (1, ?, 'AUDIO', 'SERIES', 'jpn', 'ACTIVATED', 0)",
+                        arrayOf(seriesId.key()),
+                    )
+                }
+            val room = open(name)
+            val db = room.openHelper.writableDatabase
+            assertHealthy(db)
+            assertEquals(
+                listOf(listOf("UNSET", "3210", "1", "ro", "synthetic-token")),
+                rows(db, "SELECT c_homeSettingsSource, pin, requireLogin, uiLanguage, accessToken FROM users"),
+            )
+            assertEquals(
+                setOf(1, 2, 4),
+                room
+                    .seasonIntegrityDao()
+                    .getSeries(1, seriesId)
+                    .single()
+                    .expectedEpisodeNumbers,
+            )
+            assertEquals(
+                "jpn",
+                room
+                    .seriesTrackChoiceDao()
+                    .getAll(1)
+                    .single()
+                    .language,
+            )
+            assertEquals(listOf(listOf("synthetic-credential")), rows(db, "SELECT credential FROM seerr_users"))
+            db.execSQL("UPDATE users SET c_homeSettingsSource='LOCAL' WHERE rowId=1")
+            assertEquals(listOf(listOf("LOCAL")), rows(db, "SELECT c_homeSettingsSource FROM users"))
+        }
 
     @Test
     fun `schema 35 creates integrity cache and migrates legacy playback choices`() =

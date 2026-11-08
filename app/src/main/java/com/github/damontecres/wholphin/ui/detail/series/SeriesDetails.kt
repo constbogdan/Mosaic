@@ -131,6 +131,7 @@ fun SeriesDetails(
     var showWatchConfirmation by remember { mutableStateOf(false) }
     var showPlaylistDialog by remember { mutableStateOf<Optional<UUID>>(Optional.absent()) }
     var requestSeasonNumber by remember { mutableStateOf<Int?>(null) }
+    val requestEnabled by viewModel.requestEnabled.collectAsState()
     val request4kEnabled by viewModel.request4kEnabled.collectAsState()
     val seerrActive by viewModel.seerrActive.collectAsState(initial = false)
     val requestMediaId = state.requestMediaId(seerrActive)
@@ -295,6 +296,7 @@ fun SeriesDetails(
                     title = state.seerrTvDetails?.name ?: series.title.orEmpty(),
                     seasons = state.requestSeasons,
                     seasons4k = state.requestSeasons4k,
+                    requestEnabled = requestEnabled,
                     request4kEnabled = request4kEnabled,
                     initialSeasonNumber = seasonNumber,
                     loading = state.profileLoading,

@@ -95,12 +95,13 @@ fun RequestSeasons(
     seasons: List<RequestSeason>,
     seasons4k: List<RequestSeason>,
     data: SeerrRequestData,
+    requestEnabled: Boolean,
     request4kEnabled: Boolean,
     onSubmit: (TvRequest) -> Unit,
     initialSeasonNumber: Int? = null,
     modifier: Modifier = Modifier,
 ) {
-    var is4k by remember { mutableStateOf(request4kEnabled) }
+    var is4k by remember(requestEnabled, request4kEnabled) { mutableStateOf(!requestEnabled && request4kEnabled) }
     val seasons = remember(is4k, seasons, seasons4k) { if (is4k) seasons4k else seasons }
 
     val availableSeasons =
@@ -169,7 +170,7 @@ fun RequestSeasons(
     val advancedContentBringIntoViewRequester = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
     val hasAdvancedOptions =
-        request4kEnabled ||
+        (requestEnabled && request4kEnabled) ||
             (profiles.isNotEmpty() && profile != null) ||
             (folders.isNotEmpty() && folder != null)
 
@@ -213,7 +214,7 @@ fun RequestSeasons(
                 ) {
                     Button(
                         onClick = ::submit,
-                        enabled = selectedSeasons.isNotEmpty(),
+                        enabled = selectedSeasons.isNotEmpty() && (if (is4k) request4kEnabled else requestEnabled),
                         modifier = Modifier.focusRequester(submitFocusRequester),
                     ) {
                         Text(text = stringResource(R.string.submit_request))
@@ -321,7 +322,7 @@ fun RequestSeasons(
                 )
             }
             if (advancedOptionsExpanded) {
-                if (request4kEnabled) {
+                if (requestEnabled && request4kEnabled) {
                     item {
                         Box(
                             modifier =
@@ -543,6 +544,7 @@ fun RequestSeasonsDialog(
     data: SeerrRequestData,
     seasons: List<RequestSeason>,
     seasons4k: List<RequestSeason>,
+    requestEnabled: Boolean,
     request4kEnabled: Boolean,
     initialSeasonNumber: Int? = null,
     onSubmit: (TvRequest) -> Unit,
@@ -575,6 +577,7 @@ fun RequestSeasonsDialog(
                     data = data,
                     seasons = seasons,
                     seasons4k = seasons4k,
+                    requestEnabled = requestEnabled,
                     request4kEnabled = request4kEnabled,
                     initialSeasonNumber = initialSeasonNumber,
                     onSubmit = onSubmit,
@@ -630,6 +633,7 @@ fun RequestSeasonsPreview() {
                             SeerrRootFolder(1, "/tv", "400GB", true),
                         ),
                 ),
+            requestEnabled = true,
             request4kEnabled = true,
             onSubmit = { },
             modifier = Modifier.width(400.dp),

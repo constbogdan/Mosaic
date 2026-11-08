@@ -47,16 +47,19 @@ class UserSwitchListenerTest {
     private val dao = mockk<SeerrServerDao>()
     private val home = mockk<HomeSettingsService>(relaxed = true)
     private val api = mockk<SeerrApi>(relaxed = true)
+    private val plugin = mockk<ServerPluginApi>()
 
     @Before
     fun setup() {
         WholphinDispatchers.configure(dispatcher)
         every { activity.lifecycle } returns lifecycle
         every { repository.currentUserFlow } returns users
+        every { repository.serverPluginInstalled } returns MutableStateFlow(false)
+        coEvery { plugin.checkInstalled() } returns false
         every { home.currentSettings } returns MutableStateFlow(HomePageResolvedSettings.EMPTY)
         coEvery { dao.getUsersByJellyfinUser(any()) } returns emptyList()
         lifecycle.currentState = Lifecycle.State.CREATED
-        UserSwitchListener(activity, repository, seerr, dao, api, home)
+        UserSwitchListener(activity, repository, seerr, dao, api, home, plugin)
     }
 
     @After
@@ -101,7 +104,8 @@ class UserSwitchListenerTest {
             users.value = first.copy(serverId = UUID.randomUUID(), rowId = 2)
             runCurrent()
             verify(exactly = 3) { seerr.clear() }
-            coVerify(exactly = 2) { home.loadCurrentSettings(first.id) }
+            coVerify(exactly = 1) { home.loadCurrentSettings(first) }
+            coVerify(exactly = 1) { home.loadCurrentSettings(first.copy(serverId = users.value!!.serverId, rowId = 2)) }
             coVerify(exactly = 1) { dao.getUsersByJellyfinUser(1) }
             coVerify(exactly = 1) { dao.getUsersByJellyfinUser(2) }
         }
