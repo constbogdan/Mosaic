@@ -35,9 +35,11 @@ class TestUpdateChecker {
     lateinit var releaseJson: JsonObject
     val assetsJson: JsonArray by lazy { releaseJson["assets"]!!.jsonArray }
 
-    @Before
-    fun setup() {
-        val resource = javaClass.classLoader?.getResource("release_develop.json")
+    lateinit var releaseV108Json: JsonObject
+    val assetsV108Json: JsonArray by lazy { releaseV108Json["assets"]!!.jsonArray }
+
+    private fun read(filename: String): JsonObject {
+        val resource = javaClass.classLoader?.getResource(filename)
         Assert.assertNotNull(resource)
         val fileContents =
             Paths
@@ -45,7 +47,12 @@ class TestUpdateChecker {
                 .readText()
                 .replace("damontecres/Wholphin", "constbogdan/Mosaic")
                 .replace("Wholphin-", "Mosaic-")
-        releaseJson = Json.parseToJsonElement(fileContents).jsonObject
+        return Json.parseToJsonElement(fileContents).jsonObject
+    }
+
+    @Before
+    fun setup() {
+        releaseJson = read("release_develop.json")
     }
 
     @Test
@@ -314,5 +321,23 @@ class TestUpdateChecker {
                 {"name":"Mosaic-v1.0.6.apk","browser_download_url":"two"}]""",
                 ).jsonArray
         Assert.assertNull(getDownloadUrl(ambiguousVersioned, false, emptyList()))
+    }
+
+    @Test
+    fun `upstream regular release aliases cannot replace Mosaic signed assets`() {
+        val resource = javaClass.classLoader!!.getResource("release_v108.json")!!
+        releaseV108Json = Json.parseToJsonElement(Paths.get(resource.toURI()).readText()).jsonObject
+        getDownloadUrl(assetsV108Json, false, listOf("arm64-v8a")).let { url ->
+            Assert.assertNull(url)
+        }
+        getDownloadUrl(assetsV108Json, false, listOf("armeabi-v7a")).let { url ->
+            Assert.assertNull(url)
+        }
+        getDownloadUrl(assetsV108Json, false, emptyList()).let { url ->
+            Assert.assertNull(url)
+        }
+        getDownloadUrl(assetsV108Json, true, listOf("arm64-v8a")).let { url ->
+            Assert.assertNull(url)
+        }
     }
 }

@@ -117,7 +117,7 @@ class SuggestionsWorkerTest {
             every { mockServerRepository.current } answers { MutableStateFlow(if (restored) mockUser else null) }
             coEvery { mockServerRepository.restoreLastSession() } coAnswers {
                 restored = true
-                RestoredSession.Success(currentUser())
+                RestoredSession.Success(currentUser(testServerId, testUserId))
             }
             every { mockPreferences.data } returns flowOf(mockPrefs())
             coEvery { mockUserViewsApi.getUserViews(userId = testUserId) } returns mockQueryResult()
@@ -126,6 +126,22 @@ class SuggestionsWorkerTest {
 
             coVerify { mockServerRepository.restoreLastSession() }
             assertEquals(ListenableWorker.Result.success(), result)
+        }
+
+    @Test
+    fun stale_worker_cannot_use_a_different_restored_user_or_server() =
+        runTest {
+            every { mockApi.baseUrl } returns null
+            every { mockApi.accessToken } returns null
+            for (session in listOf(
+                currentUser(UUID.randomUUID(), testUserId),
+                currentUser(testServerId, UUID.randomUUID()),
+            )) {
+                coEvery { mockServerRepository.restoreLastSession() } returns RestoredSession.Success(session)
+                assertEquals(ListenableWorker.Result.failure(), createWorker().doWork())
+            }
+            coVerify(exactly = 0) { mockUserViewsApi.getUserViews(userId = any()) }
+            coVerify(exactly = 0) { mockCache.put(any(), any(), any(), any()) }
         }
 
     @Test

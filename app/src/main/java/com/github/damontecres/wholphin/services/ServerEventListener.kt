@@ -79,6 +79,7 @@ class ServerEventListener
         }
 
         fun subscribeToWebSocket() {
+            val owner = serverRepository.current.value ?: return
             Timber.v("Subscribing to WebSocket")
             listenJob?.cancel()
             listenJob =
@@ -126,7 +127,9 @@ class ServerEventListener
                                     Timber.e(ex, "Error in user updated websocket subscription")
                                 }.collectLatestIn(this@coroutineScope) { msg ->
                                     Timber.v("Got updated user: %s", msg.data?.id)
-                                    msg.data?.let { serverRepository.updateUserDto(it) }
+                                    if (serverRepository.current.value === owner) {
+                                        msg.data?.let { serverRepository.updateUserDto(it) }
+                                    }
                                 }
                         }
                     } catch (ex: CancellationException) {

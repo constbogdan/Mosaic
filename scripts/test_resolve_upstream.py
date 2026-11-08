@@ -928,6 +928,43 @@ class ResolveUpstreamTests(unittest.TestCase):
         path.write_text(json.dumps(payload), encoding="utf-8")
         return path
 
+    def test_filter_derivation_ignores_proven_helper_but_keeps_executable_target(self):
+        root = self.root()
+        paths = []
+        for name, source in (
+            ("TestUtils", "package fixture\nfun sample() = 1\n"),
+            ("ActualTest", "package fixture\nclass ActualTest { @org.junit.Test fun works() {} }\n"),
+        ):
+            path = f"app/src/test/java/fixture/{name}.kt"
+            file = root / path
+            file.parent.mkdir(parents=True, exist_ok=True)
+            file.write_text(source, encoding="utf-8")
+            paths.append(path)
+        filters = resolve.derive_filters(paths, [], root=root)
+        self.assertEqual(["*ActualTest"], filters)
+        resolve.validate_filter_targets(root, filters)
+
+    def test_required_executable_filename_mismatch_still_refuses(self):
+        root = self.root()
+        path = "app/src/test/java/fixture/MissingTest.kt"
+        file = root / path
+        file.parent.mkdir(parents=True)
+        file.write_text("package fixture\nclass ActualTest { @org.junit.Test fun works() {} }\n")
+        filters = resolve.derive_filters([path], [], root=root)
+        with self.assertRaisesRegex(resolve.Refusal, "do not match.*MissingTest"):
+            resolve.validate_filter_targets(root, filters)
+
+    def test_helper_cannot_supply_supplemental_coverage_or_authorize_empty_selection(self):
+        root = self.root()
+        path = "app/src/test/java/fixture/Support.kt"
+        file = root / path
+        file.parent.mkdir(parents=True)
+        file.write_text("package fixture\nfun sample() = 1\n")
+        with self.assertRaisesRegex(resolve.Refusal, "No meaningful focused JVM filters"):
+            resolve.derive_filters([path], [], root=root)
+        with self.assertRaisesRegex(resolve.Refusal, "Focused coverage is ambiguous"):
+            resolve.derive_filters([path], ["app/src/main/res/values/strings.xml"], root=root)
+
     def test_absent_filter_handoff_uses_derived_fallback(self):
         candidate = self.candidate(33, "app/src/main/SeriesViewModel.kt", "1" * 40)
         filters, reason = resolve.resolution_filters(self.root(), candidate, ["derived.Filter"])
@@ -997,6 +1034,412 @@ class ResolveUpstreamTests(unittest.TestCase):
                 attention[0],
                 "app/src/main/java/com/github/damontecres/wholphin/ui/downloads/DownloadsPage.kt",
             ], attention)
+
+    def dependency_fixture(self):
+        database = resolve.APPLICATION_SOURCE + "data/AppDatabase.kt"
+        dialog = resolve.APPLICATION_SOURCE + "ui/detail/discover/RequestSeasons.kt"
+        series = resolve.APPLICATION_SOURCE + "ui/detail/series/SeriesDetails.kt"
+        schema = resolve.ROOM_SCHEMAS + "38.json"
+        current_main = "6" * 40
+
+        class DependencyRunner(FakeRunner):
+            def __init__(self):
+                super().__init__()
+                self.incoming = [database, dialog]
+                self.export_exists = False
+                self.sources = {
+                    f"{'7' * 40}:{database}": "@Database(\nversion = 40,\n)",
+                    f"{current_main}:{database}": "@Database(\nversion = 37,\n)",
+                    f"{UPSTREAM}:{database}": "@Database(\nversion = 41,\n)",
+                    f"{current_main}:{dialog}": "fun RequestSeasonsDialog(\nid: Int,\n) {}",
+                    f"{UPSTREAM}:{dialog}": (
+                        "fun RequestSeasonsDialog(\nid: Int,\nrequestEnabled: Boolean,\n) {}"
+                    ),
+                    f"{current_main}:{series}": "RequestSeasonsDialog(id = id)",
+                    f"{current_main}:{resolve.ROOM_SCHEMAS}37.json": json.dumps({
+                        "database": {"version": 37, "entities": [{"tableName": "users"}]},
+                    }),
+                    f"{'7' * 40}:{resolve.ROOM_SCHEMAS}40.json": json.dumps({
+                        "database": {"version": 40, "entities": [{"tableName": "users"}]},
+                    }),
+                    f"{UPSTREAM}:{resolve.ROOM_SCHEMAS}41.json": json.dumps({
+                        "database": {"version": 41, "entities": [
+                            {"tableName": "users", "fields": ["c_homeSettingsSource"]},
+                        ]},
+                    }),
+                }
+
+            def observation(self):
+                value = super().observation()
+                value.update(pr_number=33, review_paths=[database, dialog], conflict_paths=[database, dialog])
+                return value
+
+            def _result(self, args):
+                if args[:2] == ["gh", "api"] and "/pulls/" in args[2]:
+                    return resolve.Result(json.dumps(self.pr()), "", 0)
+                if args[:3] == ["git", "show", CANDIDATE + ":.upstream-sync/blocked-context.json"]:
+                    return resolve.Result(json.dumps({
+                        "schemaVersion": 1, "upstream": UPSTREAM, "downstream": DOWNSTREAM,
+                        "mergeBase": "9" * 40, "policyVersion": 1,
+                        "conflicts": [database, dialog],
+                    }), "", 0)
+                if args[:4] == ["git", "diff", "--no-renames", "--name-only"]:
+                    return resolve.Result("\n".join(self.incoming), "", 0)
+                if args[:3] == ["git", "merge-base", "--all"]:
+                    return resolve.Result("7" * 40, "", 0)
+                if args[:2] == ["git", "show"] and len(args) == 3 and args[2] in self.sources:
+                    return resolve.Result(self.sources[args[2]], "", 0)
+                if args[:3] == ["git", "ls-tree", "--name-only"]:
+                    return resolve.Result(schema if self.export_exists else "", "", 0)
+                if args and args[0] == "powershell":
+                    return resolve.Result("fixture prepared", "", 0)
+                return super()._result(args)
+
+        runner = DependencyRunner()
+        candidate = resolve.Candidate(runner.pr(), runner.observation(), {}, current_main=current_main)
+        attention = candidate.observation["review_paths"]
+        tests = "app/src/test/java/fixture/DependencyTest.kt"
+        return runner, candidate, attention, schema, series, tests
+
+    def check_dependency_scope(self, paths, fixture, root=None):
+        runner, candidate, attention, _schema, _series, tests = fixture
+        resolve.validate_resolution_scope(
+            [*paths, tests], attention, runner=runner, root=root or self.root(), candidate=candidate,
+        )
+
+    def permission_producer_fixture(self):
+        fixture = self.dependency_fixture()
+        runner, candidate, _attention, _schema, series, _tests = fixture
+        producer = resolve.APPLICATION_SOURCE + "ui/detail/series/SeriesViewModel.kt"
+        repository = resolve.APPLICATION_SOURCE + "services/SeerrServerRepository.kt"
+        upstream_viewmodel = resolve.APPLICATION_SOURCE + "ui/detail/discover/DiscoverSeriesViewModel.kt"
+        flow = (
+            "    val requestEnabled =\n"
+            "        seerrServerRepository.current\n"
+            "            .map { it?.requestTvEnabled ?: false }\n"
+            "            .stateIn(viewModelScope, SharingStarted.Eagerly, false)\n"
+        )
+        original = (
+            "class SeriesViewModel(private val seerrServerRepository: SeerrServerRepository) {\n"
+            + flow.replace("requestEnabled", "request4kEnabled").replace("requestTvEnabled", "request4kTvEnabled")
+            + "}\n"
+        )
+        runner.sources[f"{candidate.current_main}:{producer}"] = original
+        runner.sources[f"{candidate.current_main}:{series}"] = (
+            "fun SeriesDetails(viewModel: SeriesViewModel) {\n"
+            "    val request4kEnabled by viewModel.request4kEnabled.collectAsState()\n"
+            "    RequestSeasonsDialog(id = id, request4kEnabled = request4kEnabled)\n}\n"
+        )
+        runner.sources[f"{UPSTREAM}:{repository}"] = (
+            "val requestTvEnabled: Boolean\n"
+            "    get() = config.hasPermission(SeerrPermission.REQUEST_TV)\n"
+        )
+        runner.sources[f"{UPSTREAM}:{upstream_viewmodel}"] = flow
+        runner.incoming += [repository, upstream_viewmodel]
+        root = self.root()
+        path = root / producer
+        path.parent.mkdir(parents=True)
+        path.write_text(original.replace("    val request4kEnabled", flow + "\n    val request4kEnabled"), encoding="utf-8")
+        return fixture, root, producer
+
+    def test_permission_producer_accepts_only_existing_fail_closed_tv_flow_addition(self):
+        fixture, root, producer = self.permission_producer_fixture()
+        for paths in ([producer], [producer, fixture[3], fixture[4], *fixture[2]]):
+            with self.subTest(paths=paths):
+                self.check_dependency_scope(paths, fixture, root)
+
+    def test_permission_producer_rejects_unrelated_permission_edits_in_same_file(self):
+        for change in ("permissive_null", "permissive_initial", "wrong_permission", "other_flow", "extra_method"):
+            with self.subTest(change=change):
+                fixture, root, producer = self.permission_producer_fixture()
+                path = root / producer
+                text = path.read_text(encoding="utf-8")
+                if change == "permissive_null":
+                    text = text.replace("requestTvEnabled ?: false", "requestTvEnabled ?: true")
+                elif change == "permissive_initial":
+                    text = text.replace("SharingStarted.Eagerly, false", "SharingStarted.Eagerly, true", 1)
+                elif change == "wrong_permission":
+                    text = text.replace("it?.requestTvEnabled", "it?.requestMovieEnabled")
+                elif change == "other_flow":
+                    text = text.replace("request4kTvEnabled ?: false", "request4kTvEnabled ?: true")
+                else:
+                    text += "\nfun unrelatedPermissionOverride() = true\n"
+                path.write_text(text, encoding="utf-8")
+                with self.assertRaisesRegex(resolve.Refusal, "outside"):
+                    self.check_dependency_scope([producer], fixture, root)
+
+    def test_permission_producer_requires_immutable_incoming_permission_contract_and_owner(self):
+        for change in ("not_incoming", "wrong_upstream_permission", "wrong_upstream_flow",
+                       "wrong_owner", "no_existing_flow", "already_provided", "not_a_viewmodel_consumer"):
+            with self.subTest(change=change):
+                fixture, root, producer = self.permission_producer_fixture()
+                runner, candidate, _attention, _schema, series, _tests = fixture
+                repository = resolve.APPLICATION_SOURCE + "services/SeerrServerRepository.kt"
+                if change == "not_incoming":
+                    runner.incoming.remove(repository)
+                elif change == "wrong_upstream_permission":
+                    key = f"{UPSTREAM}:{repository}"
+                    runner.sources[key] = runner.sources[key].replace("REQUEST_TV", "REQUEST_MOVIE")
+                elif change == "wrong_upstream_flow":
+                    key = f"{UPSTREAM}:{resolve.APPLICATION_SOURCE}ui/detail/discover/DiscoverSeriesViewModel.kt"
+                    runner.sources[key] = runner.sources[key].replace("?: false", "?: true")
+                elif change == "not_a_viewmodel_consumer":
+                    key = f"{candidate.current_main}:{series}"
+                    runner.sources[key] = runner.sources[key].replace("viewModel: SeriesViewModel", "viewModel: OtherViewModel")
+                else:
+                    key = f"{candidate.current_main}:{producer}"
+                    if change == "wrong_owner":
+                        runner.sources[key] = runner.sources[key].replace("private val seerrServerRepository", "val otherRepository")
+                    elif change == "no_existing_flow":
+                        runner.sources[key] = "class SeriesViewModel {}"
+                    else:
+                        runner.sources[key] = (root / producer).read_text(encoding="utf-8")
+                with self.assertRaisesRegex(resolve.Refusal, "outside"):
+                    self.check_dependency_scope([producer], fixture, root)
+
+    def test_permission_producer_rejects_unrelated_viewmodels_and_documentation(self):
+        fixture, root, producer = self.permission_producer_fixture()
+        for other in (resolve.APPLICATION_SOURCE + "ui/detail/series/OtherViewModel.kt",
+                      resolve.APPLICATION_SOURCE + "ui/main/HomeViewModel.kt", "docs/UPSTREAM_SYNC.md"):
+            with self.subTest(other=other), self.assertRaisesRegex(resolve.Refusal, "outside"):
+                self.check_dependency_scope([producer, other], fixture, root)
+
+    def test_permission_producer_preserves_new_required_dialog_and_remaining_range_guards(self):
+        for change in ("optional", "already_present", "dialog_not_incoming", "not_a_caller"):
+            with self.subTest(change=change):
+                fixture, root, producer = self.permission_producer_fixture()
+                runner, candidate, attention, _schema, series, _tests = fixture
+                dialog = attention[1]
+                if change == "optional":
+                    key = f"{UPSTREAM}:{dialog}"
+                    runner.sources[key] = runner.sources[key].replace("Boolean,", "Boolean = true,")
+                elif change == "already_present":
+                    runner.sources[f"{candidate.current_main}:{dialog}"] = runner.sources[f"{UPSTREAM}:{dialog}"]
+                elif change == "dialog_not_incoming":
+                    runner.incoming.remove(dialog)
+                else:
+                    runner.sources[f"{candidate.current_main}:{series}"] = "Unrelated()"
+                with self.assertRaisesRegex(resolve.Refusal, "outside"):
+                    self.check_dependency_scope([producer], fixture, root)
+
+    def test_permission_producer_reauthenticates_pr_episode_head_tree_and_blocked_context(self):
+        for change, message in (("episode", "episode_id"), ("number", "different PR"),
+                                ("head", "PR identity changed"), ("tree", "tree differs"),
+                                ("upstream", "SHA pair"), ("context", "context does not match")):
+            with self.subTest(change=change):
+                fixture, root, producer = self.permission_producer_fixture()
+                runner, candidate, _attention, _schema, _series, _tests = fixture
+                if change == "episode":
+                    candidate.observation["episode_id"] = "1" * 64
+                elif change == "number":
+                    candidate.pr["number"] = 34
+                elif change == "head":
+                    candidate.pr["head"]["sha"] = "8" * 40
+                elif change == "tree":
+                    candidate.observation["candidate_tree"] = "5" * 40
+                elif change == "upstream":
+                    candidate.observation["upstream_sha"] = "5" * 40
+                else:
+                    candidate.observation["conflict_paths"] = candidate.observation["review_paths"][:1]
+                with self.assertRaisesRegex(resolve.Refusal, message):
+                    self.check_dependency_scope([producer], fixture, root)
+
+    def test_permission_producer_missing_context_or_source_fails_closed(self):
+        fixture, root, producer = self.permission_producer_fixture()
+        with self.assertRaisesRegex(resolve.Refusal, "outside"):
+            resolve.validate_resolution_scope([producer, fixture[-1]], fixture[2])
+        (root / producer).unlink()
+        with self.assertRaises(resolve.Refusal):
+            self.check_dependency_scope([producer], fixture, root)
+
+    def test_dependency_scope_accepts_stage_d_room_export_and_permission_consumer(self):
+        fixture = self.dependency_fixture()
+        _runner, _candidate, attention, schema, series, _tests = fixture
+        for paths in ([schema], [series], [schema, series, *attention]):
+            with self.subTest(paths=paths):
+                self.check_dependency_scope(paths, fixture)
+
+    def test_dependency_scope_without_authenticated_context_still_refuses(self):
+        _runner, _candidate, attention, schema, series, tests = self.dependency_fixture()
+        for path in (schema, series):
+            with self.subTest(path=path), self.assertRaisesRegex(resolve.Refusal, "outside"):
+                resolve.validate_resolution_scope([path, tests], attention)
+
+    def test_dependency_scope_rejects_other_exports_sources_and_documentation(self):
+        fixture = self.dependency_fixture()
+        rejected = [
+            resolve.ROOM_SCHEMAS + "37.json", resolve.ROOM_SCHEMAS + "39.json",
+            resolve.ROOM_SCHEMAS + "41.json", resolve.ROOM_SCHEMAS + "notes.json",
+            "app/schemas/OtherDatabase/38.json",
+            resolve.APPLICATION_SOURCE + "ui/detail/series/Unrelated.kt",
+            resolve.APPLICATION_SOURCE + "ui/downloads/DownloadsPage.kt",
+            "docs/UPSTREAM_SYNC.md", "app/build/generated/RoomExport.json",
+        ]
+        for path in rejected:
+            with self.subTest(path=path), self.assertRaisesRegex(resolve.Refusal, "outside"):
+                self.check_dependency_scope([path], fixture)
+
+    def test_dependency_scope_requires_actual_incoming_producer_changes(self):
+        fixture = self.dependency_fixture()
+        runner, _candidate, _attention, schema, series, _tests = fixture
+        runner.incoming = []
+        for path in (schema, series):
+            with self.subTest(path=path), self.assertRaisesRegex(resolve.Refusal, "outside"):
+                self.check_dependency_scope([path], fixture)
+
+    def test_dependency_scope_uses_remaining_range_not_original_episode_backlog(self):
+        fixture = self.dependency_fixture()
+        runner, _candidate, _attention, schema, _series, _tests = fixture
+        self.check_dependency_scope([schema], fixture)
+        self.assertIn([
+            "git", "diff", "--no-renames", "--name-only", "7" * 40, UPSTREAM, "--",
+        ], runner.calls)
+        self.assertFalse(any(call[:5] == [
+            "git", "diff", "--no-renames", "--name-only", "9" * 40,
+        ] for call in runner.calls))
+
+    def test_dependency_scope_requires_new_required_parameter_and_existing_caller(self):
+        for change in ("optional", "already_present", "not_a_caller"):
+            with self.subTest(change=change):
+                fixture = self.dependency_fixture()
+                runner, candidate, attention, _schema, series, _tests = fixture
+                upstream = f"{UPSTREAM}:{attention[1]}"
+                if change == "optional":
+                    runner.sources[upstream] = runner.sources[upstream].replace("Boolean,", "Boolean = true,")
+                elif change == "already_present":
+                    runner.sources[f"{candidate.current_main}:{attention[1]}"] = runner.sources[upstream]
+                else:
+                    runner.sources[f"{candidate.current_main}:{series}"] = "Unrelated()"
+                with self.assertRaisesRegex(resolve.Refusal, "outside"):
+                    self.check_dependency_scope([series], fixture)
+
+    def test_dependency_scope_rejects_existing_or_unproven_schema_export(self):
+        for change in ("exists", "invalid", "unchanged", "version_mismatch", "already_integrated"):
+            with self.subTest(change=change):
+                fixture = self.dependency_fixture()
+                runner, _candidate, _attention, schema, _series, _tests = fixture
+                upstream = f"{UPSTREAM}:{resolve.ROOM_SCHEMAS}41.json"
+                if change == "exists":
+                    runner.export_exists = True
+                elif change == "invalid":
+                    runner.sources[upstream] = "not JSON"
+                elif change == "already_integrated":
+                    runner.sources[f"{'7' * 40}:{resolve.ROOM_SCHEMAS}40.json"] = json.dumps({
+                        "database": {"version": 40, "entities": [
+                            {"tableName": "users", "fields": ["c_homeSettingsSource"]},
+                        ]},
+                    })
+                else:
+                    runner.sources[upstream] = json.dumps({"database": {
+                        "version": 40 if change == "version_mismatch" else 41,
+                        "entities": [{"tableName": "users"}],
+                    }})
+                with self.assertRaises(resolve.Refusal):
+                    self.check_dependency_scope([schema], fixture)
+
+    def test_dependency_scope_does_not_allow_unrelated_files_alongside_valid_dependency(self):
+        fixture = self.dependency_fixture()
+        schema = fixture[3]
+        for extra in ("docs/UPSTREAM_SYNC.md", resolve.APPLICATION_SOURCE + "ui/main/HomeViewModel.kt"):
+            with self.subTest(extra=extra), self.assertRaisesRegex(resolve.Refusal, "outside"):
+                self.check_dependency_scope([schema, extra], fixture)
+
+    def test_dependency_scope_reauthenticates_episode_pr_head_and_candidate_tree(self):
+        for change, message in (
+            ("episode", "episode_id"), ("number", "different PR"),
+            ("repository", "does not belong"), ("head", "PR identity changed"),
+            ("branch", "PR identity changed"),
+            ("tree", "tree differs"), ("upstream", "SHA pair"),
+            ("comparison", "comparison baseline"), ("attention", "authenticated attention"),
+        ):
+            with self.subTest(change=change):
+                fixture = self.dependency_fixture()
+                _runner, candidate, attention, schema, _series, _tests = fixture
+                if change == "episode":
+                    candidate.observation["episode_id"] = "1" * 64
+                elif change == "number":
+                    candidate.pr["number"] = 34
+                elif change == "repository":
+                    # A foreign API response cannot authorize an extension either.
+                    _runner.origin = "https://github.com/other/Mosaic.git"
+                elif change == "head":
+                    candidate.pr["head"]["sha"] = "8" * 40
+                elif change == "branch":
+                    candidate.pr["head"]["ref"] += "-unexpected"
+                elif change == "tree":
+                    candidate.observation["candidate_tree"] = "5" * 40
+                elif change == "upstream":
+                    candidate.observation["upstream_sha"] = "5" * 40
+                elif change == "comparison":
+                    candidate.observation["comparison_baseline"] = "5" * 40
+                else:
+                    attention.append(resolve.APPLICATION_SOURCE + "ui/main/HomeViewModel.kt")
+                    candidate.observation["review_paths"] = attention[:-1]
+                with self.assertRaisesRegex(resolve.Refusal, message):
+                    self.check_dependency_scope([schema], fixture)
+
+    def test_dependency_scope_rejects_ambiguous_range_and_unknown_room_version(self):
+        for change in ("range", "version"):
+            with self.subTest(change=change):
+                fixture = self.dependency_fixture()
+                runner, candidate, attention, schema, _series, _tests = fixture
+                original_run = runner.run
+
+                def run(args, **kwargs):
+                    if change == "range" and args[:3] == ["git", "merge-base", "--all"]:
+                        return resolve.Result("7" * 40 + "\n" + "8" * 40, "", 0)
+                    return original_run(args, **kwargs)
+
+                if change == "version":
+                    runner.sources[f"{candidate.current_main}:{attention[0]}"] = "unknown version"
+                with patch.object(runner, "run", side_effect=run), self.assertRaises(resolve.Refusal):
+                    self.check_dependency_scope([schema], fixture)
+
+    def test_dependency_scope_rejects_copied_or_missing_pr_number_evidence(self):
+        for change in ("copied", "missing", "conflicting"):
+            with self.subTest(change=change):
+                fixture = self.dependency_fixture()
+                runner, candidate, _attention, schema, _series, _tests = fixture
+                if change == "copied":
+                    candidate.observation["pr_number"] = 34
+                elif change == "missing":
+                    candidate.observation.pop("pr_number")
+                else:
+                    candidate.current_observation = {"blocking_pr_number": 34}
+                with self.assertRaisesRegex(resolve.Refusal, "PR-number evidence"):
+                    self.check_dependency_scope([schema], fixture)
+                self.assertFalse(any(call[:2] == ["git", "show"] for call in runner.calls))
+
+    def test_dependency_scope_accepts_matching_fresh_blocker_number_for_durable_fallback(self):
+        fixture = self.dependency_fixture()
+        _runner, candidate, _attention, schema, _series, _tests = fixture
+        candidate.observation.pop("pr_number")
+        candidate.current_observation = {"blocking_pr_number": 33}
+        self.check_dependency_scope([schema], fixture)
+
+    def test_dependency_scope_preserves_supplemental_test_requirement(self):
+        runner, candidate, attention, schema, _series, _tests = self.dependency_fixture()
+        with self.assertRaisesRegex(resolve.Refusal, "no deterministic focused-test mapping"):
+            resolve.validate_resolution_scope(
+                [schema], attention, runner=runner, root=self.root(), candidate=candidate,
+            )
+
+    def test_publication_rechecks_dependency_scope_with_refreshed_candidate(self):
+        runner, candidate, attention, schema, series, tests = self.dependency_fixture()
+        candidate.current_main = None
+        producer = resolve.APPLICATION_SOURCE + "ui/detail/series/SeriesViewModel.kt"
+        paths = [*attention, schema, series, producer, tests]
+        with (patch.object(resolve, "verify_local_descendant"),
+              patch.object(resolve, "assert_native_merge_identity"),
+              patch.object(resolve, "resolution_paths", return_value=paths),
+              patch.object(resolve, "validate_filter_targets"),
+              patch.object(resolve, "open_candidates", return_value=[candidate]),
+              patch.object(resolve, "classify_dependencies", return_value=[candidate]),
+              patch.object(resolve, "commit_native_resolution", return_value=("d" * 40, "f" * 40)),
+              patch.object(resolve, "resolution_dependency_scope", return_value={schema, series, producer}) as scope):
+            resolve.publication_phase(self.root(), runner, candidate, lambda _: "y")
+        self.assertEqual(2, scope.call_count)
+        self.assertTrue(all(call.args[-1] is candidate for call in scope.call_args_list))
 
     def test_changed_test_supplies_supplemental_filter_for_unmapped_resource_attention(self):
         filters = resolve.derive_filters([

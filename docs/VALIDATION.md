@@ -28,6 +28,13 @@ and Hold remain separate authority boundaries.
 classification and validation policy, then runs changed-scope pre-commit, explicitly mapped
 bounded offline or JVM feedback where available, and `git diff --check`.
 
+Focused test-file filters remain conservative. A readable Kotlin file proven to contain only
+top-level helpers, with no class/type declaration, test marker or unfamiliar annotation, does not
+mint a test-class filter. Missing/unreadable files, Java sources, inherited/runner-driven classes
+and uncertain syntax retain their targets. This is not a filename suffix exception or a general
+JUnit parser. Helpers cannot satisfy the resolver's executable supplemental-coverage floor;
+required unmatched targets and weakened semantic handoffs still refuse.
+
 Fast does not turn an unknown or high-risk path into a broad local suite. Heavy process-integration
 tests, complete offline tooling, and Android Full remain explicitly runnable through focused,
 Standard, or Full commands, while hosted PR CI owns authoritative integration coverage. Autofixes

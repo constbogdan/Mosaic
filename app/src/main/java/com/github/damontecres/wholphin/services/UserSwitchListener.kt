@@ -44,7 +44,7 @@ class UserSwitchListener
             context.lifecycleScope.launchDefault {
                 serverRepository.currentUserFlow
                     .distinctUntilChanged { old, new ->
-                        old?.id == new?.id && old?.uiLanguage == new?.uiLanguage
+                        old?.serverId == new?.serverId && old?.id == new?.id && old?.uiLanguage == new?.uiLanguage
                     }.collectLatest { user ->
                         Timber.d("UserSwitch: %s", user?.id)
                         seerrServerRepository.clear()
@@ -128,6 +128,8 @@ class UserSwitchListener
                                                 seerrUser,
                                                 userConfig,
                                             )
+                                        } catch (ex: CancellationException) {
+                                            throw ex
                                         } catch (ex: Exception) {
                                             Timber.w(
                                                 ex,

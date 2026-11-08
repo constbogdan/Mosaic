@@ -5,6 +5,7 @@ import com.github.damontecres.wholphin.data.model.ActivationFlag
 import com.github.damontecres.wholphin.data.model.ItemPlayback
 import com.github.damontecres.wholphin.data.model.JellyfinUser
 import com.github.damontecres.wholphin.data.model.JellyfinUserPreferences
+import com.github.damontecres.wholphin.data.model.PlaybackLanguageChoice
 import com.github.damontecres.wholphin.data.model.SeriesTrackChoice
 import com.github.damontecres.wholphin.data.model.SeriesTrackChoiceType
 import com.github.damontecres.wholphin.data.model.TrackChoiceParentType
@@ -17,6 +18,7 @@ import com.github.damontecres.wholphin.services.StreamChoiceService
 import com.github.damontecres.wholphin.services.audio
 import com.github.damontecres.wholphin.services.mockServerRepo
 import com.github.damontecres.wholphin.services.subtitle
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -62,6 +64,42 @@ class TestSeriesTrackChoice {
     @Before
     fun before() {
         every { mockServerRepository.currentUser } returns user
+    }
+
+    @Test
+    fun `audio fallback reads audio choices rather than subtitle choices`() =
+        runTest {
+            val choice = SeriesTrackChoice(user.rowId, seriesId, SeriesTrackChoiceType.AUDIO, language = "jpn")
+            coEvery { mockSeriesTrackChoiceDao.get(user.rowId, season1Id, seriesId, SeriesTrackChoiceType.AUDIO) } returns listOf(choice)
+            val source =
+                TestTracks
+                    .Builder()
+                    .addAudio(
+                        2,
+                    ).buildMediaSourceInfo()
+                    .copy(mediaStreams = listOf(audio(0, "eng"), audio(1, "jpn")))
+            val item = BaseItemDto(id = UUID.randomUUID(), type = BaseItemKind.EPISODE, seriesId = seriesId, parentId = season1Id)
+            val result =
+                streamChoiceService.chooseAudioStream(
+                    source,
+                    item,
+                    null,
+                    null,
+                    UserPreferences(AppPreferences.getDefaultInstance(), null),
+                )
+            assertEquals(1, result?.stream?.index)
+            coVerify(exactly = 0) { mockSeriesTrackChoiceDao.get(any(), any(), any(), SeriesTrackChoiceType.SUBTITLE) }
+        }
+
+    @Test
+    fun `legacy disabled subtitle without language still converts`() {
+        val legacy = PlaybackLanguageChoice(user.rowId, seriesId, subtitlesDisabled = true)
+        val choice = SeriesTrackChoice.from(legacy).single()
+        assertEquals(ActivationFlag.DISABLED, choice.activation)
+        assertEquals(SeriesTrackChoiceType.SUBTITLE, choice.type)
+        assertNull(choice.language)
+        assertTrue(SeriesTrackChoice.from(legacy.copy(subtitlesDisabled = null)).isEmpty())
+        assertTrue(SeriesTrackChoice.from(legacy.copy(audioLanguage = "", subtitleLanguage = "   ", subtitlesDisabled = null)).isEmpty())
     }
 
     @Test
@@ -345,8 +383,7 @@ class TestSeriesTrackChoice {
     fun `Test season STC doesn't apply but series STC does - audio`() =
         runTest {
             val result =
-                streamChoiceService.chooseSubtitleStream(
-                    audioStreamLang = "eng",
+                streamChoiceService.chooseAudioStream(
                     itemPlayback = null,
                     prefs = UserPreferences(AppPreferences.getDefaultInstance(), null),
                     candidates =

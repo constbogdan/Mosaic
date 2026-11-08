@@ -85,7 +85,7 @@ class ServerRepository
             }
             apiClient.update(baseUrl = server.url, accessToken = null)
             _current.value = null
-            mostRecentServerProvider.clearUser()
+            mostRecentServerProvider.saveServer(server)
         }
 
         /**
@@ -121,7 +121,7 @@ class ServerRepository
                 val currentUser = CurrentUser(updatedServer, updatedUser)
                 mostRecentServerProvider.save(currentUser)
                 _current.value = currentUser
-                _currentUserDto.value = ServerUserConfig(userDto)
+                _currentUserDto.value = ServerUserConfig(userDto).copy(serverId = updatedServer.id)
                 return@withContext currentUser
             }
 
@@ -330,8 +330,9 @@ class ServerRepository
          * Update [currentUserDto] by querying the server
          */
         suspend fun updateUserDto() {
+            val owner = current.value ?: return
             val userDto by apiClient.userApi.getCurrentUser()
-            updateUserDto(userDto)
+            if (current.value === owner) updateUserDto(userDto)
         }
 
         /**
@@ -341,7 +342,13 @@ class ServerRepository
          */
         fun updateUserDto(userDto: UserDto) {
             _currentUserDto.update {
-                if (currentUser?.id == userDto.id) ServerUserConfig(userDto) else it
+                if (currentUser?.id == userDto.id &&
+                    (userDto.serverId == null || userDto.serverId?.toUUIDOrNull() == currentServer?.id)
+                ) {
+                    ServerUserConfig(userDto).copy(serverId = currentServer?.id)
+                } else {
+                    it
+                }
             }
         }
     }

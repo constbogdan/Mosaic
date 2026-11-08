@@ -201,6 +201,92 @@ class ValidationPolicyTest(unittest.TestCase):
         ])
         self.assertEqual(["*NewNameTest", "*OldNameTest"], plan["focusedTests"])
 
+    def focused_source(self, name, source):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = f"app/src/test/java/fixture/{name}"
+            file = root / path
+            file.parent.mkdir(parents=True)
+            file.write_text(source, encoding="utf-8")
+            return policy.focused_tests([path], root=root)
+
+    def test_top_level_kotlin_helpers_do_not_mint_class_filters(self):
+        for name in ("TestUtils.kt", "FixtureBuilders.kt", "Support.kt"):
+            with self.subTest(name=name):
+                self.assertEqual(([], []), self.focused_source(
+                    name, "package fixture\nfun sample() = 1\n"
+                ))
+
+    def test_current_protected_main_helper_is_not_an_executable_class(self):
+        path = "app/src/test/java/com/github/damontecres/wholphin/test/TestUtils.kt"
+        self.assertEqual(([], []), policy.focused_tests([path]))
+
+    def test_helper_comments_strings_and_class_literals_are_not_declarations(self):
+        self.assertEqual(([], []), self.focused_source("Support.kt", '''package fixture
+/* class FakeTest { @Test fun fake() {} } */
+@OptIn(ExperimentalContracts::class)
+inline fun <reified T> sample() = "class FakeTest { @Test fun fake() {} } ${T::class}"
+'''))
+
+    def test_executable_test_with_utils_name_remains_selected(self):
+        self.assertEqual((["*RealUtils"], []), self.focused_source("RealUtils.kt", '''package fixture
+import org.junit.Test
+class RealUtils { @Test fun works() {} }
+'''))
+
+    def test_class_fixtures_inheritance_and_unknown_annotations_remain_conservative(self):
+        sources = (
+            "package fixture\nclass Support : ParentTests()\n",
+            "package fixture\nobject Support { fun sample() = 1 }\n",
+            "package fixture\n@CustomCase fun sample() = 1\n",
+            "package fixture\nimport custom.Case as OptIn\n@OptIn fun sample() = 1\n",
+            "package fixture\nimport custom.Suppress\n@Suppress fun sample() = 1\n",
+            "package fixture\nimport custom.*\n@OptIn fun sample() = 1\n",
+            "package fixture\n@file:JvmName(\"Renamed\")\nfun sample() = 1\n",
+            "package fixture\nimport org.junit.Test as Case\n@Case fun sample() = 1\n",
+            "package fixture\ntypealias Support = ParentTests\nfun sample() = 1\n",
+            "package fixture\n/* unterminated\nfun sample() = 1\n",
+            "package fixture\n/* outer /* inner */ unknown */\nfun sample() = 1\n",
+            "package fixture\nval text = \"unterminated\nfun sample() = 1\n",
+            "package fixture\n",
+        )
+        for source in sources:
+            with self.subTest(source=source):
+                self.assertEqual((["*Support"], []), self.focused_source("Support.kt", source))
+
+    def test_missing_and_unreadable_sources_are_not_silently_discarded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = "app/src/test/java/fixture/Unknown.kt"
+            self.assertEqual((["*Unknown"], []), policy.focused_tests([path], root=root))
+            file = root / path
+            file.parent.mkdir(parents=True)
+            file.write_bytes(b"\xff")
+            self.assertEqual((["*Unknown"], []), policy.focused_tests([path], root=root))
+
+    def test_java_support_and_ambiguous_kotlin_sources_keep_existing_filter(self):
+        self.assertEqual((["*Support"], []), self.focused_source(
+            "Support.java", "package fixture; class Support { static int sample() { return 1; } }"
+        ))
+        self.assertEqual((["*Support"], []), self.focused_source(
+            "Support.kt", "fun sample() = 1\n"
+        ))
+
+    def test_explicit_source_root_is_used_by_the_shared_plan(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = []
+            for name, source in (
+                ("Support", "package fixture\nfun sample() = 1\n"),
+                ("ActualTest", "package fixture\nclass ActualTest { @org.junit.Test fun works() {} }\n"),
+            ):
+                path = f"app/src/test/java/fixture/{name}.kt"
+                file = root / path
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_text(source, encoding="utf-8")
+                paths.append(path)
+            self.assertEqual(["*ActualTest"], policy.plan_paths(paths, root=root)["focusedTests"])
+
     def test_explicit_filter_remains_supported(self):
         plan = policy.plan_paths(["docs/PREPARE_PR.md"], ["*IntentionalTest"])
         self.assertEqual(policy.TARGETED_ANDROID, plan["validationMode"])

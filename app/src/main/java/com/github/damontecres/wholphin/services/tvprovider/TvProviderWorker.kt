@@ -72,7 +72,9 @@ class TvProviderWorker
             if (api.baseUrl.isNullOrBlank() || api.accessToken.isNullOrBlank()) {
                 // Not active
                 val result = serverRepository.restoreLastSession()
-                if (result !is RestoredSession.Success) {
+                if (result !is RestoredSession.Success ||
+                    result.currentUser.server.id != serverId || result.currentUser.user.id != userId
+                ) {
                     Timber.w("No user found during run")
                     return Result.failure()
                 }

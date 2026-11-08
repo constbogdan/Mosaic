@@ -16,7 +16,7 @@ import java.util.UUID
 /**
  * Represents the status of the most recently used server
  *
- * This can be saved/retrieved from a [MostRecentServerProvider]
+ * This can be read/written to shared preferences
  */
 sealed interface MostRecentServer {
     /**
@@ -58,14 +58,17 @@ sealed interface MostRecentServer {
 
 interface MostRecentServerProvider {
     /**
-     * Get the [MostRecentServer] from this provider
+     * Get the [MostRecentServer] from the shared preferences in [context]
      */
     fun get(): MostRecentServer
 
     /**
-     * Save the [CurrentUser] as the most recent server
+     * Save the [CurrentUser] as the most recent server into the shared preferences in [context]
      */
     suspend fun save(current: CurrentUser)
+
+    /** Remember a server without an authenticated user. */
+    suspend fun saveServer(server: JellyfinServer)
 
     /**
      * Clear the most recent server and user
@@ -86,6 +89,9 @@ class MostRecentServerSharedPreferences(
 ) : MostRecentServerProvider {
     private val prefs = getServerSharedPreferences(context)
 
+    /**
+     * Get the [MostRecentServer] from the shared preferences in [context]
+     */
     override fun get(): MostRecentServer {
         val serverId = prefs.getString(SERVER_ID_KEY, null)?.toUUIDOrNull()
         val serverUrl = prefs.getString(SERVER_URL_KEY, null)
@@ -100,6 +106,9 @@ class MostRecentServerSharedPreferences(
         }
     }
 
+    /**
+     * Save the [CurrentUser] as the most recent server into the shared preferences in [context]
+     */
     override suspend fun save(current: CurrentUser) {
         prefs.edit(true) {
             putString(SERVER_ID_KEY, current.server.id.toServerString())
@@ -113,6 +122,15 @@ class MostRecentServerSharedPreferences(
         prefs.edit(true) {
             remove(SERVER_ID_KEY)
             remove(SERVER_URL_KEY)
+            remove(USER_ID_KEY)
+            remove(USER_TOKEN_KEY)
+        }
+    }
+
+    override suspend fun saveServer(server: JellyfinServer) {
+        prefs.edit(true) {
+            putString(SERVER_ID_KEY, server.id.toServerString())
+            putString(SERVER_URL_KEY, server.url)
             remove(USER_ID_KEY)
             remove(USER_TOKEN_KEY)
         }

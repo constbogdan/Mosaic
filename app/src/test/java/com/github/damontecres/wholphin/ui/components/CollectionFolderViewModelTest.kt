@@ -51,6 +51,14 @@ import java.util.UUID
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CollectionFolderViewModelTest {
+    @Test
+    fun `home videos retain video items when photo kinds are added`() {
+        assertEquals(
+            listOf(BaseItemKind.VIDEO, BaseItemKind.PHOTO, BaseItemKind.PHOTO_ALBUM),
+            CollectionType.HOMEVIDEOS.baseItemKinds,
+        )
+    }
+
     private val testDispatcher = StandardTestDispatcher()
 
     private val mockApi = mockk<ApiClient>(relaxed = true)

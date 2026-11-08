@@ -2,6 +2,7 @@ package com.github.damontecres.wholphin.services
 
 import android.app.SearchManager
 import android.content.Intent
+import com.github.damontecres.wholphin.BuildConfig
 import com.github.damontecres.wholphin.data.CurrentUser
 import com.github.damontecres.wholphin.data.RestoredSession
 import com.github.damontecres.wholphin.data.ServerRepository
@@ -406,6 +407,24 @@ class IntentServiceTest {
                 }
             val result = intentService.parseIntent(intent)
             assertIs<IntentResult.Error>(result)
+        }
+
+    @Test
+    fun `Mosaic application playback action retains the inherited playback destination`() =
+        runTest {
+            setupAutoSignInUnprotected()
+            val result =
+                intentService.parseIntent(
+                    Intent("${BuildConfig.APPLICATION_ID}.PLAYBACK").apply {
+                        putExtra("itemId", itemId.toString())
+                        putExtra("position", 4000L)
+                    },
+                )
+            assertIs<IntentResult.Target>(result)
+            val playback = result.destinations.last()
+            assertIs<Destination.Playback>(playback)
+            assertEquals(itemId, playback.itemId)
+            assertEquals(4000L, playback.positionMs)
         }
 
     @Test

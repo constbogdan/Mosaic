@@ -30,11 +30,14 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.jellyfin.sdk.Jellyfin
 import org.jellyfin.sdk.api.client.ApiClient
@@ -113,6 +116,7 @@ class ServerRepositoryTest {
         every { mockApiClient.deviceInfo } returns DeviceInfo("Wholphin test ID", "Wholphin test device")
         every { mockApiClient.update(any(), any(), any(), any()) } just Runs
         coEvery { mockMostRecentServerProvider.save(any()) } just Runs
+        coEvery { mockMostRecentServerProvider.saveServer(any()) } just Runs
         coEvery { mockMostRecentServerProvider.clear() } just Runs
         coEvery { mockMostRecentServerProvider.clearUser() } just Runs
     }
@@ -154,7 +158,7 @@ class ServerRepositoryTest {
             hasConfiguredPassword = true,
             hasConfiguredEasyPassword = false,
         )
-    private val serverUserConfig = ServerUserConfig(userDto)
+    private val serverUserConfig = ServerUserConfig(userDto).copy(serverId = serverId)
 
     private fun setUpCurrentUser(
         serverRepository: ServerRepository,
@@ -461,6 +465,43 @@ class ServerRepositoryTest {
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `metadata refresh from an old server cannot overwrite the same user UUID on a new server`() =
+        runTest(testDispatcher) {
+            val repository = create()
+            setUpCurrentUser(repository)
+            val response = CompletableDeferred<UserDto>()
+            coEvery { mockUserApi.getCurrentUser() } coAnswers { successResponse(response.await()) }
+            val refresh = async { repository.updateUserDto() }
+            runCurrent()
+            val otherServer = server.copy(id = UUID.randomUUID(), url = "http://other.test")
+            (repository.current as MutableStateFlow).value = CurrentUser(otherServer, user.copy(serverId = otherServer.id))
+            response.complete(userDto)
+            refresh.await()
+            Assert.assertNull(repository.currentUserDto)
+        }
+
+    @Test
+    fun `metadata without a server ID retains the authoritative session server identity`() {
+        val repository = create()
+        setUpCurrentUser(repository)
+        repository.updateUserDto(userDto)
+        assertEquals(serverId, repository.currentUserDto?.serverId)
+    }
+
+    @Test
+    fun `websocket metadata accepts current server but rejects another server with the same user UUID`() {
+        val repository = create()
+        setUpCurrentUser(repository)
+        repository.updateUserDto(userDto.copy(serverId = UUID.randomUUID().toString()))
+        Assert.assertNull(repository.currentUserDto)
+        repository.updateUserDto(userDto.copy(serverId = serverId.toString()))
+        assertEquals(serverId, repository.currentUserDto?.serverId)
+        repository.updateUserDto(userDto.copy(id = UUID.randomUUID(), name = "other"))
+        assertEquals(userId, repository.currentUserDto?.id)
+    }
+
     @Test
     fun `Test restoreLastSession, success`() =
         runTest {
@@ -548,11 +589,15 @@ class TestMostRecentServerProvider : MostRecentServerProvider {
         mostRecentServer = MostRecentServer.None
     }
 
+    override suspend fun saveServer(server: JellyfinServer) {
+        mostRecentServer = MostRecentServer.Server(server.id, server.url)
+    }
+
     override suspend fun clearUser() {
         when (val s = mostRecentServer) {
             MostRecentServer.None -> Unit
             is MostRecentServer.Server -> Unit
-            is MostRecentServer.ServerAndUser -> MostRecentServer.Server(s.serverId, s.serverUrl)
+            is MostRecentServer.ServerAndUser -> mostRecentServer = MostRecentServer.Server(s.serverId, s.serverUrl)
         }
     }
 }

@@ -53,6 +53,7 @@ import io.mockk.verify
 import io.mockk.verifyOrder
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.InternalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -88,6 +89,16 @@ import kotlin.time.Duration.Companion.seconds
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, sdk = [30])
 class PlaybackViewModelTests {
+    @Test
+    fun `releasing playback cancels the replacement websocket subscription`() {
+        val viewModel = create(Destination.Playback(itemId = UUID.randomUUID(), positionMs = 0L))
+        viewModel.initJob.cancel()
+        val subscription = Job()
+        viewModel.subscribeJob = subscription
+        viewModel.release()
+        Assert.assertTrue(subscription.isCancelled)
+    }
+
     private val testDispatcher = StandardTestDispatcher()
 
     private val mockContext = mockk<Context>(relaxed = true)
@@ -333,6 +344,17 @@ class PlaybackViewModelTests {
                     playSessionId = playSessionId,
                 )
             }
+        }
+
+    @Test
+    fun `playback loads distinct audio and subtitle preferences`() =
+        runTest(testDispatcher) {
+            setupPreferences { cinemaMode = false }
+            coEvery { mockUserLibraryApi.getItem(movie.id) } returns successResponse(movie)
+            val viewModel = createViewModel(Destination.Playback(movie.id, 0L))
+            coVerify(exactly = 1) { mockStreamChoiceService.getSeriesTrackChoices(movie, SeriesTrackChoiceType.AUDIO) }
+            coVerify(exactly = 1) { mockStreamChoiceService.getSeriesTrackChoices(movie, SeriesTrackChoiceType.SUBTITLE) }
+            Assert.assertEquals(LoadingState.Success, viewModel.state.value.loading)
         }
 
     @Test

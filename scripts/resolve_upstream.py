@@ -39,6 +39,8 @@ BRANCH_IDENTITY = re.compile(
     re.escape(BRANCH_PREFIX) + r"([0-9a-f]{40})-([0-9a-f]{40})$"
 )
 RESOLUTION_HANDOFF = Path(".upstream-sync/resolution-handoff.json")
+APPLICATION_SOURCE = "app/src/main/java/com/github/damontecres/wholphin/"
+ROOM_SCHEMAS = "app/schemas/com.github.damontecres.wholphin.data.AppDatabase/"
 
 
 class Refusal(RuntimeError):
@@ -891,14 +893,14 @@ def validate_reconciliation_scope(runner: Runner, root: Path, candidate: Candida
     return sorted(reconciliation_paths)
 
 
-def derive_filters(paths: list[str], attention: list[str]) -> list[str]:
+def derive_filters(paths: list[str], attention: list[str], *, root: Path | None = None) -> list[str]:
     if not paths:
         raise Refusal("No semantic-resolution changes exist; publication is not needed.")
     production = sorted(set(path for path in paths + attention if path.startswith("app/src/main/")))
     changed_tests = sorted(set(path for path in paths
                                if path.startswith(("app/src/test/", "app/src/testDebug/"))))
-    production_filters, fallback = mosaic_validation_policy.focused_tests(production)
-    test_filters, _ = mosaic_validation_policy.focused_tests(changed_tests)
+    production_filters, fallback = mosaic_validation_policy.focused_tests(production, root=root)
+    test_filters, _ = mosaic_validation_policy.focused_tests(changed_tests, root=root)
     if fallback and not test_filters:
         raise Refusal("Focused coverage is ambiguous and no supplemental changed test proves intent for: " +
                       ", ".join(fallback))
@@ -909,7 +911,135 @@ def derive_filters(paths: list[str], attention: list[str]) -> list[str]:
     return filters
 
 
-def validate_resolution_scope(paths: list[str], attention: list[str]) -> None:
+def resolution_dependency_scope(paths: list[str], attention: list[str], runner: Runner,
+                                root: Path, candidate: Candidate) -> set[str]:
+    """Prove the request-permission chain and Room export, never neighboring paths."""
+    database = APPLICATION_SOURCE + "data/AppDatabase.kt"
+    dialog = APPLICATION_SOURCE + "ui/detail/discover/RequestSeasons.kt"
+    series = APPLICATION_SOURCE + "ui/detail/series/SeriesDetails.kt"
+    producer = APPLICATION_SOURCE + "ui/detail/series/SeriesViewModel.kt"
+    if not any(path in (series, producer) or path.startswith(ROOM_SCHEMAS) for path in paths):
+        return set()
+    observation = candidate.observation
+    if set(attention) != set(observation.get("review_paths") or []) | set(
+            observation.get("conflict_paths") or []):
+        raise Refusal("Dependency scope must use the authenticated attention paths.")
+    # Refresh the exact PR, not a local handoff's assertion of its identity.
+    number = int(candidate.pr["number"])
+    live = json_output(runner, ["gh", "api", f"repos/{REPOSITORY}/pulls/{number}"], root)
+    episode = validate_pr(live, number)
+    if (episode != marker(candidate.pr.get("body", ""))
+            or live["head"]["ref"] != candidate.pr["head"]["ref"]
+            or live["head"]["sha"] != candidate.pr["head"]["sha"]):
+        raise Refusal("PR identity changed before dependency scope authentication.")
+    recorded_numbers = [proof.get(key) for proof, keys in (
+        (observation, ("pr_number", "existing_pr_number")),
+        (candidate.current_observation or {}, ("blocking_pr_number", "existing_pr_number")),
+    ) for key in keys if proof.get(key) is not None]
+    if not recorded_numbers or any(str(value) != str(number) for value in recorded_numbers):
+        raise Refusal("Dependency scope requires matching recorded PR-number evidence.")
+    validate_observation(observation, live, episode, runner=runner, root=root)
+    context = blocked_context(runner, root, candidate)
+    comparison = observation["comparison_baseline"]
+    if context.get("mergeBase") != comparison:
+        raise Refusal("Dependency scope comparison baseline differs from blocked context.")
+    upstream = observation["upstream_sha"]
+    baseline = candidate.current_main or observation["downstream_sha"]
+    if not all(re.fullmatch(r"[0-9a-f]{40}", ref) for ref in (comparison, upstream, baseline)):
+        raise Refusal("Dependency scope requires exact immutable commit identities.")
+    remaining = git_text(runner, root, "merge-base", "--all", baseline, upstream).splitlines()
+    if len(remaining) != 1 or not re.fullmatch(r"[0-9a-f]{40}", remaining[0]):
+        raise Refusal("Dependency scope requires one authenticated remaining-range merge base.")
+    incoming = set(git_text(runner, root, "diff", "--no-renames", "--name-only",
+                            remaining[0], upstream, "--").splitlines())
+
+    def source(ref, path):
+        return git_text(runner, root, "show", f"{ref}:{path}")
+
+    allowed = set()
+    if (series in paths or producer in paths) and dialog in attention and dialog in incoming:
+        signature = re.compile(r"fun RequestSeasonsDialog\((.*?)\n\)", re.S)
+
+        def requires_permission(text):
+            match = signature.search(text)
+            return bool(match and re.search(r"\brequestEnabled:\s*Boolean\s*,", match[1]))
+
+        old_dialog = source(baseline, dialog)
+        old_series = source(baseline, series)
+        if (requires_permission(source(upstream, dialog))
+                and signature.search(old_dialog) and not requires_permission(old_dialog)
+                and "RequestSeasonsDialog(" in old_series):
+            if series in paths:
+                allowed.add(series)
+            repository = APPLICATION_SOURCE + "services/SeerrServerRepository.kt"
+            upstream_viewmodel = APPLICATION_SOURCE + "ui/detail/discover/DiscoverSeriesViewModel.kt"
+            if producer in paths and {repository, upstream_viewmodel} <= incoming:
+                def flow(name, permission):
+                    return re.compile(
+                        rf"^[ \t]*val {name}\s*=\s*seerrServerRepository\.current\s*"
+                        rf"\.map\s*\{{\s*it\?\.{permission}\s*\?:\s*false\s*\}}\s*"
+                        r"\.stateIn\(viewModelScope,\s*SharingStarted\.Eagerly,\s*false\)[ \t]*$",
+                        re.M,
+                    )
+
+                standard = flow("requestEnabled", "requestTvEnabled")
+                original = source(baseline, producer)
+                # Immutable sources prove this exact private owner and upstream capability.
+                if (re.search(r"\bviewModel:\s*SeriesViewModel\b", old_series)
+                        and "viewModel.request4kEnabled.collectAsState()" in old_series
+                        and re.search(r"private val seerrServerRepository:\s*SeerrServerRepository\b", original)
+                        and flow("request4kEnabled", "request4kTvEnabled").search(original)
+                        and not re.search(r"\bval requestEnabled\b", original)
+                        and standard.search(source(upstream, upstream_viewmodel))
+                        and re.search(r"val requestTvEnabled:\s*Boolean\s+get\(\)\s*=\s*"
+                                      r"config\.hasPermission\(SeerrPermission\.REQUEST_TV\)[ \t]*$",
+                                      source(upstream, repository), re.M)):
+                    try:
+                        resolved = (root / producer).read_text(encoding="utf-8")
+                    except OSError as error:
+                        raise Refusal("Cannot inspect the request-permission producer adaptation.") from error
+                    additions = list(standard.finditer(resolved))
+                    if len(additions) == 1:
+                        added = additions[0]
+                        remainder = resolved[:added.start()] + resolved[added.end():]
+
+                        def code_lines(text):
+                            return [line.rstrip() for line in text.splitlines() if line.strip()]
+
+                        # Path authority is not permission for unrelated edits in this ViewModel.
+                        if code_lines(remainder) == code_lines(original):
+                            allowed.add(producer)
+    if any(path.startswith(ROOM_SCHEMAS) for path in paths) and database in attention and database in incoming:
+        def version(ref):
+            match = re.search(r"@Database\([\s\S]*?\bversion\s*=\s*([1-9]\d*)\s*,",
+                              source(ref, database))
+            if not match:
+                raise Refusal("Cannot authenticate the Room database version.")
+            return int(match[1])
+
+        current_version, upstream_version = version(baseline), version(upstream)
+        previous_version = version(remaining[0])
+        export = ROOM_SCHEMAS + f"{current_version + 1}.json"
+        if export in paths and current_version != upstream_version and previous_version != upstream_version:
+            try:
+                current_schema = json.loads(source(baseline, ROOM_SCHEMAS + f"{current_version}.json"))["database"]
+                incoming_schema = json.loads(source(upstream, ROOM_SCHEMAS + f"{upstream_version}.json"))["database"]
+                previous_schema = json.loads(source(remaining[0], ROOM_SCHEMAS + f"{previous_version}.json"))["database"]
+                changed = (current_schema["entities"] != incoming_schema["entities"]
+                           and previous_schema["entities"] != incoming_schema["entities"])
+                versions_match = (current_schema["version"] == current_version
+                                  and incoming_schema["version"] == upstream_version
+                                  and previous_schema["version"] == previous_version)
+            except (ValueError, KeyError, TypeError) as error:
+                raise Refusal("Cannot authenticate the Room schema dependency.") from error
+            exists = git_text(runner, root, "ls-tree", "--name-only", baseline, "--", export)
+            if changed and versions_match and not exists:
+                allowed.add(export)
+    return allowed
+
+
+def validate_resolution_scope(paths: list[str], attention: list[str], *, runner=None,
+                              root=None, candidate=None) -> None:
     attention_set = set(attention)
     attention_filters, attention_fallback = mosaic_validation_policy.focused_tests(attention)
     changed_tests = [path for path in paths if path.startswith(("app/src/test/", "app/src/testDebug/"))]
@@ -927,6 +1057,9 @@ def validate_resolution_scope(paths: list[str], attention: list[str]) -> None:
             if not fallback and set(mapped) & set(attention_filters):
                 continue
         unrelated.append(path)
+    if unrelated and runner is not None and root is not None and candidate is not None:
+        dependencies = resolution_dependency_scope(unrelated, attention, runner, root, candidate)
+        unrelated = [path for path in unrelated if path not in dependencies]
     if unrelated:
         raise Refusal("Resolution contains paths outside the deterministic attention/test scope: " +
                       ", ".join(unrelated))
@@ -1128,8 +1261,8 @@ def publication_phase(root: Path, runner: Runner, candidate: Candidate, input_fn
         runner, root, candidate, resolution_first_parent
     )
     upstream_paths = sorted(set(paths) - set(reconciliation_paths))
-    validate_resolution_scope(upstream_paths, attention)
-    derived_filters = derive_filters(paths, attention)
+    validate_resolution_scope(upstream_paths, attention, runner=runner, root=root, candidate=candidate)
+    derived_filters = derive_filters(paths, attention, root=root)
     validate_filter_targets(root, derived_filters)
     filters, filter_source = resolution_filters(root, candidate, derived_filters)
     print("\nPublication plan")
@@ -1179,9 +1312,10 @@ def publication_phase(root: Path, runner: Runner, candidate: Candidate, input_fn
         runner, root, current, resolution_first_parent
     )
     validate_resolution_scope(
-        sorted(set(current_paths) - set(current_reconciliation_paths)), attention
+        sorted(set(current_paths) - set(current_reconciliation_paths)), attention,
+        runner=runner, root=root, candidate=current,
     )
-    current_derived_filters = derive_filters(current_paths, attention)
+    current_derived_filters = derive_filters(current_paths, attention, root=root)
     validate_filter_targets(root, current_derived_filters)
     current_filters, _ = resolution_filters(root, current, current_derived_filters)
     if current_paths != paths or current_filters != filters:

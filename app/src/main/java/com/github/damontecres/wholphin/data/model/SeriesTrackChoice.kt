@@ -92,7 +92,7 @@ data class SeriesTrackChoice(
          */
         fun from(plc: PlaybackLanguageChoice): List<SeriesTrackChoice> =
             buildList {
-                if (plc.subtitleLanguage != null) {
+                if (!plc.subtitleLanguage.isNullOrBlank() || plc.subtitlesDisabled == true) {
                     add(
                         SeriesTrackChoice(
                             userId = plc.userId,
@@ -110,7 +110,7 @@ data class SeriesTrackChoice(
                         ),
                     )
                 }
-                if (plc.audioLanguage != null) {
+                if (!plc.audioLanguage.isNullOrBlank()) {
                     add(
                         SeriesTrackChoice(
                             userId = plc.userId,

@@ -474,6 +474,35 @@ from I03 mappings plus changed test classes. Filters must match source-controlle
 scope and filters are displayed before `Ready to PUSH? [y/N]`; only explicit `y` delegates to
 prepare-pr. Blank, EOF, cancellation or any drift performs no commit or push.
 
+Resolution scope also recognizes two explicit dependency edges, not neighboring directories:
+
+- An attention-path `RequestSeasons.kt` introducing the required `requestEnabled` parameter on
+  `RequestSeasonsDialog` permits the existing `SeriesDetails.kt` caller to adapt. Immutable
+  current-main sources must prove the old signature and existing call.
+  Its `SeriesViewModel.kt` producer is permitted only when those sources also prove the typed
+  consumer, private Seerr repository and existing 4K flow, and the remaining incoming range
+  proves the standard-TV capability and upstream fail-closed flow. The resolved ViewModel may
+  add only that `requestTvEnabled ?: false` flow with an initial `false`; removing it must
+  leave current-main code unchanged (apart from blank lines/trailing whitespace). Other
+  permission edits, ViewModels and neighboring paths gain no authority.
+- An attention-path `AppDatabase.kt` with incoming Room version/entity changes permits only the
+  **next** Mosaic schema export, derived from the immutable current-main database version
+  (currently `37` to `38`). Existing exports, other versions and other database namespaces do
+  not gain permission. Committed current/previous-upstream/incoming schema evidence must prove
+  an actual entity change; merely changing a version or a neighboring file is insufficient.
+
+Both producer changes must occur in the remaining native merge-base-to-original-target range,
+not merely somewhere in the older observation's backlog. These exceptions refresh the exact PR
+number/repository/branch/head/episode and revalidate original candidate/tree/blocked context.
+The recorded PR number must agree in the original evidence or authenticated fresh blocker/reuse
+proof; missing or conflicting number evidence cannot authorize a dependency extension.
+They consume the already-authenticated current-main baseline without replacing the original
+episode or upstream target. No editable handoff can add dependency paths. Missing or ambiguous
+proof fails closed; other scope and focused-test requirements remain unchanged. This is path
+authorization for human semantic review, not proof that every edit within an allowed file is
+correct. Native merge, reviewed-tree, fresh-main evidence, no-force and Draft publication guards
+still apply, including the final pre-publication scope recheck.
+
 After that explicit authorization, `prepare-pr.ps1` updates the same existing candidate PR: its
 upstream-sync branch pattern requires meaningful focused JVM filters followed by Full, its remote
 check permits only a normal fast-forward push, and its PR lookup reuses the open PR by exact head

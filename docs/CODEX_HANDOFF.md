@@ -39,6 +39,19 @@ not current instruction.
 
 ## Non-obvious invariants and negative knowledge
 
+- Stage C combines Mosaic schema 36 with upstream track persistence as Mosaic schema 37,
+  not upstream schema 40 (which lacks the integrity table). Keep every older schema fixture
+  and the 2-to-3 migration. Legacy track-choice conversion belongs in the 36-to-37 Room
+  transaction: Mosaic app versions cannot safely use the upstream 1.0.10 gate, and a
+  global non-empty destination check would skip partially converted data. Retain the legacy
+  table, disabled subtitles with no language, and newer choices on repeated conversion.
+  Blank legacy languages must stay absent so ordinary profile defaults still apply.
+- Stage B's session/HDR preference migrations cannot use upstream Wholphin version thresholds:
+  Mosaic versions advance independently. Migrate from the legacy fields idempotently, retaining
+  a newer remembered session and explicit HDR override, and preserve server-only restoration.
+  The new user-switch deduplication must include server identity, not only user UUID/language;
+  cancelled Seerr authentication and old-server metadata must not publish into a replacement
+  session. Keep Mosaic's exact signed updater asset contract rather than upstream APK aliases.
 - Home refresh uses timestamp-independent `ServerUserConfig`; valid same-user/server refreshes
   retain loaded rows and Acquiring instead of resetting the entire state. Ordinary rows reset on
   invalid context or user/server changes, including a reused user UUID on another server.
@@ -48,9 +61,23 @@ not current instruction.
   bind its exact blocker identity to independently verified original blocked-context evidence and
   current main, but must still resolve only the original upstream target. Missing fresh hosted
   proof or mismatched identity remains a refusal; see [Upstream integration](UPSTREAM_SYNC.md).
+- Resolver dependency scope is deliberately limited to the existing request-dialog caller, its
+  private permission producer, and the next Mosaic Room export, proved from immutable authenticated
+  sources. Caller permission alone cannot satisfy a required dialog argument when its state lives
+  in a private ViewModel repository. The producer exception admits only the upstream-equivalent
+  fail-closed standard-TV flow addition, not other edits in that file. Use the remaining native
+  range, not the original episode's full backlog, to justify a producer change: otherwise already
+  accepted Stage B/C work could incorrectly authorize a new adaptation. This does not grant an
+  editable handoff, neighboring source, or arbitrary schema export any publication authority.
 - Local Fast feedback is not hosted validation authority. Every PR receives complete offline
   tooling; uncertain Android/build scope selects `ANDROID_FULL`. Protected main reuses evidence only
   for an exactly authenticated tested tree and otherwise runs the complete conservative fallback.
+- A Kotlin test helper is not a runnable class merely because its file changed. The shared selector
+  omits only positively proved top-level helpers; uncertain targets remain subject to matching.
+  The resolver validates its derived floor before a semantic handoff, so that handoff cannot repair
+  a bad derived target. Resolver/publisher entry points bind to their own checkout. A tooling PR
+  advancing main does not rewrite a preserved integration, but makes an older B's exact-main parent
+  stale; fresh evidence and separately authorized reconciliation are still required.
 - Validation class and Development release relevance are independent. High-risk tooling can require
   Android validation without requiring an APK.
 - Development Release assembly belongs to authenticated final main. Signing is isolated from build

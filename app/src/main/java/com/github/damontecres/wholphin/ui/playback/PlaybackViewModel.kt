@@ -192,7 +192,9 @@ class PlaybackViewModel
         private var activityListener: TrackActivityPlaybackListener? = null
         private var trackChangeListener: TracksChangedListener? = null
         private val jobs = mutableListOf<Job>()
-        private var subscribeJob: Job? = null
+
+        @VisibleForTesting
+        internal var subscribeJob: Job? = null
 
         private val isPlaylist = destination is Destination.PlaybackList
 
@@ -215,6 +217,7 @@ class PlaybackViewModel
         }
 
         private fun disconnectPlayer() {
+            subscribeJob?.cancel()
             if (this@PlaybackViewModel::player.isInitialized) {
                 player.removeListener(this@PlaybackViewModel)
                 (player as? ExoPlayer)?.removeAnalyticsListener(this@PlaybackViewModel)
@@ -507,7 +510,7 @@ class PlaybackViewModel
                 val subtitleStc =
                     streamChoiceService.getSeriesTrackChoices(
                         base,
-                        SeriesTrackChoiceType.AUDIO,
+                        SeriesTrackChoiceType.SUBTITLE,
                     )
 
                 if (mediaSource == null && !isLiveTv) {

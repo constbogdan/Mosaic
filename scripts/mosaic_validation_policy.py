@@ -5,6 +5,7 @@ from fnmatch import fnmatchcase
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 
 import mosaic_change_classification as classification
@@ -153,14 +154,57 @@ def _matches(path, patterns):
     return any(fnmatchcase(path, pattern) for pattern in patterns)
 
 
-def focused_tests(paths):
+def _kotlin_top_level_helper(path, root):
+    """Prove the narrow non-class helper case; uncertainty keeps the old target."""
+    if Path(path).suffix != ".kt":
+        return False
+    root = Path(root).resolve()
+    source = root / path
+    try:
+        if source.is_symlink() or not source.resolve().is_relative_to(root):
+            return False
+        text = source.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return False  # Deleted, moved and unreadable test targets must not disappear.
+    # Ignore comments/literals, not declarations. Unclosed/nested syntax stays unknown.
+    code = re.sub(
+        r'""".*?"""|"(?:\\.|[^"\\\r\n])*"|\'(?:\\.|[^\'\\\r\n])*\'|/\*.*?\*/|//[^\r\n]*',
+        lambda match: "\n" * match.group().count("\n"), text, flags=re.S,
+    )
+    if any(token in code for token in ('"', "'", "`", "/*", "*/")):
+        return False
+    if not re.search(r"(?m)^\s*package\s+[\w.]+", code):
+        return False
+    if re.search(r"(?<!:)\b(?:class|object|interface|typealias)\b", code):
+        return False  # Includes inherited tests and runner-driven/fixture classes.
+    if re.search(r"\b(?:Test|TestFactory|TestTemplate|Testable|RunWith|ParameterizedTest|RepeatedTest)\b", code):
+        return False
+    annotations = set(re.findall(r"@([\w.]+)", code))
+    if annotations - {"OptIn", "Suppress"}:
+        return False  # An unfamiliar annotation may identify an executable target.
+    if annotations:
+        for imported, alias in re.findall(r"(?m)^\s*import\s+([\w.*]+)(?:\s+as\s+(\w+))?", code):
+            if imported.endswith(".*") or (
+                (alias or imported.rsplit(".", 1)[-1]) in annotations
+                and imported not in {"kotlin.OptIn", "kotlin.Suppress"}
+            ):
+                return False  # Do not mistake a foreign/aliased test annotation for a builtin.
+    return bool(re.search(
+        r"(?m)^\s*(?:(?:public|internal|private|inline|suspend|tailrec|operator|infix|external|expect|actual)\s+)*fun\b",
+        code,
+    ))
+
+
+def focused_tests(paths, *, root=None):
     """Return mapped tests and whether broad fallback was required."""
+    root = Path(root) if root is not None else Path(__file__).resolve().parent.parent
     selected = set()
     fallback_paths = []
     for path in sorted(set(paths)):
         if path.startswith("app/src/test/") or path.startswith("app/src/testDebug/"):
             if path.endswith((".kt", ".java")):
-                selected.add("*" + Path(path).stem)
+                if not _kotlin_top_level_helper(path, root):
+                    selected.add("*" + Path(path).stem)
             continue
         if not path.startswith("app/src/main/"):
             continue
@@ -177,7 +221,7 @@ def focused_tests(paths):
     return sorted(selected), fallback_paths
 
 
-def plan_paths(paths, explicit_filters=(), force_full=False):
+def plan_paths(paths, explicit_filters=(), force_full=False, *, root=None):
     paths = sorted(set(paths))
     result = classification.classify_paths(paths)
     full_paths = [entry["path"] for entry in result["paths"]
@@ -196,7 +240,7 @@ def plan_paths(paths, explicit_filters=(), force_full=False):
         classification.ANDROID_VALIDATION_ONLY,
     }:
         mode = TARGETED_ANDROID
-        mapped, fallback = focused_tests(paths)
+        mapped, fallback = focused_tests(paths, root=root)
         tests = sorted(set(explicit_filters or mapped or (ALL_JVM_TESTS,)))
         reason = (
             "operator-supplied focused JVM coverage"
@@ -287,7 +331,7 @@ def main():
             paths = changed_paths(root, args.base, args.head, args.include_working_tree)
         else:
             raise ValueError("Supply --path or --base")
-        plan = plan_paths(paths, args.test_filter, args.force_full)
+        plan = plan_paths(paths, args.test_filter, args.force_full, root=root)
         plan["reviewedUntrackedPaths"] = reviewed_untracked_paths(root, paths)
         if args.github_output:
             write_github_outputs(plan, args.github_output)
