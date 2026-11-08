@@ -913,11 +913,12 @@ def derive_filters(paths: list[str], attention: list[str]) -> list[str]:
 
 def resolution_dependency_scope(paths: list[str], attention: list[str], runner: Runner,
                                 root: Path, candidate: Candidate) -> set[str]:
-    """Prove two known producer/consumer edges, never a directory-wide exception."""
+    """Prove the request-permission chain and Room export, never neighboring paths."""
     database = APPLICATION_SOURCE + "data/AppDatabase.kt"
     dialog = APPLICATION_SOURCE + "ui/detail/discover/RequestSeasons.kt"
     series = APPLICATION_SOURCE + "ui/detail/series/SeriesDetails.kt"
-    if not any(path == series or path.startswith(ROOM_SCHEMAS) for path in paths):
+    producer = APPLICATION_SOURCE + "ui/detail/series/SeriesViewModel.kt"
+    if not any(path in (series, producer) or path.startswith(ROOM_SCHEMAS) for path in paths):
         return set()
     observation = candidate.observation
     if set(attention) != set(observation.get("review_paths") or []) | set(
@@ -956,7 +957,7 @@ def resolution_dependency_scope(paths: list[str], attention: list[str], runner: 
         return git_text(runner, root, "show", f"{ref}:{path}")
 
     allowed = set()
-    if series in paths and dialog in attention and dialog in incoming:
+    if (series in paths or producer in paths) and dialog in attention and dialog in incoming:
         signature = re.compile(r"fun RequestSeasonsDialog\((.*?)\n\)", re.S)
 
         def requires_permission(text):
@@ -964,10 +965,50 @@ def resolution_dependency_scope(paths: list[str], attention: list[str], runner: 
             return bool(match and re.search(r"\brequestEnabled:\s*Boolean\s*,", match[1]))
 
         old_dialog = source(baseline, dialog)
+        old_series = source(baseline, series)
         if (requires_permission(source(upstream, dialog))
                 and signature.search(old_dialog) and not requires_permission(old_dialog)
-                and "RequestSeasonsDialog(" in source(baseline, series)):
-            allowed.add(series)
+                and "RequestSeasonsDialog(" in old_series):
+            if series in paths:
+                allowed.add(series)
+            repository = APPLICATION_SOURCE + "services/SeerrServerRepository.kt"
+            upstream_viewmodel = APPLICATION_SOURCE + "ui/detail/discover/DiscoverSeriesViewModel.kt"
+            if producer in paths and {repository, upstream_viewmodel} <= incoming:
+                def flow(name, permission):
+                    return re.compile(
+                        rf"^[ \t]*val {name}\s*=\s*seerrServerRepository\.current\s*"
+                        rf"\.map\s*\{{\s*it\?\.{permission}\s*\?:\s*false\s*\}}\s*"
+                        r"\.stateIn\(viewModelScope,\s*SharingStarted\.Eagerly,\s*false\)[ \t]*$",
+                        re.M,
+                    )
+
+                standard = flow("requestEnabled", "requestTvEnabled")
+                original = source(baseline, producer)
+                # Immutable sources prove this exact private owner and upstream capability.
+                if (re.search(r"\bviewModel:\s*SeriesViewModel\b", old_series)
+                        and "viewModel.request4kEnabled.collectAsState()" in old_series
+                        and re.search(r"private val seerrServerRepository:\s*SeerrServerRepository\b", original)
+                        and flow("request4kEnabled", "request4kTvEnabled").search(original)
+                        and not re.search(r"\bval requestEnabled\b", original)
+                        and standard.search(source(upstream, upstream_viewmodel))
+                        and re.search(r"val requestTvEnabled:\s*Boolean\s+get\(\)\s*=\s*"
+                                      r"config\.hasPermission\(SeerrPermission\.REQUEST_TV\)[ \t]*$",
+                                      source(upstream, repository), re.M)):
+                    try:
+                        resolved = (root / producer).read_text(encoding="utf-8")
+                    except OSError as error:
+                        raise Refusal("Cannot inspect the request-permission producer adaptation.") from error
+                    additions = list(standard.finditer(resolved))
+                    if len(additions) == 1:
+                        added = additions[0]
+                        remainder = resolved[:added.start()] + resolved[added.end():]
+
+                        def code_lines(text):
+                            return [line.rstrip() for line in text.splitlines() if line.strip()]
+
+                        # Path authority is not permission for unrelated edits in this ViewModel.
+                        if code_lines(remainder) == code_lines(original):
+                            allowed.add(producer)
     if any(path.startswith(ROOM_SCHEMAS) for path in paths) and database in attention and database in incoming:
         def version(ref):
             match = re.search(r"@Database\([\s\S]*?\bversion\s*=\s*([1-9]\d*)\s*,",

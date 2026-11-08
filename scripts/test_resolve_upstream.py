@@ -1064,11 +1064,156 @@ class ResolveUpstreamTests(unittest.TestCase):
         tests = "app/src/test/java/fixture/DependencyTest.kt"
         return runner, candidate, attention, schema, series, tests
 
-    def check_dependency_scope(self, paths, fixture):
+    def check_dependency_scope(self, paths, fixture, root=None):
         runner, candidate, attention, _schema, _series, tests = fixture
         resolve.validate_resolution_scope(
-            [*paths, tests], attention, runner=runner, root=self.root(), candidate=candidate,
+            [*paths, tests], attention, runner=runner, root=root or self.root(), candidate=candidate,
         )
+
+    def permission_producer_fixture(self):
+        fixture = self.dependency_fixture()
+        runner, candidate, _attention, _schema, series, _tests = fixture
+        producer = resolve.APPLICATION_SOURCE + "ui/detail/series/SeriesViewModel.kt"
+        repository = resolve.APPLICATION_SOURCE + "services/SeerrServerRepository.kt"
+        upstream_viewmodel = resolve.APPLICATION_SOURCE + "ui/detail/discover/DiscoverSeriesViewModel.kt"
+        flow = (
+            "    val requestEnabled =\n"
+            "        seerrServerRepository.current\n"
+            "            .map { it?.requestTvEnabled ?: false }\n"
+            "            .stateIn(viewModelScope, SharingStarted.Eagerly, false)\n"
+        )
+        original = (
+            "class SeriesViewModel(private val seerrServerRepository: SeerrServerRepository) {\n"
+            + flow.replace("requestEnabled", "request4kEnabled").replace("requestTvEnabled", "request4kTvEnabled")
+            + "}\n"
+        )
+        runner.sources[f"{candidate.current_main}:{producer}"] = original
+        runner.sources[f"{candidate.current_main}:{series}"] = (
+            "fun SeriesDetails(viewModel: SeriesViewModel) {\n"
+            "    val request4kEnabled by viewModel.request4kEnabled.collectAsState()\n"
+            "    RequestSeasonsDialog(id = id, request4kEnabled = request4kEnabled)\n}\n"
+        )
+        runner.sources[f"{UPSTREAM}:{repository}"] = (
+            "val requestTvEnabled: Boolean\n"
+            "    get() = config.hasPermission(SeerrPermission.REQUEST_TV)\n"
+        )
+        runner.sources[f"{UPSTREAM}:{upstream_viewmodel}"] = flow
+        runner.incoming += [repository, upstream_viewmodel]
+        root = self.root()
+        path = root / producer
+        path.parent.mkdir(parents=True)
+        path.write_text(original.replace("    val request4kEnabled", flow + "\n    val request4kEnabled"), encoding="utf-8")
+        return fixture, root, producer
+
+    def test_permission_producer_accepts_only_existing_fail_closed_tv_flow_addition(self):
+        fixture, root, producer = self.permission_producer_fixture()
+        for paths in ([producer], [producer, fixture[3], fixture[4], *fixture[2]]):
+            with self.subTest(paths=paths):
+                self.check_dependency_scope(paths, fixture, root)
+
+    def test_permission_producer_rejects_unrelated_permission_edits_in_same_file(self):
+        for change in ("permissive_null", "permissive_initial", "wrong_permission", "other_flow", "extra_method"):
+            with self.subTest(change=change):
+                fixture, root, producer = self.permission_producer_fixture()
+                path = root / producer
+                text = path.read_text(encoding="utf-8")
+                if change == "permissive_null":
+                    text = text.replace("requestTvEnabled ?: false", "requestTvEnabled ?: true")
+                elif change == "permissive_initial":
+                    text = text.replace("SharingStarted.Eagerly, false", "SharingStarted.Eagerly, true", 1)
+                elif change == "wrong_permission":
+                    text = text.replace("it?.requestTvEnabled", "it?.requestMovieEnabled")
+                elif change == "other_flow":
+                    text = text.replace("request4kTvEnabled ?: false", "request4kTvEnabled ?: true")
+                else:
+                    text += "\nfun unrelatedPermissionOverride() = true\n"
+                path.write_text(text, encoding="utf-8")
+                with self.assertRaisesRegex(resolve.Refusal, "outside"):
+                    self.check_dependency_scope([producer], fixture, root)
+
+    def test_permission_producer_requires_immutable_incoming_permission_contract_and_owner(self):
+        for change in ("not_incoming", "wrong_upstream_permission", "wrong_upstream_flow",
+                       "wrong_owner", "no_existing_flow", "already_provided", "not_a_viewmodel_consumer"):
+            with self.subTest(change=change):
+                fixture, root, producer = self.permission_producer_fixture()
+                runner, candidate, _attention, _schema, series, _tests = fixture
+                repository = resolve.APPLICATION_SOURCE + "services/SeerrServerRepository.kt"
+                if change == "not_incoming":
+                    runner.incoming.remove(repository)
+                elif change == "wrong_upstream_permission":
+                    key = f"{UPSTREAM}:{repository}"
+                    runner.sources[key] = runner.sources[key].replace("REQUEST_TV", "REQUEST_MOVIE")
+                elif change == "wrong_upstream_flow":
+                    key = f"{UPSTREAM}:{resolve.APPLICATION_SOURCE}ui/detail/discover/DiscoverSeriesViewModel.kt"
+                    runner.sources[key] = runner.sources[key].replace("?: false", "?: true")
+                elif change == "not_a_viewmodel_consumer":
+                    key = f"{candidate.current_main}:{series}"
+                    runner.sources[key] = runner.sources[key].replace("viewModel: SeriesViewModel", "viewModel: OtherViewModel")
+                else:
+                    key = f"{candidate.current_main}:{producer}"
+                    if change == "wrong_owner":
+                        runner.sources[key] = runner.sources[key].replace("private val seerrServerRepository", "val otherRepository")
+                    elif change == "no_existing_flow":
+                        runner.sources[key] = "class SeriesViewModel {}"
+                    else:
+                        runner.sources[key] = (root / producer).read_text(encoding="utf-8")
+                with self.assertRaisesRegex(resolve.Refusal, "outside"):
+                    self.check_dependency_scope([producer], fixture, root)
+
+    def test_permission_producer_rejects_unrelated_viewmodels_and_documentation(self):
+        fixture, root, producer = self.permission_producer_fixture()
+        for other in (resolve.APPLICATION_SOURCE + "ui/detail/series/OtherViewModel.kt",
+                      resolve.APPLICATION_SOURCE + "ui/main/HomeViewModel.kt", "docs/UPSTREAM_SYNC.md"):
+            with self.subTest(other=other), self.assertRaisesRegex(resolve.Refusal, "outside"):
+                self.check_dependency_scope([producer, other], fixture, root)
+
+    def test_permission_producer_preserves_new_required_dialog_and_remaining_range_guards(self):
+        for change in ("optional", "already_present", "dialog_not_incoming", "not_a_caller"):
+            with self.subTest(change=change):
+                fixture, root, producer = self.permission_producer_fixture()
+                runner, candidate, attention, _schema, series, _tests = fixture
+                dialog = attention[1]
+                if change == "optional":
+                    key = f"{UPSTREAM}:{dialog}"
+                    runner.sources[key] = runner.sources[key].replace("Boolean,", "Boolean = true,")
+                elif change == "already_present":
+                    runner.sources[f"{candidate.current_main}:{dialog}"] = runner.sources[f"{UPSTREAM}:{dialog}"]
+                elif change == "dialog_not_incoming":
+                    runner.incoming.remove(dialog)
+                else:
+                    runner.sources[f"{candidate.current_main}:{series}"] = "Unrelated()"
+                with self.assertRaisesRegex(resolve.Refusal, "outside"):
+                    self.check_dependency_scope([producer], fixture, root)
+
+    def test_permission_producer_reauthenticates_pr_episode_head_tree_and_blocked_context(self):
+        for change, message in (("episode", "episode_id"), ("number", "different PR"),
+                                ("head", "PR identity changed"), ("tree", "tree differs"),
+                                ("upstream", "SHA pair"), ("context", "context does not match")):
+            with self.subTest(change=change):
+                fixture, root, producer = self.permission_producer_fixture()
+                runner, candidate, _attention, _schema, _series, _tests = fixture
+                if change == "episode":
+                    candidate.observation["episode_id"] = "1" * 64
+                elif change == "number":
+                    candidate.pr["number"] = 34
+                elif change == "head":
+                    candidate.pr["head"]["sha"] = "8" * 40
+                elif change == "tree":
+                    candidate.observation["candidate_tree"] = "5" * 40
+                elif change == "upstream":
+                    candidate.observation["upstream_sha"] = "5" * 40
+                else:
+                    candidate.observation["conflict_paths"] = candidate.observation["review_paths"][:1]
+                with self.assertRaisesRegex(resolve.Refusal, message):
+                    self.check_dependency_scope([producer], fixture, root)
+
+    def test_permission_producer_missing_context_or_source_fails_closed(self):
+        fixture, root, producer = self.permission_producer_fixture()
+        with self.assertRaisesRegex(resolve.Refusal, "outside"):
+            resolve.validate_resolution_scope([producer, fixture[-1]], fixture[2])
+        (root / producer).unlink()
+        with self.assertRaises(resolve.Refusal):
+            self.check_dependency_scope([producer], fixture, root)
 
     def test_dependency_scope_accepts_stage_d_room_export_and_permission_consumer(self):
         fixture = self.dependency_fixture()
@@ -1245,7 +1390,8 @@ class ResolveUpstreamTests(unittest.TestCase):
     def test_publication_rechecks_dependency_scope_with_refreshed_candidate(self):
         runner, candidate, attention, schema, series, tests = self.dependency_fixture()
         candidate.current_main = None
-        paths = [*attention, schema, series, tests]
+        producer = resolve.APPLICATION_SOURCE + "ui/detail/series/SeriesViewModel.kt"
+        paths = [*attention, schema, series, producer, tests]
         with (patch.object(resolve, "verify_local_descendant"),
               patch.object(resolve, "assert_native_merge_identity"),
               patch.object(resolve, "resolution_paths", return_value=paths),
@@ -1253,7 +1399,7 @@ class ResolveUpstreamTests(unittest.TestCase):
               patch.object(resolve, "open_candidates", return_value=[candidate]),
               patch.object(resolve, "classify_dependencies", return_value=[candidate]),
               patch.object(resolve, "commit_native_resolution", return_value=("d" * 40, "f" * 40)),
-              patch.object(resolve, "resolution_dependency_scope", return_value={schema, series}) as scope):
+              patch.object(resolve, "resolution_dependency_scope", return_value={schema, series, producer}) as scope):
             resolve.publication_phase(self.root(), runner, candidate, lambda _: "y")
         self.assertEqual(2, scope.call_count)
         self.assertTrue(all(call.args[-1] is candidate for call in scope.call_args_list))

@@ -479,6 +479,12 @@ Resolution scope also recognizes two explicit dependency edges, not neighboring 
 - An attention-path `RequestSeasons.kt` introducing the required `requestEnabled` parameter on
   `RequestSeasonsDialog` permits the existing `SeriesDetails.kt` caller to adapt. Immutable
   current-main sources must prove the old signature and existing call.
+  Its `SeriesViewModel.kt` producer is permitted only when those sources also prove the typed
+  consumer, private Seerr repository and existing 4K flow, and the remaining incoming range
+  proves the standard-TV capability and upstream fail-closed flow. The resolved ViewModel may
+  add only that `requestTvEnabled ?: false` flow with an initial `false`; removing it must
+  leave current-main code unchanged (apart from blank lines/trailing whitespace). Other
+  permission edits, ViewModels and neighboring paths gain no authority.
 - An attention-path `AppDatabase.kt` with incoming Room version/entity changes permits only the
   **next** Mosaic schema export, derived from the immutable current-main database version
   (currently `37` to `38`). Existing exports, other versions and other database namespaces do
