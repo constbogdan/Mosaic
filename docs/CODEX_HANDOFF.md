@@ -61,8 +61,11 @@ not current instruction.
   bind its exact blocker identity to independently verified original blocked-context evidence and
   current main, but must still resolve only the original upstream target. Missing fresh hosted
   proof or mismatched identity remains a refusal; see [Upstream integration](UPSTREAM_SYNC.md).
-- Resolver dependency scope is deliberately limited to the existing request-dialog caller and the
-  next Mosaic Room export, proved from immutable authenticated sources. Use the remaining native
+- Resolver dependency scope is deliberately limited to the existing request-dialog caller, its
+  private permission producer, and the next Mosaic Room export, proved from immutable authenticated
+  sources. Caller permission alone cannot satisfy a required dialog argument when its state lives
+  in a private ViewModel repository. The producer exception admits only the upstream-equivalent
+  fail-closed standard-TV flow addition, not other edits in that file. Use the remaining native
   range, not the original episode's full backlog, to justify a producer change: otherwise already
   accepted Stage B/C work could incorrectly authorize a new adaptation. This does not grant an
   editable handoff, neighboring source, or arbitrary schema export any publication authority.
