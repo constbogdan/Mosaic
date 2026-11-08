@@ -893,14 +893,14 @@ def validate_reconciliation_scope(runner: Runner, root: Path, candidate: Candida
     return sorted(reconciliation_paths)
 
 
-def derive_filters(paths: list[str], attention: list[str]) -> list[str]:
+def derive_filters(paths: list[str], attention: list[str], *, root: Path | None = None) -> list[str]:
     if not paths:
         raise Refusal("No semantic-resolution changes exist; publication is not needed.")
     production = sorted(set(path for path in paths + attention if path.startswith("app/src/main/")))
     changed_tests = sorted(set(path for path in paths
                                if path.startswith(("app/src/test/", "app/src/testDebug/"))))
-    production_filters, fallback = mosaic_validation_policy.focused_tests(production)
-    test_filters, _ = mosaic_validation_policy.focused_tests(changed_tests)
+    production_filters, fallback = mosaic_validation_policy.focused_tests(production, root=root)
+    test_filters, _ = mosaic_validation_policy.focused_tests(changed_tests, root=root)
     if fallback and not test_filters:
         raise Refusal("Focused coverage is ambiguous and no supplemental changed test proves intent for: " +
                       ", ".join(fallback))
@@ -1262,7 +1262,7 @@ def publication_phase(root: Path, runner: Runner, candidate: Candidate, input_fn
     )
     upstream_paths = sorted(set(paths) - set(reconciliation_paths))
     validate_resolution_scope(upstream_paths, attention, runner=runner, root=root, candidate=candidate)
-    derived_filters = derive_filters(paths, attention)
+    derived_filters = derive_filters(paths, attention, root=root)
     validate_filter_targets(root, derived_filters)
     filters, filter_source = resolution_filters(root, candidate, derived_filters)
     print("\nPublication plan")
@@ -1315,7 +1315,7 @@ def publication_phase(root: Path, runner: Runner, candidate: Candidate, input_fn
         sorted(set(current_paths) - set(current_reconciliation_paths)), attention,
         runner=runner, root=root, candidate=current,
     )
-    current_derived_filters = derive_filters(current_paths, attention)
+    current_derived_filters = derive_filters(current_paths, attention, root=root)
     validate_filter_targets(root, current_derived_filters)
     current_filters, _ = resolution_filters(root, current, current_derived_filters)
     if current_paths != paths or current_filters != filters:

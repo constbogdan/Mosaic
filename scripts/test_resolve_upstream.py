@@ -928,6 +928,43 @@ class ResolveUpstreamTests(unittest.TestCase):
         path.write_text(json.dumps(payload), encoding="utf-8")
         return path
 
+    def test_filter_derivation_ignores_proven_helper_but_keeps_executable_target(self):
+        root = self.root()
+        paths = []
+        for name, source in (
+            ("TestUtils", "package fixture\nfun sample() = 1\n"),
+            ("ActualTest", "package fixture\nclass ActualTest { @org.junit.Test fun works() {} }\n"),
+        ):
+            path = f"app/src/test/java/fixture/{name}.kt"
+            file = root / path
+            file.parent.mkdir(parents=True, exist_ok=True)
+            file.write_text(source, encoding="utf-8")
+            paths.append(path)
+        filters = resolve.derive_filters(paths, [], root=root)
+        self.assertEqual(["*ActualTest"], filters)
+        resolve.validate_filter_targets(root, filters)
+
+    def test_required_executable_filename_mismatch_still_refuses(self):
+        root = self.root()
+        path = "app/src/test/java/fixture/MissingTest.kt"
+        file = root / path
+        file.parent.mkdir(parents=True)
+        file.write_text("package fixture\nclass ActualTest { @org.junit.Test fun works() {} }\n")
+        filters = resolve.derive_filters([path], [], root=root)
+        with self.assertRaisesRegex(resolve.Refusal, "do not match.*MissingTest"):
+            resolve.validate_filter_targets(root, filters)
+
+    def test_helper_cannot_supply_supplemental_coverage_or_authorize_empty_selection(self):
+        root = self.root()
+        path = "app/src/test/java/fixture/Support.kt"
+        file = root / path
+        file.parent.mkdir(parents=True)
+        file.write_text("package fixture\nfun sample() = 1\n")
+        with self.assertRaisesRegex(resolve.Refusal, "No meaningful focused JVM filters"):
+            resolve.derive_filters([path], [], root=root)
+        with self.assertRaisesRegex(resolve.Refusal, "Focused coverage is ambiguous"):
+            resolve.derive_filters([path], ["app/src/main/res/values/strings.xml"], root=root)
+
     def test_absent_filter_handoff_uses_derived_fallback(self):
         candidate = self.candidate(33, "app/src/main/SeriesViewModel.kt", "1" * 40)
         filters, reason = resolve.resolution_filters(self.root(), candidate, ["derived.Filter"])

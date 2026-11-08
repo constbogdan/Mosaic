@@ -72,6 +72,12 @@ not current instruction.
 - Local Fast feedback is not hosted validation authority. Every PR receives complete offline
   tooling; uncertain Android/build scope selects `ANDROID_FULL`. Protected main reuses evidence only
   for an exactly authenticated tested tree and otherwise runs the complete conservative fallback.
+- A Kotlin test helper is not a runnable class merely because its file changed. The shared selector
+  omits only positively proved top-level helpers; uncertain targets remain subject to matching.
+  The resolver validates its derived floor before a semantic handoff, so that handoff cannot repair
+  a bad derived target. Resolver/publisher entry points bind to their own checkout. A tooling PR
+  advancing main does not rewrite a preserved integration, but makes an older B's exact-main parent
+  stale; fresh evidence and separately authorized reconciliation are still required.
 - Validation class and Development release relevance are independent. High-risk tooling can require
   Android validation without requiring an APK.
 - Development Release assembly belongs to authenticated final main. Signing is isolated from build
