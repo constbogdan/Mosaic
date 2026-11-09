@@ -1,10 +1,12 @@
 package com.github.damontecres.wholphin.services
 
+import com.github.damontecres.wholphin.api.seerr.TvRequestHttpFixture
 import com.github.damontecres.wholphin.api.seerr.model.DownloadStatus
 import com.github.damontecres.wholphin.api.seerr.model.DownloadStatusEpisode
 import com.github.damontecres.wholphin.api.seerr.model.MediaInfo
 import com.github.damontecres.wholphin.api.seerr.model.MediaRequest
 import com.github.damontecres.wholphin.api.seerr.model.Season
+import com.github.damontecres.wholphin.api.seerr.requestSession
 import com.github.damontecres.wholphin.data.model.AcquisitionPhase
 import com.github.damontecres.wholphin.data.model.DiscoverItem
 import com.github.damontecres.wholphin.data.model.SeerrAcquisitionState
@@ -24,6 +26,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -55,6 +58,157 @@ class JellyfinAcquisitionReadinessServiceTest {
     fun setUp() {
         every { api.itemsApi } returns itemsApi
     }
+
+    @Test
+    fun ordinaryMovieAndTvReadinessNeedsSourcesNotResolutionOrItemLevelStreams() =
+        runTest {
+            for (width in listOf(3840, 3596, null)) {
+                val source = if (width == null) videoSource(null, null).copy(mediaStreams = null) else videoSource(width, 2160)
+                val item = movie(UUID.randomUUID(), source)
+                coEvery { itemsApi.getItems(match<GetItemsRequest> { it.ids == listOf(item.id) }) } returns
+                    successQueryResult(listOf(item))
+                val movieReady =
+                    service
+                        .enrich(listOf(movieRequest(item.id)))
+                        .single()
+                        .request.jellyfinReadiness
+                assertTrue(movieReady.movieReady)
+                assertEquals(item.id, movieReady.playableMovieId)
+
+                val seriesId = UUID.randomUUID()
+                val episode = episode(seriesId, 1, 1920).copy(mediaSources = listOf(source))
+                inventoryResponse(seriesId, listOf(episode))
+                val tvReady =
+                    realInventoryService()
+                        .enrich(listOf(tvRequest(seriesId)))
+                        .single()
+                        .request.jellyfinReadiness
+                assertTrue(tvReady.seasonReady(1, 1))
+                assertEquals(episode.id, tvReady.episodeItemIds[1]?.get(1))
+            }
+            coVerify(exactly = 0) {
+                itemsApi.getItems(match<GetItemsRequest> { ItemFields.MEDIA_STREAMS in it.fields.orEmpty() })
+            }
+        }
+
+    @Test
+    fun inPlaceExternalReplacementKeepsOrdinaryRequestAndCompletionWithoutUpgradeRequest() =
+        runTest {
+            val id = UUID.randomUUID()
+            var item = movie(id, videoSource(1920, 1080))
+            coEvery { itemsApi.getItems(any<GetItemsRequest>()) } answers { successQueryResult(listOf(item)) }
+            val request = movieRequest(id).let { it.copy(request = it.request.copy(updatedAt = "1970-01-01T00:00:00Z")) }
+            val tracker =
+                SeerrAcquisitionTracker(
+                    loadRequests = { listOf(request) },
+                    resolveJellyfinReadiness = service::enrich,
+                    sessions = MutableStateFlow(SeerrAcquisitionSession(1, 7, "fixture", 1)),
+                    dispatcher = StandardTestDispatcher(testScheduler),
+                    pollIntervalMillis = 30_000L,
+                    maxBackoffMillis = 300_000L,
+                    currentTimeMillis = { testScheduler.currentTime },
+                )
+            try {
+                tracker.startForeground()
+                runCurrent()
+                val before =
+                    tracker.state.value.requests
+                        .single()
+                        .request
+                assertTrue(before.jellyfinReadiness.movieReady)
+                for (source in listOf(
+                    videoSource(3840, 2160),
+                    videoSource(3596, 2160),
+                    videoSource(null, null).copy(mediaStreams = null),
+                )) {
+                    item = movie(id, source)
+                    tracker.refreshNow()
+                    runCurrent()
+                    val after =
+                        tracker.state.value.requests
+                            .single()
+                            .request
+                    assertEquals(before.requestId, after.requestId)
+                    assertFalse(after.is4k)
+                    assertEquals(id, after.jellyfinReadiness.playableMovieId)
+                    assertTrue(after.jellyfinReadiness.movieReady)
+                    assertEquals(before.jellyfinReadySinceEpochMillis, after.jellyfinReadySinceEpochMillis)
+                    assertEquals(
+                        1,
+                        tracker.state.value.requests
+                            .toDownloadSections(testScheduler.currentTime)
+                            .completed.size,
+                    )
+                    assertTrue(
+                        tracker.state.value
+                            .toAcquisitionIndex()
+                            .toHomeAcquiringState()
+                            .items
+                            .isEmpty(),
+                    )
+                }
+            } finally {
+                tracker.stopForeground()
+            }
+        }
+
+    @Test
+    fun historicalFourKRequestIsTrackedWhenCurrentPublicCapabilitiesAreDisabled() =
+        runTest {
+            val current = MutableStateFlow<CurrentSeerr?>(requestSession(movie4k = false, tv4k = false))
+            val http =
+                TvRequestHttpFixture(
+                    200,
+                    """{"pageInfo":{"page":1,"pages":1,"results":1},"results":[{"id":91,"status":5,"type":"movie","is4k":true,"media":{"id":1,"tmdbId":10,"status":5,"status4k":5}}]}""",
+                )
+            val repository =
+                mockk<SeerrServerRepository> {
+                    every { this@mockk.current } returns current
+                    every { currentUserId } returns current.map { it?.config?.id }
+                }
+            val wrapper = mockk<SeerrApi> { every { api } returns http.api }
+            val seerr = SeerrService(wrapper, repository, mockk())
+            val requests = seerr.getRequestAcquisitions()
+            val id = UUID.randomUUID()
+            var item = movie(id, videoSource(1920, 1080))
+            coEvery { itemsApi.getItems(any<GetItemsRequest>()) } answers { successQueryResult(listOf(item)) }
+            val tracker =
+                SeerrAcquisitionTracker(
+                    loadRequests = { requests.map { it.withDiscoverItem(SeerrItemType.MOVIE, 10, "Movie", id) } },
+                    resolveJellyfinReadiness = service::enrich,
+                    sessions = MutableStateFlow(SeerrAcquisitionSession(1, 7, "fixture", 1)),
+                    dispatcher = StandardTestDispatcher(testScheduler),
+                    pollIntervalMillis = 30_000L,
+                    maxBackoffMillis = 300_000L,
+                    currentTimeMillis = { testScheduler.currentTime },
+                )
+            try {
+                assertFalse(current.value.permitsRequest(SeerrItemType.MOVIE, true))
+                tracker.startForeground()
+                runCurrent()
+                val historical =
+                    tracker.state.value.requests
+                        .single()
+                        .request
+                assertTrue(historical.is4k)
+                assertFalse(historical.jellyfinReadiness.movieReady)
+                assertEquals(id, historical.jellyfinReadiness.playableMovieId)
+                item = movie(id, videoSource(3840, 2160))
+                tracker.refreshNow()
+                runCurrent()
+                val fulfilled =
+                    tracker.state.value.requests
+                        .single()
+                        .request
+                assertTrue(fulfilled.is4k)
+                assertTrue(fulfilled.jellyfinReadiness.movieReady)
+                assertEquals(historical.requestId, fulfilled.requestId)
+                assertTrue(http.calls.isNotEmpty())
+                assertTrue(http.calls.all { it.method == "GET" && it.url.encodedPath == "/api/v1/request" })
+            } finally {
+                tracker.stopForeground()
+            }
+        }
 
     @Test
     fun coldStartMovieUsesExplicitJellyfinIdAndValidatesPlayability() =
@@ -209,7 +363,8 @@ class JellyfinAcquisitionReadinessServiceTest {
             coVerify(exactly = 1) {
                 itemsApi.getItems(
                     match<GetItemsRequest> {
-                        it.searchTerm == "Movie" && it.limit == 20 && ItemFields.MEDIA_STREAMS in it.fields.orEmpty()
+                        it.searchTerm == "Movie" && it.limit == 20 &&
+                            ItemFields.MEDIA_SOURCES in it.fields.orEmpty() && ItemFields.MEDIA_STREAMS !in it.fields.orEmpty()
                     },
                 )
             }

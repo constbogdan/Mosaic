@@ -99,7 +99,7 @@ class JellyfinAcquisitionReadinessService
                                 GetItemsRequest(
                                     ids = listOf(jellyfinItemId),
                                     includeItemTypes = listOf(kind),
-                                    fields = listOf(ItemFields.PROVIDER_IDS, ItemFields.MEDIA_SOURCES, ItemFields.MEDIA_STREAMS),
+                                    fields = listOf(ItemFields.PROVIDER_IDS, ItemFields.MEDIA_SOURCES),
                                     limit = 1,
                                     enableTotalRecordCount = false,
                                 ),
@@ -141,7 +141,7 @@ class JellyfinAcquisitionReadinessService
                             searchTerm = title,
                             recursive = true,
                             includeItemTypes = listOf(kind),
-                            fields = listOf(ItemFields.PROVIDER_IDS, ItemFields.MEDIA_SOURCES, ItemFields.MEDIA_STREAMS),
+                            fields = listOf(ItemFields.PROVIDER_IDS, ItemFields.MEDIA_SOURCES),
                             limit = 20,
                             enableTotalRecordCount = false,
                         ),

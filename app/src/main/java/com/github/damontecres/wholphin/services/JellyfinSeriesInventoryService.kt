@@ -32,7 +32,7 @@ class JellyfinSeriesInventoryService
                             parentId = seriesItemId,
                             recursive = true,
                             includeItemTypes = listOf(BaseItemKind.SEASON, BaseItemKind.EPISODE),
-                            fields = listOf(ItemFields.MEDIA_SOURCES, ItemFields.MEDIA_STREAMS),
+                            fields = listOf(ItemFields.MEDIA_SOURCES),
                             enableTotalRecordCount = false,
                         ),
                     ).content.items

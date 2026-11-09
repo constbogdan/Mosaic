@@ -6,9 +6,11 @@ import androidx.lifecycle.ViewModelStore
 import com.github.damontecres.wholphin.api.seerr.MoviesApi
 import com.github.damontecres.wholphin.api.seerr.SeerrApiClient
 import com.github.damontecres.wholphin.api.seerr.TvRequestHttpFixture
+import com.github.damontecres.wholphin.api.seerr.infrastructure.Serializer
 import com.github.damontecres.wholphin.api.seerr.model.MediaInfo
 import com.github.damontecres.wholphin.api.seerr.model.MediaRequest
 import com.github.damontecres.wholphin.api.seerr.model.MovieDetails
+import com.github.damontecres.wholphin.api.seerr.model.RequestPostRequest
 import com.github.damontecres.wholphin.api.seerr.model.RequestUser
 import com.github.damontecres.wholphin.api.seerr.requestSession
 import com.github.damontecres.wholphin.data.model.DiscoverItem
@@ -42,6 +44,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import okio.Buffer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -110,6 +113,23 @@ class DiscoverMovieRequestTest {
     }
 
     @Test fun standardOnly() = runTest(dispatcher) { assertQualities(requestSession(32), true, false) }
+
+    @Test fun ordinaryUhdProfileUsesStandardRadarrWithoutFourKCapability() =
+        runTest(dispatcher) {
+            current.value = requestSession(movie4k = false, tv4k = false)
+            val profile = SeerrProfile(9, "UHD", true)
+            refreshed = CompletableDeferred()
+            model.request(MovieRequest(SeerrRequestData(serverId = 11, profiles = listOf(profile)), 42, false, profile.id, null))
+            runCurrent()
+            refreshed!!.await()
+            val call = http.calls.single()
+            val body = Buffer().also { call.body!!.writeTo(it) }.readUtf8()
+            val submitted = Serializer.kotlinxSerializationJson.decodeFromString<RequestPostRequest>(body)
+            assertEquals("POST", call.method)
+            assertEquals(11, submitted.serverId)
+            assertEquals(profile.id, submitted.profileId)
+            assertEquals(false, submitted.is4k)
+        }
 
     @Test fun fourKOnly() = runTest(dispatcher) { assertQualities(requestSession(1024), false, true) }
 

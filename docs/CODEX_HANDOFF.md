@@ -48,7 +48,13 @@ not current instruction.
   remain independent. Acquisition readiness now uses source-level Jellyfin video dimensions for
   4K (width at least 3840, positive height; cropped UHD/DCI sources qualify). Standard keeps its
   existing playable-source behavior. Item-level streams, names/HDR, Seerr `status4k`, request
-  completion and queue disappearance are not quality proof. Seerr's scanner uses width >2000,
+  completion and queue disappearance are not quality proof. `MEDIA_SOURCES` includes those
+  per-source streams; readiness queries do not need the unused top-level `MEDIA_STREAMS` field.
+  Ordinary requests keep the chosen Servarr profile and standard service role even for UHD;
+  3596-wide or dimensionless playable sources qualify without a new upgrade request. Current
+  public 4K capability flags gate new submissions, not historical 4K tracking. The dedicated-4K
+  3840-width limitation remains a separate follow-up, not a generic readiness restriction.
+  Seerr's scanner uses width >2000,
   which can classify 2K as 4K; its Library resolution summaries are neither per-version Jellyfin
   identities nor part of the request contract. Movie fulfillment and generic playback IDs are
   separate; TV counts only exact verified episode numbers for 4K, never duplicate versions.
