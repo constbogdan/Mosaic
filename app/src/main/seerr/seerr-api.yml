@@ -1373,6 +1373,31 @@ components:
     DownloadStatus:
       type: object
       properties:
+        acquisitionPhase:
+          type: string
+          nullable: true
+          description: Per-queue-entry phase; unknown future values must remain conservative.
+        acquisitionPhaseStartedAt:
+          type: string
+          nullable: true
+        health:
+          type: string
+          nullable: true
+          description: Independent health; ok, warning or error.
+        safeReason:
+          type: string
+          nullable: true
+          description: Allowlisted backend reason code, never a raw provider error.
+        trackedDownloadStatus:
+          type: string
+          nullable: true
+        trackedDownloadState:
+          type: string
+          nullable: true
+        trackedStatus:
+          type: string
+          nullable: true
+          description: Compatibility alias for trackedDownloadStatus.
         externalId:
           type: integer
           nullable: true

@@ -39,6 +39,9 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.model.AcquisitionAggregate
+import com.github.damontecres.wholphin.data.model.AcquisitionHealth
+import com.github.damontecres.wholphin.data.model.AcquisitionLifecycle
+import com.github.damontecres.wholphin.data.model.AcquisitionPhase
 import com.github.damontecres.wholphin.data.model.AcquisitionStatus
 import com.github.damontecres.wholphin.data.model.DiscoverItem
 import com.github.damontecres.wholphin.data.model.RequestStatus
@@ -56,12 +59,15 @@ import com.github.damontecres.wholphin.data.model.hasActiveProgress
 import com.github.damontecres.wholphin.data.model.isFinishing
 import com.github.damontecres.wholphin.data.model.isWithinDownloadsCompletedWindow
 import com.github.damontecres.wholphin.data.model.isWithinDownloadsWaitingGrace
+import com.github.damontecres.wholphin.data.model.lifecycle
 import com.github.damontecres.wholphin.data.model.toTvSeasonTargets
 import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.services.SeerrAcquisitionTracker
 import com.github.damontecres.wholphin.ui.cards.CardAcquisitionState
 import com.github.damontecres.wholphin.ui.cards.CardMediaPresentation
+import com.github.damontecres.wholphin.ui.cards.displayText
 import com.github.damontecres.wholphin.ui.cards.movieCardPresentation
+import com.github.damontecres.wholphin.ui.cards.stringResource
 import com.github.damontecres.wholphin.ui.cards.tvSeasonCardPresentation
 import com.github.damontecres.wholphin.ui.nav.Destination
 import com.github.damontecres.wholphin.ui.nav.verifiedSeriesDestination
@@ -346,7 +352,8 @@ private fun DownloadRow(
         headlineContent = { Text(displayTitle, maxLines = 1) },
         supportingContent = {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(item.status.stringResource))
+                Text(item.lifecycle?.displayText() ?: stringResource(item.status.stringResource))
+                item.lifecycle?.reason?.let { Text(stringResource(it.stringResource)) }
                 timing?.let { Text(it) }
             }
         },
@@ -385,6 +392,7 @@ data class DownloadDisplayItem(
     val request: SeerrRequestAcquisition,
     val seasonNumber: Int? = null,
     val flatIndex: Int = 0,
+    val lifecycle: AcquisitionLifecycle? = null,
 )
 
 enum class DownloadStatusLabel(
@@ -496,7 +504,7 @@ internal fun List<SeerrRequestAcquisition>.toDownloadSections(nowEpochMillis: Lo
                         completed = false,
                         nowEpochMillis = nowEpochMillis,
                     )
-                if (aggregate.hasActiveProgress && !aggregate.isFinishing) {
+                if (row.status == DownloadStatusLabel.IN_PROGRESS) {
                     active += row
                 } else {
                     processing += row
@@ -519,7 +527,7 @@ internal fun List<SeerrRequestAcquisition>.toDownloadSections(nowEpochMillis: Lo
                     nowEpochMillis = nowEpochMillis,
                     mediaPresentation = moviePresentation,
                 )
-            if (moviePresentation.acquisitionProgress != null) {
+            if (row.status == DownloadStatusLabel.IN_PROGRESS) {
                 active += row
             } else {
                 processing += row
@@ -585,6 +593,7 @@ private fun TvSeasonTarget.toRow(
             completed = false,
             request = request,
             seasonNumber = seasonNumber,
+            lifecycle = mediaPresentation.lifecycle,
         )
     }
     val hasAcquisitionEvidence = aggregate?.entries.orEmpty().isNotEmpty()
@@ -672,13 +681,14 @@ private fun SeerrRequestAcquisition.row(
         status =
             mediaPresentation?.downloadStatus() ?: when {
                 completed -> DownloadStatusLabel.AVAILABLE
+                aggregate?.lifecycle != null -> aggregate.lifecycle!!.downloadStatus(aggregate.hasActiveProgress)
                 request.status == RequestStatus.FAILURE -> DownloadStatusLabel.PROBLEM
                 aggregate == null -> DownloadStatusLabel.QUEUED
                 aggregate.isFinishing -> DownloadStatusLabel.FINISHING
                 aggregate.hasActiveProgress -> DownloadStatusLabel.IN_PROGRESS
                 else -> DownloadStatusLabel.QUEUED
             },
-        // ARR may report 100% before import; reserve 100%/Available for Jellyfin readiness.
+        // Transfer percentage is independent of import/playability; only readiness makes a row completed.
         progress =
             if (mediaPresentation != null) {
                 mediaPresentation.acquisitionProgress
@@ -699,14 +709,41 @@ private fun SeerrRequestAcquisition.row(
         completed = completed,
         request = this,
         seasonNumber = seasonNumber,
+        lifecycle = mediaPresentation?.lifecycle ?: aggregate?.lifecycle,
     )
 
 private fun CardMediaPresentation.downloadStatus(): DownloadStatusLabel =
-    when {
+    lifecycle?.downloadStatus(acquisitionProgress != null) ?: when {
         acquisitionProgress != null -> DownloadStatusLabel.IN_PROGRESS
         acquisitionState == CardAcquisitionState.QUEUEING -> DownloadStatusLabel.QUEUEING
         acquisitionState == CardAcquisitionState.FINISHING -> DownloadStatusLabel.FINISHING
         else -> DownloadStatusLabel.QUEUED
+    }
+
+private fun AcquisitionLifecycle.downloadStatus(hasProgress: Boolean): DownloadStatusLabel =
+    when {
+        health == AcquisitionHealth.ERROR || phase == AcquisitionPhase.WARNING -> {
+            DownloadStatusLabel.PROBLEM
+        }
+
+        phase == AcquisitionPhase.DOWNLOADING && hasProgress -> {
+            DownloadStatusLabel.IN_PROGRESS
+        }
+
+        phase in
+            setOf(
+                AcquisitionPhase.PROCESSING,
+                AcquisitionPhase.IMPORT_PENDING,
+                AcquisitionPhase.IMPORTING,
+                AcquisitionPhase.FINALIZING,
+            )
+        -> {
+            DownloadStatusLabel.FINISHING
+        }
+
+        else -> {
+            DownloadStatusLabel.QUEUED
+        }
     }
 
 private fun SeerrRequestAcquisition.queueingRow(
@@ -791,6 +828,7 @@ private fun SeerrRequestAcquisition.toDiscoverItem(title: String): DiscoverItem?
     }
 
 private fun AcquisitionAggregate.activeTiming(nowEpochMillis: Long): DownloadTiming? {
+    lifecycle?.let { if (it.phase != AcquisitionPhase.DOWNLOADING || it.health != AcquisitionHealth.OK) return null }
     if (!hasActiveProgress || isFinishing) return null
     val entry =
         entries.firstOrNull {

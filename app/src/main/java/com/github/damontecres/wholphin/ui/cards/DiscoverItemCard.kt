@@ -37,6 +37,8 @@ import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.github.damontecres.wholphin.R
+import com.github.damontecres.wholphin.data.model.AcquisitionHealth
+import com.github.damontecres.wholphin.data.model.AcquisitionLifecycle
 import com.github.damontecres.wholphin.data.model.DiscoverItem
 import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.data.model.SeerrItemType
@@ -148,6 +150,7 @@ fun DiscoverItemCard(
                 if (acquisitionOverlayState != null) {
                     AcquisitionStateIndicator(
                         state = acquisitionOverlayState,
+                        lifecycle = mediaPresentation?.lifecycle,
                         modifier = Modifier.align(Alignment.TopStart),
                     )
                 } else if (showOverlay) {
@@ -221,10 +224,11 @@ fun DiscoverItemCard(
 @Composable
 fun AcquisitionStateIndicator(
     state: CardAcquisitionState,
+    lifecycle: AcquisitionLifecycle? = null,
     modifier: Modifier = Modifier,
 ) {
     val text =
-        when (state) {
+        lifecycle?.displayText() ?: when (state) {
             CardAcquisitionState.ACQUIRING -> stringResource(R.string.acquiring)
             CardAcquisitionState.QUEUEING -> stringResource(R.string.download_status_queueing)
             CardAcquisitionState.QUEUED -> stringResource(R.string.download_status_queued)
@@ -234,8 +238,14 @@ fun AcquisitionStateIndicator(
         modifier =
             modifier
                 .padding(4.dp)
-                .background(AppColors.Discover.Purple.copy(alpha = .7f), RoundedCornerShape(4.dp))
-                .padding(horizontal = 4.5.dp, vertical = 1.75.dp),
+                .background(
+                    when (lifecycle?.health) {
+                        AcquisitionHealth.ERROR -> Color.Red
+                        AcquisitionHealth.WARNING -> AppColors.Discover.Yellow
+                        else -> AppColors.Discover.Purple
+                    }.copy(alpha = .7f),
+                    RoundedCornerShape(4.dp),
+                ).padding(horizontal = 4.5.dp, vertical = 1.75.dp),
     ) {
         Text(
             text = text,

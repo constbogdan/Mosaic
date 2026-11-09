@@ -45,7 +45,13 @@ not current instruction.
   request-season lifecycle status or the opposite quality. Missing physical seasons stay Unknown;
   their timestamps must not come from request seasons. The shared generated `Season` DTO is still
   used in both payload contexts, so field ownership matters. Queue progress and Jellyfin readiness
-  remain independent; quality-aware Jellyfin fulfillment and acquisition-health handling are deferred.
+  remain independent; quality-aware Jellyfin fulfillment remains deferred.
+  Explicit queue phase/health is projected once for Home and Downloads. Blocked/failed evidence
+  overrides byte/time completion; a mixed failed/healthy episode scope is Warning, not globally
+  Failed. Explicit evidence uses the existing two-missed-poll grace and never promotes queue
+  disappearance to import success. Fields absent retain legacy fallback. Reasons are allowlisted
+  backend codes mapped to local text, never provider errors. Internal backend observation IDs are
+  not serialized: reused transfer hashes without distinct evidence cannot prove a new generation.
   Seerr-custom's request-list query does not explicitly join `media.seasons`; omitted physical
   seasons therefore remain Unknown, not completed merely because a request completed.
   TV PUT selection is owner-, media-, quality- and season-overlap-specific. Disjoint seasons

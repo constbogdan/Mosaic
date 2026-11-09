@@ -607,6 +607,7 @@ fun SeriesDetailsContent(
                                             item.mediaPresentation?.acquisitionState?.let { state ->
                                                 AcquisitionStateIndicator(
                                                     state = state,
+                                                    lifecycle = item.mediaPresentation?.lifecycle,
                                                     modifier = Modifier.align(Alignment.TopStart),
                                                 )
                                             }
@@ -654,6 +655,7 @@ fun SeriesDetailsContent(
                                             if (acquisitionState != null) {
                                                 AcquisitionStateIndicator(
                                                     state = acquisitionState,
+                                                    lifecycle = item.mediaPresentation?.lifecycle,
                                                     modifier = Modifier.align(Alignment.TopStart),
                                                 )
                                             } else {

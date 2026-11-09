@@ -1048,7 +1048,7 @@ class SeerrAcquisitionTrackerTest {
             val tracker =
                 tracker(sessions) {
                     if (sessions.value?.userId == 1) {
-                        listOf(movieRequest(1, size = 100.0, sizeLeft = 50.0))
+                        listOf(movieRequest(1, size = 100.0, sizeLeft = 50.0, phase = "importBlocked"))
                     } else {
                         listOf(movieRequest(2, size = null, sizeLeft = null))
                     }
@@ -1082,7 +1082,7 @@ class SeerrAcquisitionTrackerTest {
             val tracker =
                 tracker(MutableStateFlow(SeerrAcquisitionSession(1, 1))) {
                     if (fail) error("offline")
-                    listOf(movieRequest(1, size = 100.0, sizeLeft = 50.0))
+                    listOf(movieRequest(1, size = 100.0, sizeLeft = 50.0, phase = "importing"))
                 }
             tracker.startForeground()
             runCurrent()
@@ -1124,8 +1124,9 @@ class SeerrAcquisitionTrackerTest {
         size: Double?,
         sizeLeft: Double?,
         is4k: Boolean = false,
+        phase: String? = null,
     ): SeerrRequestAcquisition {
-        val entry = size?.let { download("movie-$requestId", it, sizeLeft ?: 0.0) }
+        val entry = size?.let { download("movie-$requestId", it, sizeLeft ?: 0.0).copy(acquisitionPhase = phase) }
         return MediaRequest(
             id = requestId,
             status = 2,

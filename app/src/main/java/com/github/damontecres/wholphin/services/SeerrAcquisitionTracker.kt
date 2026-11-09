@@ -1,13 +1,17 @@
 package com.github.damontecres.wholphin.services
 
+import com.github.damontecres.wholphin.data.model.AcquisitionHealth
+import com.github.damontecres.wholphin.data.model.AcquisitionPhase
 import com.github.damontecres.wholphin.data.model.AcquisitionStatus
 import com.github.damontecres.wholphin.data.model.SeerrAcquisitionState
 import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.data.model.SeerrRequestAcquisition
 import com.github.damontecres.wholphin.data.model.authoritativelyRepresentedSeasons
 import com.github.damontecres.wholphin.data.model.hasAuthoritativeDownloadsRepresentation
+import com.github.damontecres.wholphin.data.model.hasFreshLifecycleEvidence
 import com.github.damontecres.wholphin.data.model.isWithinDownloadsCompletedWindow
 import com.github.damontecres.wholphin.data.model.isWithinDownloadsWaitingGrace
+import com.github.damontecres.wholphin.data.model.lifecycle
 import com.github.damontecres.wholphin.util.WholphinDispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -593,12 +597,19 @@ private fun SeerrRequestAcquisition.hasProblem(): Boolean =
         }
 
         is SeerrAcquisitionState.Movie -> {
-            acquisition.aggregate.status == AcquisitionStatus.PROBLEM
+            acquisition.aggregate.status == AcquisitionStatus.PROBLEM ||
+                acquisition.aggregate.lifecycle?.health in setOf(AcquisitionHealth.WARNING, AcquisitionHealth.ERROR)
         }
 
         is SeerrAcquisitionState.Tv -> {
-            acquisition.seasons.any { it.aggregate.status == AcquisitionStatus.PROBLEM } ||
-                acquisition.unassignedEntries.any { it.status == AcquisitionStatus.PROBLEM }
+            acquisition.seasons.any {
+                it.aggregate.status == AcquisitionStatus.PROBLEM ||
+                    it.aggregate.lifecycle?.health in setOf(AcquisitionHealth.WARNING, AcquisitionHealth.ERROR)
+            } ||
+                acquisition.unassignedEntries.any {
+                    it.status == AcquisitionStatus.PROBLEM ||
+                        (it.hasFreshLifecycleEvidence && it.lifecycle?.health in setOf(AcquisitionHealth.WARNING, AcquisitionHealth.ERROR))
+                }
         }
     }
 
@@ -622,7 +633,8 @@ private fun SeerrRequestAcquisition.hasLiveQueueEntry(): Boolean =
     }
 
 private fun com.github.damontecres.wholphin.data.model.AcquisitionEntry.isActivelyProgressing(): Boolean =
-    presentInQueue && hasObservedProgress && sizeLeft?.let { it > 0.0 } == true
+    presentInQueue && hasObservedProgress && sizeLeft?.let { it > 0.0 } == true &&
+        (lifecycle == null || (lifecycle.phase == AcquisitionPhase.DOWNLOADING && lifecycle.health == AcquisitionHealth.OK))
 
 private fun String.toEpochMillis(): Long? =
     runCatching { Instant.parse(this).toEpochMilli() }

@@ -121,6 +121,7 @@ data class AcquisitionEntry(
     val observedSuccessfulTransferCompletion: Boolean = false,
     /** Number of missed tracker snapshots for which this entry's TV progress remains provisional. */
     val absentPollCount: Int = 0,
+    val lifecycle: AcquisitionLifecycle? = null,
 )
 
 data class AcquisitionEpisode(
@@ -199,6 +200,7 @@ fun MediaRequest.toSeerrRequestAcquisition(): SeerrRequestAcquisition {
 }
 
 private fun DownloadStatus.toAcquisitionEntry(): AcquisitionEntry? {
+    val lifecycle = toAcquisitionLifecycle()
     val validSize = propertySize.validSize()
     val validSizeLeft = sizeLeft.validSizeLeft(validSize)
     val episode =
@@ -227,15 +229,17 @@ private fun DownloadStatus.toAcquisitionEntry(): AcquisitionEntry? {
             validSize != null && validSizeLeft != null && validSizeLeft < validSize,
         observedSuccessfulTransferCompletion =
             status.toAcquisitionStatus() != AcquisitionStatus.PROBLEM &&
+                (lifecycle == null || lifecycle.isPostTransfer) &&
                 (
                     (validSize != null && validSize > 0.0 && validSizeLeft == 0.0) ||
                         status.toAcquisitionStatus() == AcquisitionStatus.COMPLETED
                 ),
+        lifecycle = lifecycle,
     ).takeIf { it.hasMeaningfulQueueData() }
 }
 
 private fun AcquisitionEntry.hasMeaningfulQueueData(): Boolean =
-    externalId != null ||
+    lifecycle != null || externalId != null ||
         !downloadId.isNullOrBlank() ||
         !rawStatus.isNullOrBlank() ||
         totalSize != null ||

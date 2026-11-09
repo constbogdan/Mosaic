@@ -16,6 +16,53 @@ import java.util.UUID
 
 class SeerrAcquisitionTest {
     @Test
+    fun importBlockedAtOneHundredPercentIsNotFinishingOrSuccessful() {
+        val request =
+            backendRequest(
+                type = "movie",
+                physical = """{"status":3,"downloadStatus":[{
+            "status":"downloading","size":100,"sizeLeft":0,"acquisitionPhase":"importBlocked","health":"error",
+            "safeReason":"insufficient_space"}]}""",
+            ).toSeerrRequestAcquisition()
+        val aggregate = (request.acquisition as SeerrAcquisitionState.Movie).aggregate
+        assertFalse(aggregate.isFinishing)
+        assertFalse(aggregate.entries.single().observedSuccessfulTransferCompletion)
+    }
+
+    @Test
+    fun unknownExplicitPhaseDoesNotInventSuccessfulImport() {
+        val request =
+            backendRequest(
+                type = "movie",
+                physical = """{"downloadStatus":[{
+            "status":"completed","size":100,"sizeLeft":0,"acquisitionPhase":"futurePhase"}]}""",
+            ).toSeerrRequestAcquisition()
+        assertFalse((request.acquisition as SeerrAcquisitionState.Movie).aggregate.isFinishing)
+    }
+
+    @Test
+    fun explicitImportingOverridesStaleTransferBytes() {
+        val request =
+            backendRequest(
+                type = "movie",
+                physical = """{"downloadStatus":[{
+            "status":"queued","size":100,"sizeLeft":25,"acquisitionPhase":"importing","health":"ok"}]}""",
+            ).toSeerrRequestAcquisition()
+        assertTrue((request.acquisition as SeerrAcquisitionState.Movie).aggregate.isFinishing)
+    }
+
+    @Test
+    fun errorHealthOverridesDownloadingAtOneHundredPercent() {
+        val request =
+            backendRequest(
+                type = "movie",
+                physical = """{"downloadStatus":[{
+            "status":"downloading","size":100,"sizeLeft":0,"acquisitionPhase":"downloading","health":"error"}]}""",
+            ).toSeerrRequestAcquisition()
+        assertFalse((request.acquisition as SeerrAcquisitionState.Movie).aggregate.isFinishing)
+    }
+
+    @Test
     fun calculatesMovieProgressFromAllValidQueueEntries() {
         val result =
             movieRequest(
