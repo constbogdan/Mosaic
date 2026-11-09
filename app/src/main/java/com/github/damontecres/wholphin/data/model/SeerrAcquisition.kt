@@ -36,12 +36,18 @@ data class SeerrRequestState(
 )
 
 data class JellyfinAcquisitionReadiness(
+    /** IDs below prove fulfillment of this request's selected quality, not generic playback. */
     val movieItemId: UUID? = null,
     val seriesItemId: UUID? = null,
     val seasonItemIds: Map<Int, UUID> = emptyMap(),
     val episodeItemIds: Map<Int, Map<Int, UUID>> = emptyMap(),
+    /** Independently playable movie, even when it does not fulfill a 4K acquisition. */
+    val playableMovieItemId: UUID? = null,
+    /** Quality required when the fulfillment IDs were observed; standard retains legacy counting. */
+    val fulfillmentIs4k: Boolean = false,
 ) {
     val movieReady: Boolean get() = movieItemId != null
+    val playableMovieId: UUID? get() = playableMovieItemId ?: movieItemId
 
     fun seasonReady(
         seasonNumber: Int,
@@ -49,7 +55,11 @@ data class JellyfinAcquisitionReadiness(
     ): Boolean =
         expectedEpisodeCount != null &&
             expectedEpisodeCount > 0 &&
-            episodeItemIds[seasonNumber].orEmpty().size >= expectedEpisodeCount
+            if (fulfillmentIs4k) {
+                (1..expectedEpisodeCount).all { it in episodeItemIds[seasonNumber].orEmpty() }
+            } else {
+                episodeItemIds[seasonNumber].orEmpty().size >= expectedEpisodeCount
+            }
 }
 
 sealed interface SeerrAcquisitionState {

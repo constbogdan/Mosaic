@@ -93,7 +93,7 @@ internal fun AcquisitionIndexSnapshot.toHomeAcquiringState(): HomeAcquiringState
                     requests
                         .mapNotNull { acquisition ->
                             when (key.mediaType) {
-                                CatalogMediaType.MOVIE -> acquisition.request.request.jellyfinReadiness.movieItemId
+                                CatalogMediaType.MOVIE -> acquisition.request.request.jellyfinReadiness.playableMovieId
                                 CatalogMediaType.SERIES -> acquisition.request.request.jellyfinReadiness.seriesItemId
                             }
                         }.distinct()

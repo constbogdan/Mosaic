@@ -4,6 +4,7 @@ internal val SeerrRequestAcquisition.hasCurrentMovieAcquisitionWork: Boolean
     get() {
         if (request.mediaType != SeerrItemType.MOVIE) return false
         if (acquisition == SeerrAcquisitionState.Queueing) return true
+        if (request.is4k && request.availability == SeerrAvailability.AVAILABLE && !request.jellyfinReadiness.movieReady) return true
         val movie = acquisition as? SeerrAcquisitionState.Movie ?: return false
         return movie.aggregate.entries.any { entry ->
             if (entry.lifecycle != null) {

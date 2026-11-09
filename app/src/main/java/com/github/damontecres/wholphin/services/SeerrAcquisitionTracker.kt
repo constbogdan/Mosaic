@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.services
 
+import com.github.damontecres.wholphin.data.model.AcquisitionEntry
 import com.github.damontecres.wholphin.data.model.AcquisitionHealth
 import com.github.damontecres.wholphin.data.model.AcquisitionPhase
 import com.github.damontecres.wholphin.data.model.AcquisitionStatus
@@ -409,7 +410,9 @@ internal fun retainJellyfinReadiness(
 ): List<SeerrRequestAcquisition> {
     val previousById = previous.associateBy { it.request.requestId }
     return current.map { acquisition ->
-        val old = previousById[acquisition.request.requestId]?.request ?: return@map acquisition
+        val previousAcquisition = previousById[acquisition.request.requestId] ?: return@map acquisition
+        if (!acquisition.sameReadinessGenerationAs(previousAcquisition)) return@map acquisition
+        val old = previousAcquisition.request
         val currentReadiness = acquisition.request.jellyfinReadiness
         val oldReadiness = old.jellyfinReadiness
         val episodeItemIds =
@@ -426,6 +429,8 @@ internal fun retainJellyfinReadiness(
                             seriesItemId = currentReadiness.seriesItemId ?: oldReadiness.seriesItemId,
                             seasonItemIds = oldReadiness.seasonItemIds + currentReadiness.seasonItemIds,
                             episodeItemIds = episodeItemIds,
+                            playableMovieItemId = currentReadiness.playableMovieId ?: oldReadiness.playableMovieId,
+                            fulfillmentIs4k = acquisition.request.is4k,
                         ),
                     jellyfinReadySinceEpochMillis =
                         acquisition.request.jellyfinReadySinceEpochMillis
@@ -436,6 +441,35 @@ internal fun retainJellyfinReadiness(
                 ),
         )
     }
+}
+
+/** Reuse last-good proof only for the same target/quality and identifiable transfer generation.
+ * A newly visible transfer (including one after terminal ledger eviction) requires a fresh
+ * Jellyfin observation. Endpoint/account changes are independently fenced by resetSession.
+ */
+private fun SeerrRequestAcquisition.sameReadinessGenerationAs(previous: SeerrRequestAcquisition): Boolean {
+    if (request.requestId != previous.request.requestId || request.mediaId != previous.request.mediaId ||
+        request.tmdbId != previous.request.tmdbId || request.mediaType != previous.request.mediaType ||
+        request.is4k != previous.request.is4k || request.createdAt != previous.request.createdAt ||
+        (
+            request.jellyfinReadiness.seriesItemId != null && previous.request.jellyfinReadiness.seriesItemId != null &&
+                request.jellyfinReadiness.seriesItemId != previous.request.jellyfinReadiness.seriesItemId
+        )
+    ) {
+        return false
+    }
+
+    fun SeerrRequestAcquisition.queuedEntries(): List<AcquisitionEntry> =
+        when (val state = acquisition) {
+            is SeerrAcquisitionState.Movie -> state.aggregate.entries
+            is SeerrAcquisitionState.Tv -> state.seasons.flatMap { it.aggregate.entries } + state.unassignedEntries
+            else -> emptyList()
+        }.filter { it.presentInQueue }
+    val currentQueue = queuedEntries()
+    val oldQueue = previous.queuedEntries()
+    // Queue reappearance after terminal eviction is new evidence even without a transfer ID.
+    if (currentQueue.isNotEmpty() && oldQueue.isEmpty()) return false
+    return (currentQueue.mapNotNull { it.downloadId }.toSet() - oldQueue.mapNotNull { it.downloadId }.toSet()).isEmpty()
 }
 
 private fun SeerrRequestAcquisition.hasKnownAcquisitionEntries(): Boolean =
@@ -506,12 +540,12 @@ internal fun stampJellyfinReadinessTransitions(
     val previousById = previous.associateBy { it.request.requestId }
     return current.map { acquisition ->
         val request = acquisition.request
-        val old = previousById[request.requestId]?.request
+        val old = previousById[request.requestId]?.takeIf { acquisition.sameReadinessGenerationAs(it) }?.request
         val movieReadySince =
             when {
                 !request.jellyfinReadiness.movieReady -> null
                 old?.jellyfinReadiness?.movieReady == true -> old.jellyfinReadySinceEpochMillis
-                old != null -> nowEpochMillis
+                previousById.containsKey(request.requestId) -> nowEpochMillis
                 else -> request.jellyfinReadySinceEpochMillis
             }
         val seasonReadySince =
@@ -531,7 +565,7 @@ internal fun stampJellyfinReadinessTransitions(
                         val readySince =
                             when {
                                 wasReady -> old?.jellyfinSeasonReadySinceEpochMillis?.get(seasonNumber)
-                                old != null -> nowEpochMillis
+                                previousById.containsKey(request.requestId) -> nowEpochMillis
                                 else -> request.jellyfinSeasonReadySinceEpochMillis[seasonNumber]
                             }
                         readySince?.let { seasonNumber to it }

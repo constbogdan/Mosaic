@@ -741,6 +741,100 @@ class SeerrAcquisitionTrackerTest {
     }
 
     @Test
+    fun readinessCannotCrossQualityTargetOrRequestGeneration() {
+        val base = movieRequest(70, null, null)
+        val ready =
+            base.copy(
+                request =
+                    base.request.copy(
+                        jellyfinReadiness = JellyfinAcquisitionReadiness(movieItemId = UUID.randomUUID()),
+                        jellyfinReadySinceEpochMillis = 1234L,
+                    ),
+            )
+        val changed =
+            listOf(
+                base.copy(request = base.request.copy(is4k = true)),
+                base.copy(request = base.request.copy(mediaId = 999)),
+                base.copy(request = base.request.copy(tmdbId = 999)),
+                base.copy(request = base.request.copy(createdAt = "2026-11-09T00:00:00Z")),
+            )
+        changed.forEach { next ->
+            val retained = retainJellyfinReadiness(listOf(next), listOf(ready)).single()
+            assertFalse(retained.request.jellyfinReadiness.movieReady)
+            assertEquals(null, retained.request.jellyfinReadySinceEpochMillis)
+        }
+    }
+
+    @Test
+    fun explicitNewTransferInvalidatesRetained4kProofAndCompletionTimestamp() {
+        val current = movieRequest(70, 100.0, 50.0, is4k = true, phase = "downloading")
+        val previous =
+            movieRequest(70, null, null, is4k = true).let { acquisition ->
+                acquisition.copy(
+                    request =
+                        acquisition.request.copy(
+                            jellyfinReadiness = JellyfinAcquisitionReadiness(movieItemId = UUID.randomUUID()),
+                            jellyfinReadySinceEpochMillis = 1234L,
+                        ),
+                )
+            }
+        val retained = retainJellyfinReadiness(listOf(current), listOf(previous)).single()
+        assertFalse(retained.request.jellyfinReadiness.movieReady)
+        assertEquals(null, retained.request.jellyfinReadySinceEpochMillis)
+        val movie = current.acquisition as SeerrAcquisitionState.Movie
+        val unidentifiedTransfer =
+            current.copy(
+                acquisition =
+                    movie.copy(
+                        aggregate =
+                            movie.aggregate.copy(
+                                entries = movie.aggregate.entries.map { it.copy(downloadId = null) },
+                            ),
+                    ),
+            )
+        assertFalse(
+            retainJellyfinReadiness(listOf(unidentifiedTransfer), listOf(previous))
+                .single()
+                .request.jellyfinReadiness.movieReady,
+        )
+        assertEquals(
+            null,
+            stampJellyfinReadinessTransitions(listOf(retained), listOf(previous), 5678L).single().request.jellyfinReadySinceEpochMillis,
+        )
+
+        val freshlyVerified = current.copy(request = current.request.copy(jellyfinReadiness = previous.request.jellyfinReadiness))
+        assertEquals(
+            5678L,
+            stampJellyfinReadinessTransitions(
+                listOf(freshlyVerified),
+                listOf(previous),
+                5678L,
+            ).single().request.jellyfinReadySinceEpochMillis,
+        )
+    }
+
+    @Test
+    fun sameTransferRetainsQualityProofAcrossMissingMetadataAndEpisodeInventory() {
+        val current = tvRequest(70, "4k-transfer", 100.0, 0.0).let { it.copy(request = it.request.copy(is4k = true)) }
+        val previous =
+            current.copy(
+                request =
+                    current.request.copy(
+                        jellyfinReadiness = JellyfinAcquisitionReadiness(episodeItemIds = mapOf(1 to mapOf(1 to UUID.randomUUID()))),
+                        jellyfinSeasonReadySinceEpochMillis = mapOf(1 to 1234L),
+                    ),
+            )
+        val retained = retainJellyfinReadiness(listOf(current), listOf(previous)).single()
+        assertTrue(retained.request.jellyfinReadiness.seasonReady(1, 1))
+        assertEquals(1234L, retained.request.jellyfinSeasonReadySinceEpochMillis[1])
+
+        val newTransfer = tvRequest(70, "replacement", 100.0, 50.0).let { it.copy(request = it.request.copy(is4k = true)) }
+        val reset = retainJellyfinReadiness(listOf(newTransfer), listOf(previous)).single()
+        assertFalse(reset.request.jellyfinReadiness.seasonReady(1, 1))
+        assertTrue(reset.request.jellyfinSeasonReadySinceEpochMillis.isEmpty())
+    }
+
+    @Test
     fun seerrCompletedTargetsStillRequireJellyfinIdentityResolution() {
         val completedMovie =
             MediaRequest(

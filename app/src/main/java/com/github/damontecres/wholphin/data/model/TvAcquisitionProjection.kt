@@ -153,6 +153,7 @@ internal fun SeerrRequestAcquisition.toTvSeasonTargets(): List<TvSeasonTarget> {
             }
         val hasCurrentAcquisitionWork =
             acquisition == SeerrAcquisitionState.Queueing ||
+                (request.is4k && seerrAvailability == SeerrAvailability.AVAILABLE && !jellyfinReady) ||
                 entries.any { entry ->
                     (entry.hasFreshLifecycleEvidence || (entry.lifecycle == null && entry.status != AcquisitionStatus.PROBLEM)) &&
                         (

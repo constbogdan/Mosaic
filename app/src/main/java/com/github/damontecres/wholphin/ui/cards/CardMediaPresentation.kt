@@ -9,6 +9,7 @@ import com.github.damontecres.wholphin.data.model.AcquisitionPhase
 import com.github.damontecres.wholphin.data.model.AcquisitionSafeReason
 import com.github.damontecres.wholphin.data.model.AcquisitionStatus
 import com.github.damontecres.wholphin.data.model.SeerrAcquisitionState
+import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.data.model.SeerrItemType
 import com.github.damontecres.wholphin.data.model.SeerrRequestAcquisition
 import com.github.damontecres.wholphin.data.model.TvSeasonLifecycle
@@ -173,7 +174,11 @@ internal fun SeerrRequestAcquisition.movieCardPresentation(): CardMediaPresentat
         }
 
         else -> {
-            null
+            if (request.is4k && request.availability == SeerrAvailability.AVAILABLE && !request.jellyfinReadiness.movieReady) {
+                CardMediaPresentation(acquisitionState = CardAcquisitionState.FINISHING)
+            } else {
+                null
+            }
         }
     }
 }
