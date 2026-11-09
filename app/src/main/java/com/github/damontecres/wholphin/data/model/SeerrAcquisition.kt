@@ -135,20 +135,20 @@ fun MediaRequest.toSeerrRequestAcquisition(): SeerrRequestAcquisition {
     val mediaType = SeerrItemType.fromString(type)
     val is4k = is4k == true
     val requestedSeasons = seasons.orEmpty().mapNotNull { it.seasonNumber }.toSet()
-    val availability = SeerrAvailability.from(media?.status) ?: SeerrAvailability.UNKNOWN
-    val requestedSeasonStates = seasons.orEmpty()
+    val availability = SeerrAvailability.from(if (is4k) media?.status4k else media?.status) ?: SeerrAvailability.UNKNOWN
+    // Request seasons carry MediaRequestStatus, not MediaStatus. Only the media's
+    // physical seasons may supply availability/timestamps; never fall back across qualities.
+    val physicalSeasons = media?.seasons.orEmpty().associateBy { it.seasonNumber }
     val seasonAvailability =
-        requestedSeasonStates
-            .mapNotNull { season ->
-                val seasonNumber = season.seasonNumber ?: return@mapNotNull null
-                val status = if (is4k) season.status4k ?: season.status else season.status
-                seasonNumber to (SeerrAvailability.from(status) ?: SeerrAvailability.UNKNOWN)
-            }.toMap()
+        requestedSeasons.associateWith { seasonNumber ->
+            val season = physicalSeasons[seasonNumber]
+            val status = if (is4k) season?.status4k else season?.status
+            SeerrAvailability.from(status) ?: SeerrAvailability.UNKNOWN
+        }
     val seasonUpdatedAt =
-        requestedSeasonStates
-            .mapNotNull { season ->
-                val seasonNumber = season.seasonNumber ?: return@mapNotNull null
-                season.updatedAt?.let { seasonNumber to it }
+        requestedSeasons
+            .mapNotNull { seasonNumber ->
+                physicalSeasons[seasonNumber]?.updatedAt?.let { seasonNumber to it }
             }.toMap()
     val queue =
         if (is4k) {

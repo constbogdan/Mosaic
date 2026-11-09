@@ -41,7 +41,13 @@ not current instruction.
 
 - Request actions check current capabilities again at submission. Standard has no separate
   public backend enabled flag; 4K requires its public enabled flag and matching permission.
-  Request-only `status4k` consumption must not be mistaken for a completed acquisition-mapping fix.
+  Acquisition conversion now reads selected-quality media/season availability from `media`, never
+  request-season lifecycle status or the opposite quality. Missing physical seasons stay Unknown;
+  their timestamps must not come from request seasons. The shared generated `Season` DTO is still
+  used in both payload contexts, so field ownership matters. Queue progress and Jellyfin readiness
+  remain independent; quality-aware Jellyfin fulfillment and acquisition-health handling are deferred.
+  Seerr-custom's request-list query does not explicitly join `media.seasons`; omitted physical
+  seasons therefore remain Unknown, not completed merely because a request completed.
   TV PUT selection is owner-, media-, quality- and season-overlap-specific. Disjoint seasons
   use POST; multiple overlapping editable requests fail closed rather than choosing one.
   The generic Discover Cancel action is offered only for one authorized target across qualities;

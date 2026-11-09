@@ -1,5 +1,6 @@
 package com.github.damontecres.wholphin.ui.downloads
 
+import com.github.damontecres.wholphin.api.seerr.infrastructure.Serializer
 import com.github.damontecres.wholphin.api.seerr.model.DownloadStatus
 import com.github.damontecres.wholphin.api.seerr.model.DownloadStatusEpisode
 import com.github.damontecres.wholphin.api.seerr.model.MediaInfo
@@ -18,6 +19,7 @@ import com.github.damontecres.wholphin.services.SeerrAcquisitionLedger
 import com.github.damontecres.wholphin.ui.cards.CardAcquisitionState
 import com.github.damontecres.wholphin.ui.cards.tvSeasonCardPresentation
 import com.github.damontecres.wholphin.ui.nav.Destination
+import kotlinx.serialization.decodeFromString
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -29,6 +31,24 @@ import java.util.UUID
 
 class DownloadsPageTest {
     private val now = Instant.parse("2026-08-31T12:00:00Z")
+
+    @Test
+    fun completedRequestWithUnavailablePhysicalMediaDoesNotBecomeAvailable() {
+        for (type in listOf("movie", "tv")) {
+            val request =
+                Serializer.kotlinxSerializationJson
+                    .decodeFromString<MediaRequest>(
+                        """{"id":920,"status":5,"type":"$type","is4k":false,"updatedAt":"$now",
+                  "seasons":[{"seasonNumber":1,"status":5}],
+                  "media":{"id":84,"tmdbId":42,"status":1,"seasons":[{"seasonNumber":1,"status":1}]}}""",
+                    ).toSeerrRequestAcquisition()
+            val sections = listOf(request).toDownloadSections(now.toEpochMilli())
+            assertTrue(sections.active.isEmpty())
+            assertTrue(sections.completed.isEmpty())
+            assertEquals(DownloadStatusLabel.QUEUED, sections.processing.single().status)
+            assertTrue(sections.processing.single().destination("Fixture") is Destination.DiscoveredItem)
+        }
+    }
 
     @Test
     fun queueingMovieAndTvSeasonRenderImmediatelyWithoutProgress() {
@@ -350,7 +370,7 @@ class DownloadsPageTest {
                 status = 5,
                 type = "tv",
                 seasons = listOf(Season(seasonNumber = 1, status = SeerrAvailability.AVAILABLE.status)),
-                media = MediaInfo(id = 23, tmdbId = 23, status = SeerrAvailability.PARTIALLY_AVAILABLE.status),
+                media = MediaInfo(id = 23, tmdbId = 23, status = 4, seasons = listOf(Season(seasonNumber = 1, status = 5))),
             ).toSeerrRequestAcquisition()
         val seerrOnly =
             base.copy(
@@ -545,7 +565,7 @@ class DownloadsPageTest {
                 status = 5,
                 type = "tv",
                 seasons = listOf(Season(seasonNumber = 1, status = SeerrAvailability.AVAILABLE.status)),
-                media = MediaInfo(id = 20, tmdbId = 20, status = SeerrAvailability.PARTIALLY_AVAILABLE.status),
+                media = MediaInfo(id = 20, tmdbId = 20, status = 4, seasons = listOf(Season(seasonNumber = 1, status = 5))),
             ).toSeerrRequestAcquisition().let { acquisition ->
                 acquisition.copy(
                     request = acquisition.request.copy(seasonAvailableSinceEpochMillis = mapOf(1 to now.toEpochMilli())),
@@ -1451,6 +1471,7 @@ class DownloadsPageTest {
                         id = 572,
                         tmdbId = 572,
                         status = SeerrAvailability.PARTIALLY_AVAILABLE.status,
+                        seasons = listOf(Season(seasonNumber = 1, status = 5)),
                         downloadStatus = listOf(tvEpisode(1, 100.0, 0.0)),
                     ),
             ).toSeerrRequestAcquisition().let { acquisition ->

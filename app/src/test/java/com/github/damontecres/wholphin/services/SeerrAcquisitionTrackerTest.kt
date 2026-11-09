@@ -435,7 +435,7 @@ class SeerrAcquisitionTrackerTest {
     }
 
     @Test
-    fun initialTvSeasonCompletionUsesRequestedSeasonUpdateTime() {
+    fun initialTvSeasonCompletionUsesPhysicalSeasonUpdateTime() {
         val completedAt = Instant.parse("2026-09-01T07:38:08Z")
         val completed =
             MediaRequest(
@@ -443,18 +443,12 @@ class SeerrAcquisitionTrackerTest {
                 status = 5,
                 type = "tv",
                 updatedAt = "2026-09-01T07:40:00Z",
-                seasons =
-                    listOf(
-                        Season(
-                            seasonNumber = 1,
-                            status = SeerrAvailability.AVAILABLE.status,
-                            updatedAt = completedAt.toString(),
-                        ),
-                    ),
+                seasons = listOf(Season(seasonNumber = 1, status = 5, updatedAt = "2026-09-01T07:40:00Z")),
                 media =
                     MediaInfo(
                         id = 20,
                         status = SeerrAvailability.PARTIALLY_AVAILABLE.status,
+                        seasons = listOf(Season(seasonNumber = 1, status = 5, updatedAt = completedAt.toString())),
                     ),
             ).toSeerrRequestAcquisition()
 
@@ -470,28 +464,82 @@ class SeerrAcquisitionTrackerTest {
                 id = 2,
                 status = 2,
                 type = "tv",
-                seasons = listOf(Season(seasonNumber = 1, status = SeerrAvailability.PROCESSING.status)),
-                media = MediaInfo(id = 20, status = SeerrAvailability.PARTIALLY_AVAILABLE.status),
+                seasons = listOf(Season(seasonNumber = 1, status = 2)),
+                media = MediaInfo(id = 20, status = 4, seasons = listOf(Season(seasonNumber = 1, status = 3))),
             ).toSeerrRequestAcquisition()
         val completed =
             MediaRequest(
                 id = 2,
                 status = 5,
                 type = "tv",
-                seasons =
-                    listOf(
-                        Season(
-                            seasonNumber = 1,
-                            status = SeerrAvailability.AVAILABLE.status,
-                            updatedAt = "2026-09-01T07:38:08Z",
-                        ),
+                seasons = listOf(Season(seasonNumber = 1, status = 5)),
+                media =
+                    MediaInfo(
+                        id = 20,
+                        status = 4,
+                        seasons = listOf(Season(seasonNumber = 1, status = 5, updatedAt = "2026-09-01T07:38:08Z")),
                     ),
-                media = MediaInfo(id = 20, status = SeerrAvailability.PARTIALLY_AVAILABLE.status),
             ).toSeerrRequestAcquisition()
 
         val stamped = stampAvailabilityTransitions(listOf(completed), listOf(processing), 1234L)
 
         assertEquals(1234L, stamped.single().request.seasonAvailableSinceEpochMillis[1])
+    }
+
+    @Test
+    fun requestCompletionAloneDoesNotStampPhysicalSeasonAvailability() {
+        val pending =
+            MediaRequest(
+                id = 2,
+                status = 2,
+                type = "tv",
+                updatedAt = "2026-09-01T07:40:00Z",
+                seasons = listOf(Season(seasonNumber = 1, status = 2)),
+                media = MediaInfo(id = 20, status = 4, seasons = listOf(Season(seasonNumber = 1, status = 1))),
+            )
+        val completed = pending.copy(status = 5, seasons = listOf(Season(seasonNumber = 1, status = 5)))
+        val stamped =
+            stampAvailabilityTransitions(
+                listOf(completed.toSeerrRequestAcquisition()),
+                listOf(pending.toSeerrRequestAcquisition()),
+                1234L,
+            ).single().request
+        assertTrue(stamped.seasonAvailableSinceEpochMillis.isEmpty())
+        assertEquals(SeerrAvailability.UNKNOWN, stamped.seasonAvailability[1])
+    }
+
+    @Test
+    fun physicalSeasonTransitionIsQualitySpecific() {
+        val pending =
+            MediaRequest(
+                id = 2,
+                status = 2,
+                type = "tv",
+                is4k = true,
+                updatedAt = "2026-09-01T07:40:00Z",
+                seasons = listOf(Season(seasonNumber = 1, status = 2)),
+                media = MediaInfo(id = 20, status = 5, status4k = 1, seasons = listOf(Season(seasonNumber = 1, status = 5, status4k = 1))),
+            )
+        val previous = pending.toSeerrRequestAcquisition()
+        assertTrue(
+            stampAvailabilityTransitions(listOf(previous), emptyList(), 1234L)
+                .single()
+                .request.seasonAvailableSinceEpochMillis
+                .isEmpty(),
+        )
+        val available =
+            pending
+                .copy(
+                    media =
+                        pending.media!!.copy(
+                            status = 1,
+                            status4k = 5,
+                            seasons = listOf(Season(seasonNumber = 1, status = 1, status4k = 5)),
+                        ),
+                ).toSeerrRequestAcquisition()
+        val stamped = stampAvailabilityTransitions(listOf(available), listOf(previous), 1234L).single().request
+        assertEquals(1234L, stamped.availableSinceEpochMillis)
+        assertEquals(1234L, stamped.seasonAvailableSinceEpochMillis[1])
     }
 
     @Test
@@ -706,8 +754,8 @@ class SeerrAcquisitionTrackerTest {
                 id = 72,
                 status = 5,
                 type = "tv",
-                seasons = listOf(Season(seasonNumber = 1, status = SeerrAvailability.AVAILABLE.status)),
-                media = MediaInfo(id = 72, status = SeerrAvailability.PARTIALLY_AVAILABLE.status),
+                seasons = listOf(Season(seasonNumber = 1, status = 5)),
+                media = MediaInfo(id = 72, status = 4, seasons = listOf(Season(seasonNumber = 1, status = 5))),
             ).toSeerrRequestAcquisition().let { acquisition ->
                 acquisition.copy(
                     request = acquisition.request.copy(seasonEpisodeCounts = mapOf(1 to 1)),
@@ -1121,11 +1169,12 @@ class SeerrAcquisitionTrackerTest {
             id = 1,
             status = 2,
             type = "tv",
-            seasons = listOf(Season(seasonNumber = 1, status = SeerrAvailability.PROCESSING.status)),
+            seasons = listOf(Season(seasonNumber = 1, status = 2)),
             media =
                 MediaInfo(
                     id = 20,
                     status = SeerrAvailability.PARTIALLY_AVAILABLE.status,
+                    seasons = listOf(Season(seasonNumber = 1, status = 3)),
                     downloadStatus = entries,
                 ),
         ).toSeerrRequestAcquisition()
