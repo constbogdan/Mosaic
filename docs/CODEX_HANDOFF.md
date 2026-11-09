@@ -39,6 +39,52 @@ not current instruction.
 
 ## Non-obvious invariants and negative knowledge
 
+- Request actions check current capabilities again at submission. Standard has no separate
+  public backend enabled flag; 4K requires its public enabled flag and matching permission.
+  Acquisition conversion now reads selected-quality media/season availability from `media`, never
+  request-season lifecycle status or the opposite quality. Missing physical seasons stay Unknown;
+  their timestamps must not come from request seasons. The shared generated `Season` DTO is still
+  used in both payload contexts, so field ownership matters. Queue progress and Jellyfin readiness
+  remain independent. Acquisition readiness now uses source-level Jellyfin video dimensions for
+  4K (width at least 3840, positive height; cropped UHD/DCI sources qualify). Standard keeps its
+  existing playable-source behavior. Item-level streams, names/HDR, Seerr `status4k`, request
+  completion and queue disappearance are not quality proof. `MEDIA_SOURCES` includes those
+  per-source streams; readiness queries do not need the unused top-level `MEDIA_STREAMS` field.
+  Ordinary requests keep the chosen Servarr profile and standard service role even for UHD;
+  3596-wide or dimensionless playable sources qualify without a new upgrade request. Current
+  public 4K capability flags gate new submissions, not historical 4K tracking. The dedicated-4K
+  3840-width limitation remains a separate follow-up, not a generic readiness restriction.
+  Seerr's scanner uses width >2000,
+  which can classify 2K as 4K; its Library resolution summaries are neither per-version Jellyfin
+  identities nor part of the request contract. Movie fulfillment and generic playback IDs are
+  separate; TV counts only exact verified episode numbers for 4K, never duplicate versions.
+  Same-context last-good proof survives refresh omissions, but changed target/quality/creation
+  identity or an identifiable new transfer requires a new observation. Account/server reset
+  still clears readiness and ledger state; cancellation must propagate out of readiness lookups.
+  Jellyfin metadata is not a live filesystem probe: stale server metadata, missing/reused transfer IDs
+  within continuously present queues,
+  and matching alternate versions outside the bounded 20-result lookup cannot be resolved with
+  these APIs. Missing dimensions remain unknown; do not substitute Seerr's status or provider
+  profile labels. Separate duplicate series are not silently merged across parent identities.
+  Explicit queue phase/health is projected once for Home and Downloads. Blocked/failed evidence
+  overrides byte/time completion; a mixed failed/healthy episode scope is Warning, not globally
+  Failed. Explicit evidence uses the existing two-missed-poll grace and never promotes queue
+  disappearance to import success. Fields absent retain legacy fallback. Reasons are allowlisted
+  backend codes mapped to local text, never provider errors. Internal backend observation IDs are
+  not serialized: reused transfer hashes without distinct evidence cannot prove a new generation.
+  Seerr-custom's request-list query does not explicitly join `media.seasons`; omitted physical
+  seasons therefore remain Unknown, not completed merely because a request completed.
+  TV PUT selection is owner-, media-, quality- and season-overlap-specific. Disjoint seasons
+  use POST; multiple overlapping editable requests fail closed rather than choosing one.
+  The generic Discover Cancel action is offered only for one authorized target across qualities;
+  multiple targets need a separately reviewed chooser. Owner cancellation needs pending status,
+  not a request-creation permission; managers may delete any status under the backend contract.
+- TV request POST/PUT may return a message-only 202 when no seasons remain requestable.
+  This is not an asynchronous download acknowledgement and carries no request identity.
+  `TvRequestSubmission` reuses generated configs/transport but decodes that outcome before
+  `MediaRequest`; the generated `WithHttpInfo` methods still deserialize too early. Both TV
+  callers refresh eligibility without Queueing or resubmission on 202. Movie submission,
+  quality targeting and acquisition mappings are deliberately unchanged by this correction.
 - Stage C combines Mosaic schema 36 with upstream track persistence as Mosaic schema 37,
   not upstream schema 40 (which lacks the integrity table). Keep every older schema fixture
   and the 2-to-3 migration. Legacy track-choice conversion belongs in the 36-to-37 Room

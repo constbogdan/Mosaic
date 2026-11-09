@@ -31,9 +31,12 @@ import com.github.damontecres.wholphin.ui.detail.discover.TvRequest
 import com.github.damontecres.wholphin.ui.formatBytes
 import com.github.damontecres.wholphin.ui.isNotNullOrBlank
 import com.github.damontecres.wholphin.ui.toLocalDate
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
@@ -301,45 +304,83 @@ class SeerrService
         suspend fun requestTv(
             tv: TvDetails,
             request: TvRequest,
-        ): MediaRequest {
+        ): com.github.damontecres.wholphin.api.seerr.TvRequestOutcome {
+            val client = api
+            val current = seerrServerRepository.current.firstOrNull()
+            check(current.permitsRequest(SeerrItemType.TV, request.is4k)) { "TV request quality is not permitted" }
+            check(tv.id == request.tvId && request.tvId > 0 && request.seasons.isNotEmpty()) { "Invalid TV request identity or selection" }
+            check(tv.mediaInfo?.tmdbId == null || tv.mediaInfo?.tmdbId == request.tvId) { "Mismatched TV media identity" }
+            check(tv.mediaInfo?.status != 6) { "This media is blocklisted" }
             val currentUserId = seerrServerRepository.currentUserId.first()
-            val currentRequest =
-                tv.mediaInfo?.requests?.firstOrNull {
-                    it.status == RequestStatus.PENDING.status &&
-                        it.requestedBy?.id == currentUserId
-                }
+            val currentRequest = tv.pendingRequestFor(currentUserId, request.is4k, request.seasons)
             val serverId =
                 when {
                     request.profileId == null && request.folder == null -> null
                     request.is4k -> request.data.server4kId
                     else -> request.data.serverId
                 }
-            return if (currentRequest != null) {
-                api.requestApi.requestRequestIdPut(
-                    requestId = currentRequest.id.toString(),
-                    requestRequestIdPutRequest =
-                        RequestRequestIdPutRequest(
+            currentCoroutineContext().ensureActive()
+            if (api !== client || current?.config?.id != currentUserId) throw CancellationException("Seerr session changed")
+            val outcome =
+                if (currentRequest != null) {
+                    client.tvRequestSubmission.update(
+                        id = currentRequest.id.toString(),
+                        body =
+                            RequestRequestIdPutRequest(
+                                is4k = request.is4k,
+                                mediaType = RequestRequestIdPutRequest.MediaType.TV,
+                                seasons = request.seasons,
+                                serverId = serverId,
+                                profileId = request.profileId,
+                                rootFolder = request.folder,
+                            ),
+                    )
+                } else {
+                    client.tvRequestSubmission.create(
+                        RequestPostRequest(
                             is4k = request.is4k,
-                            mediaType = RequestRequestIdPutRequest.MediaType.TV,
+                            mediaId = request.tvId,
+                            mediaType = RequestPostRequest.MediaType.TV,
                             seasons = request.seasons,
                             serverId = serverId,
                             profileId = request.profileId,
                             rootFolder = request.folder,
+                            tags = emptyList(),
                         ),
-                )
-            } else {
-                api.requestApi.requestPost(
-                    RequestPostRequest(
-                        is4k = request.is4k,
-                        mediaId = request.tvId,
-                        mediaType = RequestPostRequest.MediaType.TV,
-                        seasons = request.seasons,
-                        serverId = serverId,
-                        profileId = request.profileId,
-                        rootFolder = request.folder,
-                        tags = emptyList(),
-                    ),
-                )
+                    )
+                }
+            currentCoroutineContext().ensureActive()
+            if (api !== client || seerrServerRepository.currentUserId.first() != currentUserId) {
+                throw CancellationException("Seerr session changed")
+            }
+            return outcome
+        }
+
+        suspend fun cancelRequest(
+            media: MediaInfo?,
+            type: SeerrItemType,
+            tmdbId: Int,
+            requestId: Int,
+            is4k: Boolean,
+            expectedClient: SeerrApiClient = api,
+        ) {
+            val client = expectedClient
+            if (api !== client) throw CancellationException("Seerr session changed")
+            val owner = seerrServerRepository.current.firstOrNull()?.config
+            val target = media.singleCancellationTarget(owner, type, tmdbId)
+            check(target?.id == requestId && (target.is4k == true) == is4k) { "No unambiguous authorized cancellation target" }
+            currentCoroutineContext().ensureActive()
+            if (api !== client ||
+                seerrServerRepository.currentUserId.first() != owner?.id
+            ) {
+                throw CancellationException("Seerr session changed")
+            }
+            client.requestApi.requestRequestIdDelete(requestId.toString())
+            currentCoroutineContext().ensureActive()
+            if (api !== client ||
+                seerrServerRepository.currentUserId.first() != owner?.id
+            ) {
+                throw CancellationException("Seerr session changed")
             }
         }
 

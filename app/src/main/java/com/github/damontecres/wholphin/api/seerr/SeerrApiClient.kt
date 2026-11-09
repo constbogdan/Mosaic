@@ -54,6 +54,7 @@ class SeerrApiClient(
     val personApi by create(::PersonApi)
     val publicApi by create(::PublicApi)
     val requestApi by create(::RequestApi)
+    internal val tvRequestSubmission by lazy { TvRequestSubmission(baseUrl, client, requestApi) }
     val searchApi by create(::SearchApi)
     val serviceApi by create(::ServiceApi)
     val settingsApi by create(::SettingsApi)

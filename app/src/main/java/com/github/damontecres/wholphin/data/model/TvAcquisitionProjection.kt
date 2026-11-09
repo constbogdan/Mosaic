@@ -116,18 +116,46 @@ internal fun SeerrRequestAcquisition.toTvSeasonTargets(): List<TvSeasonTarget> {
         val hasObservedActivity =
             entries.any { it.status != AcquisitionStatus.PROBLEM && it.hasObservedProgress } ||
                 playableEpisodeCount > 0
+        val explicitLifecycle = aggregate.lifecycle
         val lifecycle =
             when {
-                jellyfinReady -> TvSeasonLifecycle.AVAILABLE
-                seerrAvailability == SeerrAvailability.AVAILABLE -> TvSeasonLifecycle.FINISHING
-                expectedEpisodesHaveFinalEvidence -> TvSeasonLifecycle.FINISHING
-                hasObservedActivity -> TvSeasonLifecycle.IN_PROGRESS
-                else -> TvSeasonLifecycle.QUEUED
+                jellyfinReady -> {
+                    TvSeasonLifecycle.AVAILABLE
+                }
+
+                explicitLifecycle != null -> {
+                    when {
+                        explicitLifecycle.isPostTransfer -> TvSeasonLifecycle.FINISHING
+                        explicitLifecycle.phase == AcquisitionPhase.DOWNLOADING && hasObservedActivity -> TvSeasonLifecycle.IN_PROGRESS
+                        else -> TvSeasonLifecycle.QUEUED
+                    }
+                }
+
+                seerrAvailability == SeerrAvailability.AVAILABLE -> {
+                    TvSeasonLifecycle.FINISHING
+                }
+
+                entries.any { it.lifecycle != null } -> {
+                    TvSeasonLifecycle.QUEUED
+                }
+
+                expectedEpisodesHaveFinalEvidence -> {
+                    TvSeasonLifecycle.FINISHING
+                }
+
+                hasObservedActivity -> {
+                    TvSeasonLifecycle.IN_PROGRESS
+                }
+
+                else -> {
+                    TvSeasonLifecycle.QUEUED
+                }
             }
         val hasCurrentAcquisitionWork =
             acquisition == SeerrAcquisitionState.Queueing ||
+                (request.is4k && seerrAvailability == SeerrAvailability.AVAILABLE && !jellyfinReady) ||
                 entries.any { entry ->
-                    entry.status != AcquisitionStatus.PROBLEM &&
+                    (entry.hasFreshLifecycleEvidence || (entry.lifecycle == null && entry.status != AcquisitionStatus.PROBLEM)) &&
                         (
                             entry.presentInQueue ||
                                 (
@@ -243,6 +271,7 @@ internal fun AcquisitionAggregate.analyzeTvSeasonAcquisition(
 }
 
 internal fun TvSeasonAcquisitionProjection.activeTiming(nowEpochMillis: Long): TvAcquisitionTiming? {
+    aggregate.lifecycle?.let { if (it.phase != AcquisitionPhase.DOWNLOADING || it.health != AcquisitionHealth.OK) return null }
     if (!aggregate.hasCurrentDownloadingProgress || aggregate.isFinishing) return null
 
     val selectedFullSeasonGroup =
@@ -277,6 +306,8 @@ internal val AcquisitionAggregate.hasActiveProgress: Boolean
 
 internal val AcquisitionAggregate.isFinishing: Boolean
     get() {
+        lifecycle?.let { return it.isPostTransfer }
+        if (entries.any { it.lifecycle != null }) return false
         val liveEntries = entries.filter { it.presentInQueue }
         return entries.isNotEmpty() &&
             (

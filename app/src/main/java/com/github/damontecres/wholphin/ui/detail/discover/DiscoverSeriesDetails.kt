@@ -42,6 +42,7 @@ import com.github.damontecres.wholphin.preferences.UserPreferences
 import com.github.damontecres.wholphin.services.SeerrUserConfig
 import com.github.damontecres.wholphin.services.TrailerService
 import com.github.damontecres.wholphin.services.jellyfinId
+import com.github.damontecres.wholphin.services.singleCancellationTarget
 import com.github.damontecres.wholphin.ui.LocalImageUrlService
 import com.github.damontecres.wholphin.ui.cards.DiscoverItemCard
 import com.github.damontecres.wholphin.ui.cards.DiscoverPersonRow
@@ -114,7 +115,14 @@ fun DiscoverSeriesDetails(
                 availability = state.availability,
                 userConfig = userConfig,
                 rating = state.rating,
-                canCancel = state.canCancelRequest,
+                canCancel =
+                    item.mediaInfo.singleCancellationTarget(
+                        userConfig,
+                        com.github.damontecres.wholphin.data.model.SeerrItemType.TV,
+                        item.id ?: 0,
+                    ) !=
+                        null,
+                canRequest = requestEnabled || request4kEnabled,
                 seasons = state.seasons,
                 people = state.people,
                 similar = state.similar,
@@ -147,7 +155,14 @@ fun DiscoverSeriesDetails(
                     showRequestSeasonDialog = true
                 },
                 cancelOnClick = {
-                    item.id?.let { viewModel.cancelRequest(it) }
+                    item.mediaInfo
+                        .singleCancellationTarget(
+                            userConfig,
+                            com.github.damontecres.wholphin.data.model.SeerrItemType.TV,
+                            item.id ?: 0,
+                        )?.let {
+                            viewModel.cancelRequest(it.id, it.is4k == true)
+                        }
                 },
                 moreOnClick = {
                 },
@@ -231,6 +246,7 @@ fun DiscoverSeriesDetailsContent(
     onClickPerson: (DiscoverItem) -> Unit,
     onLongClickPerson: (Int, DiscoverItem) -> Unit,
     onLongClickSimilar: (Int, DiscoverItem) -> Unit,
+    canRequest: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -291,7 +307,7 @@ fun DiscoverSeriesDetailsContent(
                                     }
                                 }
                             },
-                            canRequest = userConfig.canRequestTv,
+                            canRequest = canRequest,
                             canCancel = canCancel,
                             trailers = trailers,
                             trailerOnClick = trailerOnClick,

@@ -1276,7 +1276,7 @@ components:
         status:
           type: integer
           example: 0
-          description: Status of the request. 1 = PENDING APPROVAL, 2 = APPROVED, 3 = DECLINED
+          description: Request lifecycle only. 1 = PENDING, 2 = APPROVED, 3 = DECLINED, 4 = FAILED, 5 = COMPLETED. Not physical availability.
           readOnly: true
         media:
           $ref: '#/components/schemas/MediaInfo'
@@ -1308,6 +1308,7 @@ components:
           type: string
         seasons:
           type: array
+          description: Request season entries carry request lifecycle status, not physical availability. Physical season state is in media.seasons.
           items:
             $ref: '#/components/schemas/Season'
       required:
@@ -1329,9 +1330,13 @@ components:
         status:
           type: integer
           example: 0
-          description: Availability of the media. 1 = `UNKNOWN`, 2 = `PENDING`, 3 = `PROCESSING`, 4 = `PARTIALLY_AVAILABLE`, 5 = `AVAILABLE`, 6 = `DELETED`
+          description: Standard media availability. 1 = UNKNOWN, 2 = PENDING, 3 = PROCESSING, 4 = PARTIALLY_AVAILABLE, 5 = AVAILABLE, 6 = BLOCKLISTED, 7 = DELETED. Not request lifecycle or Jellyfin readiness.
+        status4k:
+          type: integer
+          description: Independent 4K availability of the media.
         seasons:
           type: array
+          description: Physical season state. status and status4k are independent media availability values, not request lifecycle status.
           readOnly: true
           nullable: true
           items:
@@ -1368,6 +1373,31 @@ components:
     DownloadStatus:
       type: object
       properties:
+        acquisitionPhase:
+          type: string
+          nullable: true
+          description: Per-queue-entry phase; unknown future values must remain conservative.
+        acquisitionPhaseStartedAt:
+          type: string
+          nullable: true
+        health:
+          type: string
+          nullable: true
+          description: Independent health; ok, warning or error.
+        safeReason:
+          type: string
+          nullable: true
+          description: Allowlisted backend reason code, never a raw provider error.
+        trackedDownloadStatus:
+          type: string
+          nullable: true
+        trackedDownloadState:
+          type: string
+          nullable: true
+        trackedStatus:
+          type: string
+          nullable: true
+          description: Compatibility alias for trackedDownloadStatus.
         externalId:
           type: integer
           nullable: true

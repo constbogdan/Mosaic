@@ -36,12 +36,18 @@ data class SeerrRequestState(
 )
 
 data class JellyfinAcquisitionReadiness(
+    /** IDs below prove fulfillment of this request's selected quality, not generic playback. */
     val movieItemId: UUID? = null,
     val seriesItemId: UUID? = null,
     val seasonItemIds: Map<Int, UUID> = emptyMap(),
     val episodeItemIds: Map<Int, Map<Int, UUID>> = emptyMap(),
+    /** Independently playable movie, even when it does not fulfill a 4K acquisition. */
+    val playableMovieItemId: UUID? = null,
+    /** Quality required when the fulfillment IDs were observed; standard retains legacy counting. */
+    val fulfillmentIs4k: Boolean = false,
 ) {
     val movieReady: Boolean get() = movieItemId != null
+    val playableMovieId: UUID? get() = playableMovieItemId ?: movieItemId
 
     fun seasonReady(
         seasonNumber: Int,
@@ -49,7 +55,11 @@ data class JellyfinAcquisitionReadiness(
     ): Boolean =
         expectedEpisodeCount != null &&
             expectedEpisodeCount > 0 &&
-            episodeItemIds[seasonNumber].orEmpty().size >= expectedEpisodeCount
+            if (fulfillmentIs4k) {
+                (1..expectedEpisodeCount).all { it in episodeItemIds[seasonNumber].orEmpty() }
+            } else {
+                episodeItemIds[seasonNumber].orEmpty().size >= expectedEpisodeCount
+            }
 }
 
 sealed interface SeerrAcquisitionState {
@@ -121,6 +131,7 @@ data class AcquisitionEntry(
     val observedSuccessfulTransferCompletion: Boolean = false,
     /** Number of missed tracker snapshots for which this entry's TV progress remains provisional. */
     val absentPollCount: Int = 0,
+    val lifecycle: AcquisitionLifecycle? = null,
 )
 
 data class AcquisitionEpisode(
@@ -135,20 +146,20 @@ fun MediaRequest.toSeerrRequestAcquisition(): SeerrRequestAcquisition {
     val mediaType = SeerrItemType.fromString(type)
     val is4k = is4k == true
     val requestedSeasons = seasons.orEmpty().mapNotNull { it.seasonNumber }.toSet()
-    val availability = SeerrAvailability.from(media?.status) ?: SeerrAvailability.UNKNOWN
-    val requestedSeasonStates = seasons.orEmpty()
+    val availability = SeerrAvailability.from(if (is4k) media?.status4k else media?.status) ?: SeerrAvailability.UNKNOWN
+    // Request seasons carry MediaRequestStatus, not MediaStatus. Only the media's
+    // physical seasons may supply availability/timestamps; never fall back across qualities.
+    val physicalSeasons = media?.seasons.orEmpty().associateBy { it.seasonNumber }
     val seasonAvailability =
-        requestedSeasonStates
-            .mapNotNull { season ->
-                val seasonNumber = season.seasonNumber ?: return@mapNotNull null
-                val status = if (is4k) season.status4k ?: season.status else season.status
-                seasonNumber to (SeerrAvailability.from(status) ?: SeerrAvailability.UNKNOWN)
-            }.toMap()
+        requestedSeasons.associateWith { seasonNumber ->
+            val season = physicalSeasons[seasonNumber]
+            val status = if (is4k) season?.status4k else season?.status
+            SeerrAvailability.from(status) ?: SeerrAvailability.UNKNOWN
+        }
     val seasonUpdatedAt =
-        requestedSeasonStates
-            .mapNotNull { season ->
-                val seasonNumber = season.seasonNumber ?: return@mapNotNull null
-                season.updatedAt?.let { seasonNumber to it }
+        requestedSeasons
+            .mapNotNull { seasonNumber ->
+                physicalSeasons[seasonNumber]?.updatedAt?.let { seasonNumber to it }
             }.toMap()
     val queue =
         if (is4k) {
@@ -199,6 +210,7 @@ fun MediaRequest.toSeerrRequestAcquisition(): SeerrRequestAcquisition {
 }
 
 private fun DownloadStatus.toAcquisitionEntry(): AcquisitionEntry? {
+    val lifecycle = toAcquisitionLifecycle()
     val validSize = propertySize.validSize()
     val validSizeLeft = sizeLeft.validSizeLeft(validSize)
     val episode =
@@ -227,15 +239,17 @@ private fun DownloadStatus.toAcquisitionEntry(): AcquisitionEntry? {
             validSize != null && validSizeLeft != null && validSizeLeft < validSize,
         observedSuccessfulTransferCompletion =
             status.toAcquisitionStatus() != AcquisitionStatus.PROBLEM &&
+                (lifecycle == null || lifecycle.isPostTransfer) &&
                 (
                     (validSize != null && validSize > 0.0 && validSizeLeft == 0.0) ||
                         status.toAcquisitionStatus() == AcquisitionStatus.COMPLETED
                 ),
+        lifecycle = lifecycle,
     ).takeIf { it.hasMeaningfulQueueData() }
 }
 
 private fun AcquisitionEntry.hasMeaningfulQueueData(): Boolean =
-    externalId != null ||
+    lifecycle != null || externalId != null ||
         !downloadId.isNullOrBlank() ||
         !rawStatus.isNullOrBlank() ||
         totalSize != null ||

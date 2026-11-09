@@ -7,6 +7,7 @@ import com.github.damontecres.wholphin.data.model.SeerrAcquisitionState
 import com.github.damontecres.wholphin.data.model.SeerrRequestAcquisition
 import com.github.damontecres.wholphin.data.model.TV_PROGRESS_GRACE_POLLS
 import com.github.damontecres.wholphin.data.model.aggregateAcquisitionEntries
+import com.github.damontecres.wholphin.data.model.hasFreshLifecycleEvidence
 
 internal class SeerrAcquisitionLedger {
     private val entries = mutableMapOf<LedgerEntryKey, LedgerEntry>()
@@ -21,7 +22,7 @@ internal class SeerrAcquisitionLedger {
                         status = AcquisitionStatus.UNKNOWN,
                         presentInQueue = false,
                         absentPollCount =
-                            if (value.entry.status == AcquisitionStatus.PROBLEM) {
+                            if (value.entry.status == AcquisitionStatus.PROBLEM && value.entry.lifecycle == null) {
                                 TV_PROGRESS_GRACE_POLLS + 1
                             } else {
                                 value.entry.absentPollCount + 1
@@ -156,6 +157,10 @@ internal class SeerrAcquisitionLedger {
                                     }.sortedBy { it.seasonNumber },
                             unassignedEntries = matching.filter { it.episode?.seasonNumber == null },
                         )
+                    } else if (request.mediaType == com.github.damontecres.wholphin.data.model.SeerrItemType.MOVIE &&
+                        matching.any { it.hasFreshLifecycleEvidence }
+                    ) {
+                        SeerrAcquisitionState.Movie(aggregateAcquisitionEntries(matching))
                     } else {
                         current
                     }
@@ -247,6 +252,12 @@ internal class SeerrAcquisitionLedger {
             current: AcquisitionEntry,
             retainByteMaximums: Boolean,
         ): LedgerEntry {
+            // A new explicitly identified transfer must not inherit the prior transfer's 100%/success.
+            if ((current.lifecycle != null || entry.lifecycle != null) &&
+                current.downloadId != null && entry.downloadId != null && current.downloadId != entry.downloadId
+            ) {
+                return LedgerEntry(current)
+            }
             val decreasedSinceLastPoll =
                 entry.sizeLeft != null && current.sizeLeft != null && current.sizeLeft < entry.sizeLeft
             val total = if (retainByteMaximums) maxOfNullable(entry.totalSize, current.totalSize) else current.totalSize
@@ -272,6 +283,7 @@ internal class SeerrAcquisitionLedger {
                         entry.hasObservedProgress || current.hasObservedProgress || decreasedSinceLastPoll,
                     observedSuccessfulTransferCompletion =
                         current.status != AcquisitionStatus.PROBLEM &&
+                            (current.lifecycle == null || current.lifecycle.isPostTransfer) &&
                             (
                                 entry.observedSuccessfulTransferCompletion ||
                                     current.observedSuccessfulTransferCompletion

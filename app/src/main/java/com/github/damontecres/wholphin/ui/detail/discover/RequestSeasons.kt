@@ -179,6 +179,7 @@ fun RequestSeasons(
     }
 
     fun submit() {
+        if (selectedSeasons.isEmpty() || !(if (is4k) request4kEnabled else requestEnabled)) return
         onSubmit.invoke(
             TvRequest(
                 data = data,

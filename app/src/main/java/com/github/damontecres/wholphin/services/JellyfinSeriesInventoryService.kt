@@ -12,6 +12,7 @@ import javax.inject.Singleton
 data class JellyfinSeriesInventory(
     val seasonItemIds: Map<Int, UUID>,
     val playableEpisodeItemIds: Map<Int, Map<Int, UUID>>,
+    val verified4kEpisodeItemIds: Map<Int, Map<Int, UUID>> = emptyMap(),
 ) {
     val playableEpisodeNumbers: Map<Int, Set<Int>> =
         playableEpisodeItemIds.mapValues { (_, episodes) -> episodes.keys }
@@ -49,6 +50,17 @@ class JellyfinSeriesInventoryService
                         Triple(season, number, episode.id)
                     }.groupBy { it.first }
                     .mapValues { (_, values) -> values.associate { it.second to it.third } }
-            return JellyfinSeriesInventory(seasons, episodes)
+            val verified4kEpisodes =
+                items
+                    .filter {
+                        it.type == BaseItemKind.EPISODE && it.hasVerified4kSource() &&
+                            (it.seriesId == null || it.seriesId == seriesItemId)
+                    }.mapNotNull { episode ->
+                        val season = episode.parentIndexNumber?.takeIf { it >= 0 } ?: return@mapNotNull null
+                        val number = episode.indexNumber?.takeIf { it > 0 } ?: return@mapNotNull null
+                        Triple(season, number, episode.id)
+                    }.groupBy { it.first }
+                    .mapValues { (_, values) -> values.associate { it.second to it.third } }
+            return JellyfinSeriesInventory(seasons, episodes, verified4kEpisodes)
         }
     }

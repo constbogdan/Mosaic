@@ -10,6 +10,7 @@ import com.github.damontecres.wholphin.services.IndexedAcquisition
 import com.github.damontecres.wholphin.services.hilt.DefaultCoroutineScope
 import com.github.damontecres.wholphin.ui.cards.CardAcquisitionState
 import com.github.damontecres.wholphin.ui.cards.CardMediaPresentation
+import com.github.damontecres.wholphin.ui.cards.combinedCardPresentation
 import com.github.damontecres.wholphin.ui.cards.movieCatalogCardPresentation
 import com.github.damontecres.wholphin.ui.cards.tvSeasonCardPresentation
 import kotlinx.coroutines.CoroutineScope
@@ -92,7 +93,7 @@ internal fun AcquisitionIndexSnapshot.toHomeAcquiringState(): HomeAcquiringState
                     requests
                         .mapNotNull { acquisition ->
                             when (key.mediaType) {
-                                CatalogMediaType.MOVIE -> acquisition.request.request.jellyfinReadiness.movieItemId
+                                CatalogMediaType.MOVIE -> acquisition.request.request.jellyfinReadiness.playableMovieId
                                 CatalogMediaType.SERIES -> acquisition.request.request.jellyfinReadiness.seriesItemId
                             }
                         }.distinct()
@@ -113,7 +114,13 @@ internal fun AcquisitionIndexSnapshot.toHomeAcquiringState(): HomeAcquiringState
                         if (key.mediaType == CatalogMediaType.MOVIE) {
                             requests.movieCatalogCardPresentation()
                         } else {
-                            requests.mapNotNull(IndexedAcquisition::tvSeasonCardPresentation).distinct().singleOrNull()
+                            val presentations = requests.mapNotNull(IndexedAcquisition::tvSeasonCardPresentation).distinct()
+                            if (presentations.any { it.lifecycle != null }) {
+                                presentations.combinedCardPresentation()
+                            } else {
+                                presentations
+                                    .singleOrNull()
+                            }
                         },
                     requestedAtEpochMillis =
                         requests

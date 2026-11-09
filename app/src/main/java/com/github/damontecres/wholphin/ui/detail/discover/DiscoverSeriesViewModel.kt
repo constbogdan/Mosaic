@@ -3,6 +3,9 @@ package com.github.damontecres.wholphin.ui.detail.discover
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.damontecres.wholphin.R
+import com.github.damontecres.wholphin.api.seerr.SeerrApiClient
+import com.github.damontecres.wholphin.api.seerr.TvRequestOutcome
 import com.github.damontecres.wholphin.api.seerr.model.MediaInfo
 import com.github.damontecres.wholphin.api.seerr.model.RelatedVideo
 import com.github.damontecres.wholphin.api.seerr.model.TvDetails
@@ -22,6 +25,9 @@ import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.services.SeerrAcquisitionTracker
 import com.github.damontecres.wholphin.services.SeerrServerRepository
 import com.github.damontecres.wholphin.services.SeerrService
+import com.github.damontecres.wholphin.services.canRequestTv
+import com.github.damontecres.wholphin.services.permitsRequest
+import com.github.damontecres.wholphin.services.singleCancellationTarget
 import com.github.damontecres.wholphin.ui.isNotNullOrBlank
 import com.github.damontecres.wholphin.ui.launchDefault
 import com.github.damontecres.wholphin.ui.launchIO
@@ -40,9 +46,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
@@ -77,22 +86,30 @@ class DiscoverSeriesViewModel
 
         val userConfig = seerrServerRepository.current.map { it?.config }
         val requestEnabled =
-            seerrServerRepository.current
-                .map { it?.requestTvEnabled ?: false }
+            combine(seerrServerRepository.current, state) { current, state -> current.canRequestTv(state.tvSeries.successValue, false) }
                 .stateIn(viewModelScope, SharingStarted.Eagerly, false)
         val request4kEnabled =
-            seerrServerRepository.current
-                .map { it?.request4kTvEnabled ?: false }
+            combine(seerrServerRepository.current, state) { current, state -> current.canRequestTv(state.tvSeries.successValue, true) }
                 .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
         init {
             init()
         }
 
-        private fun fetchAndSetItem(): Deferred<TvDetails?> =
+        private fun fetchAndSetItem(
+            expectedClient: SeerrApiClient? = null,
+            ownerId: Int? = null,
+        ): Deferred<TvDetails?> =
             viewModelScope.async(WholphinDispatchers.IO) {
                 try {
-                    val tv = seerrService.api.tvApi.tvTvIdGet(tvId = item.id)
+                    val client = expectedClient ?: seerrService.api
+                    val tv = client.tvApi.tvTvIdGet(tvId = item.id)
+                    currentCoroutineContext().ensureActive()
+                    if (expectedClient != null &&
+                        (seerrService.api !== expectedClient || seerrServerRepository.currentUserId.first() != ownerId)
+                    ) {
+                        return@async null
+                    }
                     _state.update { it.copy(tvSeries = DataLoadingState.Success(tv)) }
                     tv
                 } catch (ex: CancellationException) {
@@ -183,7 +200,7 @@ class DiscoverSeriesViewModel
         }
 
         private suspend fun updateSeasonStatus(tv: TvDetails) {
-            if (request4kEnabled.first()) {
+            if (seerrServerRepository.current.first().permitsRequest(SeerrItemType.TV, true)) {
                 updateSeasonStatus(tv, true)
             }
             updateSeasonStatus(tv, false)
@@ -219,12 +236,9 @@ class DiscoverSeriesViewModel
         private suspend fun updateAvailability() {
             val user = userConfig.firstOrNull()
             val canCancel =
-                canUserCancelRequest(
-                    user,
-                    state.value.tvSeries.successValue
-                        ?.mediaInfo
-                        ?.requests,
-                )
+                state.value.tvSeries.successValue
+                    ?.mediaInfo
+                    .singleCancellationTarget(user, SeerrItemType.TV, item.id) != null
             val status =
                 state.value.tvSeries.successValue?.let { tv ->
                     val overallStatus = SeerrAvailability.from(tv.mediaInfo?.status)
@@ -255,6 +269,9 @@ class DiscoverSeriesViewModel
 
         fun requestOnClick() {
             viewModelScope.launchIO {
+                val current = seerrServerRepository.current.first()
+                val tv = state.value.tvSeries.successValue
+                if (!current.canRequestTv(tv, false) && !current.canRequestTv(tv, true)) return@launchIO
                 try {
                     val data = seerrService.getProfilesAndFolders(SeerrItemType.TV)
                     _state.update {
@@ -278,16 +295,27 @@ class DiscoverSeriesViewModel
         fun request(request: TvRequest) {
             viewModelScope.launchIO {
                 state.value.tvSeries.successValue?.let { tv ->
-                    var submitted: com.github.damontecres.wholphin.api.seerr.model.MediaRequest? = null
+                    val current = seerrServerRepository.current.first()
+                    if (tv.id != request.tvId || request.tvId != item.id || request.seasons.isEmpty() ||
+                        !current.permitsRequest(SeerrItemType.TV, request.is4k)
+                    ) {
+                        return@launchIO
+                    }
+                    val client = seerrService.api
+                    val ownerId = seerrServerRepository.currentUserId.first()
+                    var submitted: TvRequestOutcome? = null
                     try {
                         submitted = seerrService.requestTv(tv, request)
+                        currentCoroutineContext().ensureActive()
                     } catch (ex: CancellationException) {
                         throw ex
                     } catch (ex: Exception) {
+                        if (seerrService.api !== client || seerrServerRepository.currentUserId.first() != ownerId) return@launchIO
                         Timber.e(ex, "Error requesting %s", request.tvId)
                         showToast(context, "An error occurred")
                     }
-                    submitted?.let { response ->
+                    if (seerrService.api !== client || seerrServerRepository.currentUserId.first() != ownerId) return@launchIO
+                    (submitted as? TvRequestOutcome.Submitted)?.request?.let { response ->
                         if (!enhancedFeatureGate.isEnabled(EnhancedCapability.ACQUISITION_TRACKING)) {
                             return@let
                         }
@@ -310,10 +338,15 @@ class DiscoverSeriesViewModel
                                     ),
                             ),
                         )
+                    }
+                    if (submitted != null && enhancedFeatureGate.isEnabled(EnhancedCapability.ACQUISITION_TRACKING)) {
                         seerrAcquisitionTracker.refreshNow()
                     }
+                    if (submitted == TvRequestOutcome.NoNewRequest) {
+                        showToast(context, context.getString(R.string.request_no_new_seasons))
+                    }
 
-                    fetchAndSetItem().await()?.let {
+                    fetchAndSetItem(client, ownerId).await()?.let {
                         updateSeasonStatus(it)
                         updateAvailability()
                     }
@@ -321,23 +354,33 @@ class DiscoverSeriesViewModel
             }
         }
 
-        fun cancelRequest(id: Int) {
+        fun cancelRequest(
+            requestId: Int,
+            is4k: Boolean,
+        ) {
             viewModelScope.launchIO {
-                state.value.tvSeries.successValue?.mediaInfo?.requests?.firstOrNull()?.let {
-                    // TODO handle multiple requests? Or just delete self's request?
-                    try {
-                        seerrService.api.requestApi.requestRequestIdDelete(it.id.toString())
-                    } catch (ex: CancellationException) {
-                        throw ex
-                    } catch (ex: Exception) {
-                        Timber.e(ex, "Error requesting %s", id)
-                        showToast(context, "An error occurred")
-                    }
-
-                    fetchAndSetItem().await()?.let {
+                val client = seerrService.api
+                val media =
+                    state.value.tvSeries.successValue
+                        ?.takeIf { it.id == item.id }
+                        ?.mediaInfo ?: return@launchIO
+                val owner = seerrServerRepository.current.first()?.config
+                val target = media.singleCancellationTarget(owner, SeerrItemType.TV, item.id)
+                if (target?.id != requestId || (target.is4k == true) != is4k) return@launchIO
+                try {
+                    seerrService.cancelRequest(media, SeerrItemType.TV, item.id, requestId, is4k, client)
+                    currentCoroutineContext().ensureActive()
+                    if (seerrService.api !== client || seerrServerRepository.currentUserId.first() != owner?.id) return@launchIO
+                    fetchAndSetItem(client, owner?.id).await()?.let {
                         updateSeasonStatus(it)
                         updateAvailability()
                     }
+                } catch (ex: CancellationException) {
+                    throw ex
+                } catch (ex: Exception) {
+                    if (seerrService.api !== client || seerrServerRepository.currentUserId.first() != owner?.id) return@launchIO
+                    Timber.e(ex, "Error cancelling request %s", requestId)
+                    showToast(context, "An error occurred")
                 }
             }
         }

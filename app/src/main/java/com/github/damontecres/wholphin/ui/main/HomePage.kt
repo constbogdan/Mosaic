@@ -808,6 +808,7 @@ private fun HomeAcquiringPosterCard(
             presentation.mediaPresentation.acquisitionState?.let {
                 AcquisitionStateIndicator(
                     state = it,
+                    lifecycle = presentation.mediaPresentation.lifecycle,
                     modifier = Modifier.align(Alignment.TopStart),
                 )
             }

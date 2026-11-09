@@ -435,7 +435,7 @@ class SeerrAcquisitionTrackerTest {
     }
 
     @Test
-    fun initialTvSeasonCompletionUsesRequestedSeasonUpdateTime() {
+    fun initialTvSeasonCompletionUsesPhysicalSeasonUpdateTime() {
         val completedAt = Instant.parse("2026-09-01T07:38:08Z")
         val completed =
             MediaRequest(
@@ -443,18 +443,12 @@ class SeerrAcquisitionTrackerTest {
                 status = 5,
                 type = "tv",
                 updatedAt = "2026-09-01T07:40:00Z",
-                seasons =
-                    listOf(
-                        Season(
-                            seasonNumber = 1,
-                            status = SeerrAvailability.AVAILABLE.status,
-                            updatedAt = completedAt.toString(),
-                        ),
-                    ),
+                seasons = listOf(Season(seasonNumber = 1, status = 5, updatedAt = "2026-09-01T07:40:00Z")),
                 media =
                     MediaInfo(
                         id = 20,
                         status = SeerrAvailability.PARTIALLY_AVAILABLE.status,
+                        seasons = listOf(Season(seasonNumber = 1, status = 5, updatedAt = completedAt.toString())),
                     ),
             ).toSeerrRequestAcquisition()
 
@@ -470,28 +464,82 @@ class SeerrAcquisitionTrackerTest {
                 id = 2,
                 status = 2,
                 type = "tv",
-                seasons = listOf(Season(seasonNumber = 1, status = SeerrAvailability.PROCESSING.status)),
-                media = MediaInfo(id = 20, status = SeerrAvailability.PARTIALLY_AVAILABLE.status),
+                seasons = listOf(Season(seasonNumber = 1, status = 2)),
+                media = MediaInfo(id = 20, status = 4, seasons = listOf(Season(seasonNumber = 1, status = 3))),
             ).toSeerrRequestAcquisition()
         val completed =
             MediaRequest(
                 id = 2,
                 status = 5,
                 type = "tv",
-                seasons =
-                    listOf(
-                        Season(
-                            seasonNumber = 1,
-                            status = SeerrAvailability.AVAILABLE.status,
-                            updatedAt = "2026-09-01T07:38:08Z",
-                        ),
+                seasons = listOf(Season(seasonNumber = 1, status = 5)),
+                media =
+                    MediaInfo(
+                        id = 20,
+                        status = 4,
+                        seasons = listOf(Season(seasonNumber = 1, status = 5, updatedAt = "2026-09-01T07:38:08Z")),
                     ),
-                media = MediaInfo(id = 20, status = SeerrAvailability.PARTIALLY_AVAILABLE.status),
             ).toSeerrRequestAcquisition()
 
         val stamped = stampAvailabilityTransitions(listOf(completed), listOf(processing), 1234L)
 
         assertEquals(1234L, stamped.single().request.seasonAvailableSinceEpochMillis[1])
+    }
+
+    @Test
+    fun requestCompletionAloneDoesNotStampPhysicalSeasonAvailability() {
+        val pending =
+            MediaRequest(
+                id = 2,
+                status = 2,
+                type = "tv",
+                updatedAt = "2026-09-01T07:40:00Z",
+                seasons = listOf(Season(seasonNumber = 1, status = 2)),
+                media = MediaInfo(id = 20, status = 4, seasons = listOf(Season(seasonNumber = 1, status = 1))),
+            )
+        val completed = pending.copy(status = 5, seasons = listOf(Season(seasonNumber = 1, status = 5)))
+        val stamped =
+            stampAvailabilityTransitions(
+                listOf(completed.toSeerrRequestAcquisition()),
+                listOf(pending.toSeerrRequestAcquisition()),
+                1234L,
+            ).single().request
+        assertTrue(stamped.seasonAvailableSinceEpochMillis.isEmpty())
+        assertEquals(SeerrAvailability.UNKNOWN, stamped.seasonAvailability[1])
+    }
+
+    @Test
+    fun physicalSeasonTransitionIsQualitySpecific() {
+        val pending =
+            MediaRequest(
+                id = 2,
+                status = 2,
+                type = "tv",
+                is4k = true,
+                updatedAt = "2026-09-01T07:40:00Z",
+                seasons = listOf(Season(seasonNumber = 1, status = 2)),
+                media = MediaInfo(id = 20, status = 5, status4k = 1, seasons = listOf(Season(seasonNumber = 1, status = 5, status4k = 1))),
+            )
+        val previous = pending.toSeerrRequestAcquisition()
+        assertTrue(
+            stampAvailabilityTransitions(listOf(previous), emptyList(), 1234L)
+                .single()
+                .request.seasonAvailableSinceEpochMillis
+                .isEmpty(),
+        )
+        val available =
+            pending
+                .copy(
+                    media =
+                        pending.media!!.copy(
+                            status = 1,
+                            status4k = 5,
+                            seasons = listOf(Season(seasonNumber = 1, status = 1, status4k = 5)),
+                        ),
+                ).toSeerrRequestAcquisition()
+        val stamped = stampAvailabilityTransitions(listOf(available), listOf(previous), 1234L).single().request
+        assertEquals(1234L, stamped.availableSinceEpochMillis)
+        assertEquals(1234L, stamped.seasonAvailableSinceEpochMillis[1])
     }
 
     @Test
@@ -693,6 +741,100 @@ class SeerrAcquisitionTrackerTest {
     }
 
     @Test
+    fun readinessCannotCrossQualityTargetOrRequestGeneration() {
+        val base = movieRequest(70, null, null)
+        val ready =
+            base.copy(
+                request =
+                    base.request.copy(
+                        jellyfinReadiness = JellyfinAcquisitionReadiness(movieItemId = UUID.randomUUID()),
+                        jellyfinReadySinceEpochMillis = 1234L,
+                    ),
+            )
+        val changed =
+            listOf(
+                base.copy(request = base.request.copy(is4k = true)),
+                base.copy(request = base.request.copy(mediaId = 999)),
+                base.copy(request = base.request.copy(tmdbId = 999)),
+                base.copy(request = base.request.copy(createdAt = "2026-11-09T00:00:00Z")),
+            )
+        changed.forEach { next ->
+            val retained = retainJellyfinReadiness(listOf(next), listOf(ready)).single()
+            assertFalse(retained.request.jellyfinReadiness.movieReady)
+            assertEquals(null, retained.request.jellyfinReadySinceEpochMillis)
+        }
+    }
+
+    @Test
+    fun explicitNewTransferInvalidatesRetained4kProofAndCompletionTimestamp() {
+        val current = movieRequest(70, 100.0, 50.0, is4k = true, phase = "downloading")
+        val previous =
+            movieRequest(70, null, null, is4k = true).let { acquisition ->
+                acquisition.copy(
+                    request =
+                        acquisition.request.copy(
+                            jellyfinReadiness = JellyfinAcquisitionReadiness(movieItemId = UUID.randomUUID()),
+                            jellyfinReadySinceEpochMillis = 1234L,
+                        ),
+                )
+            }
+        val retained = retainJellyfinReadiness(listOf(current), listOf(previous)).single()
+        assertFalse(retained.request.jellyfinReadiness.movieReady)
+        assertEquals(null, retained.request.jellyfinReadySinceEpochMillis)
+        val movie = current.acquisition as SeerrAcquisitionState.Movie
+        val unidentifiedTransfer =
+            current.copy(
+                acquisition =
+                    movie.copy(
+                        aggregate =
+                            movie.aggregate.copy(
+                                entries = movie.aggregate.entries.map { it.copy(downloadId = null) },
+                            ),
+                    ),
+            )
+        assertFalse(
+            retainJellyfinReadiness(listOf(unidentifiedTransfer), listOf(previous))
+                .single()
+                .request.jellyfinReadiness.movieReady,
+        )
+        assertEquals(
+            null,
+            stampJellyfinReadinessTransitions(listOf(retained), listOf(previous), 5678L).single().request.jellyfinReadySinceEpochMillis,
+        )
+
+        val freshlyVerified = current.copy(request = current.request.copy(jellyfinReadiness = previous.request.jellyfinReadiness))
+        assertEquals(
+            5678L,
+            stampJellyfinReadinessTransitions(
+                listOf(freshlyVerified),
+                listOf(previous),
+                5678L,
+            ).single().request.jellyfinReadySinceEpochMillis,
+        )
+    }
+
+    @Test
+    fun sameTransferRetainsQualityProofAcrossMissingMetadataAndEpisodeInventory() {
+        val current = tvRequest(70, "4k-transfer", 100.0, 0.0).let { it.copy(request = it.request.copy(is4k = true)) }
+        val previous =
+            current.copy(
+                request =
+                    current.request.copy(
+                        jellyfinReadiness = JellyfinAcquisitionReadiness(episodeItemIds = mapOf(1 to mapOf(1 to UUID.randomUUID()))),
+                        jellyfinSeasonReadySinceEpochMillis = mapOf(1 to 1234L),
+                    ),
+            )
+        val retained = retainJellyfinReadiness(listOf(current), listOf(previous)).single()
+        assertTrue(retained.request.jellyfinReadiness.seasonReady(1, 1))
+        assertEquals(1234L, retained.request.jellyfinSeasonReadySinceEpochMillis[1])
+
+        val newTransfer = tvRequest(70, "replacement", 100.0, 50.0).let { it.copy(request = it.request.copy(is4k = true)) }
+        val reset = retainJellyfinReadiness(listOf(newTransfer), listOf(previous)).single()
+        assertFalse(reset.request.jellyfinReadiness.seasonReady(1, 1))
+        assertTrue(reset.request.jellyfinSeasonReadySinceEpochMillis.isEmpty())
+    }
+
+    @Test
     fun seerrCompletedTargetsStillRequireJellyfinIdentityResolution() {
         val completedMovie =
             MediaRequest(
@@ -706,8 +848,8 @@ class SeerrAcquisitionTrackerTest {
                 id = 72,
                 status = 5,
                 type = "tv",
-                seasons = listOf(Season(seasonNumber = 1, status = SeerrAvailability.AVAILABLE.status)),
-                media = MediaInfo(id = 72, status = SeerrAvailability.PARTIALLY_AVAILABLE.status),
+                seasons = listOf(Season(seasonNumber = 1, status = 5)),
+                media = MediaInfo(id = 72, status = 4, seasons = listOf(Season(seasonNumber = 1, status = 5))),
             ).toSeerrRequestAcquisition().let { acquisition ->
                 acquisition.copy(
                     request = acquisition.request.copy(seasonEpisodeCounts = mapOf(1 to 1)),
@@ -1000,7 +1142,7 @@ class SeerrAcquisitionTrackerTest {
             val tracker =
                 tracker(sessions) {
                     if (sessions.value?.userId == 1) {
-                        listOf(movieRequest(1, size = 100.0, sizeLeft = 50.0))
+                        listOf(movieRequest(1, size = 100.0, sizeLeft = 50.0, phase = "importBlocked"))
                     } else {
                         listOf(movieRequest(2, size = null, sizeLeft = null))
                     }
@@ -1034,7 +1176,7 @@ class SeerrAcquisitionTrackerTest {
             val tracker =
                 tracker(MutableStateFlow(SeerrAcquisitionSession(1, 1))) {
                     if (fail) error("offline")
-                    listOf(movieRequest(1, size = 100.0, sizeLeft = 50.0))
+                    listOf(movieRequest(1, size = 100.0, sizeLeft = 50.0, phase = "importing"))
                 }
             tracker.startForeground()
             runCurrent()
@@ -1076,8 +1218,9 @@ class SeerrAcquisitionTrackerTest {
         size: Double?,
         sizeLeft: Double?,
         is4k: Boolean = false,
+        phase: String? = null,
     ): SeerrRequestAcquisition {
-        val entry = size?.let { download("movie-$requestId", it, sizeLeft ?: 0.0) }
+        val entry = size?.let { download("movie-$requestId", it, sizeLeft ?: 0.0).copy(acquisitionPhase = phase) }
         return MediaRequest(
             id = requestId,
             status = 2,
@@ -1121,11 +1264,12 @@ class SeerrAcquisitionTrackerTest {
             id = 1,
             status = 2,
             type = "tv",
-            seasons = listOf(Season(seasonNumber = 1, status = SeerrAvailability.PROCESSING.status)),
+            seasons = listOf(Season(seasonNumber = 1, status = 2)),
             media =
                 MediaInfo(
                     id = 20,
                     status = SeerrAvailability.PARTIALLY_AVAILABLE.status,
+                    seasons = listOf(Season(seasonNumber = 1, status = 3)),
                     downloadStatus = entries,
                 ),
         ).toSeerrRequestAcquisition()

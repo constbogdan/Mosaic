@@ -92,6 +92,7 @@ import com.github.damontecres.wholphin.ui.data.ItemDetailsDialog
 import com.github.damontecres.wholphin.ui.data.ItemDetailsDialogInfo
 import com.github.damontecres.wholphin.ui.detail.PlaylistDialog
 import com.github.damontecres.wholphin.ui.detail.discover.RequestSeasonsDialog
+import com.github.damontecres.wholphin.ui.detail.discover.isRequestable
 import com.github.damontecres.wholphin.ui.discover.DiscoverRow
 import com.github.damontecres.wholphin.ui.discover.DiscoverRowData
 import com.github.damontecres.wholphin.ui.letNotEmpty
@@ -296,8 +297,18 @@ fun SeriesDetails(
                     title = state.seerrTvDetails?.name ?: series.title.orEmpty(),
                     seasons = state.requestSeasons,
                     seasons4k = state.requestSeasons4k,
-                    requestEnabled = requestEnabled,
-                    request4kEnabled = request4kEnabled,
+                    requestEnabled =
+                        requestEnabled &&
+                            state.requestSeasons.any {
+                                it.isRequestable() ||
+                                    (it.editable && it.status == com.github.damontecres.wholphin.data.model.RequestStatus.PENDING)
+                            },
+                    request4kEnabled =
+                        request4kEnabled &&
+                            state.requestSeasons4k.any {
+                                it.isRequestable() ||
+                                    (it.editable && it.status == com.github.damontecres.wholphin.data.model.RequestStatus.PENDING)
+                            },
                     initialSeasonNumber = seasonNumber,
                     loading = state.profileLoading,
                     data = state.requestData,
@@ -596,6 +607,7 @@ fun SeriesDetailsContent(
                                             item.mediaPresentation?.acquisitionState?.let { state ->
                                                 AcquisitionStateIndicator(
                                                     state = state,
+                                                    lifecycle = item.mediaPresentation?.lifecycle,
                                                     modifier = Modifier.align(Alignment.TopStart),
                                                 )
                                             }
@@ -643,6 +655,7 @@ fun SeriesDetailsContent(
                                             if (acquisitionState != null) {
                                                 AcquisitionStateIndicator(
                                                     state = acquisitionState,
+                                                    lifecycle = item.mediaPresentation?.lifecycle,
                                                     modifier = Modifier.align(Alignment.TopStart),
                                                 )
                                             } else {

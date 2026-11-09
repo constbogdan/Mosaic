@@ -74,6 +74,19 @@ fun RequestMovie(
     onSubmit: (MovieRequest) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // A permission change must not turn an open quality chooser into an automatic request.
+    val automaticQuality =
+        remember(movie.id) {
+            when {
+                requestEnabled && !request4kEnabled -> false
+                request4kEnabled && !requestEnabled -> true
+                else -> null
+            }
+        }
+    if (!requestEnabled && !request4kEnabled) {
+        Text(text = stringResource(R.string.unavailable), modifier = modifier)
+        return
+    }
     when (loading) {
         is LoadingState.Error -> {
             ErrorMessage(loading, modifier)
@@ -94,23 +107,33 @@ fun RequestMovie(
                 data.profiles4k.isEmpty() && data.rootFolders4k.isEmpty()
             ) {
                 // Both enabled, show choice
-                if (requestEnabled && request4kEnabled) {
+                if ((requestEnabled && request4kEnabled) || automaticQuality == null ||
+                    !(if (automaticQuality) request4kEnabled else requestEnabled)
+                ) {
                     val items =
-                        remember {
-                            listOf(
-                                DialogItem(
-                                    text = requestStr,
-                                    onClick = {
-                                        onSubmit.invoke(MovieRequest(data, movie.id, false, null, null))
-                                    },
-                                ),
-                                DialogItem(
-                                    text = request4kStr,
-                                    onClick = {
-                                        onSubmit.invoke(MovieRequest(data, movie.id, true, null, null))
-                                    },
-                                ),
-                            )
+                        remember(requestEnabled, request4kEnabled, movie, data, onSubmit) {
+                            buildList {
+                                if (requestEnabled) {
+                                    add(
+                                        DialogItem(
+                                            text = requestStr,
+                                            onClick = {
+                                                onSubmit.invoke(MovieRequest(data, movie.id, false, null, null))
+                                            },
+                                        ),
+                                    )
+                                }
+                                if (request4kEnabled) {
+                                    add(
+                                        DialogItem(
+                                            text = request4kStr,
+                                            onClick = {
+                                                onSubmit.invoke(MovieRequest(data, movie.id, true, null, null))
+                                            },
+                                        ),
+                                    )
+                                }
+                            }
                         }
                     DialogPopupContent(
                         title = movie.title + " (${movie.releaseDate ?: ""})",
@@ -121,7 +144,8 @@ fun RequestMovie(
                         modifier = modifier.focusRequester(focusRequester),
                     )
                 } else {
-                    LaunchedEffect(Unit) {
+                    LaunchedEffect(requestEnabled, request4kEnabled) {
+                        if (!requestEnabled && !request4kEnabled) return@LaunchedEffect
                         onSubmit.invoke(MovieRequest(data, movie.id, request4kEnabled, null, null))
                     }
                 }
@@ -148,7 +172,7 @@ private fun RequestMovieWithOptions(
     onSubmit: (MovieRequest) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var is4k by remember { mutableStateOf(!requestEnabled) }
+    var is4k by remember(requestEnabled, request4kEnabled) { mutableStateOf(!requestEnabled && request4kEnabled) }
     var profile by remember(is4k) {
         mutableStateOf(
             if (is4k) {
@@ -200,8 +224,10 @@ private fun RequestMovieWithOptions(
                     }
                     Button(
                         onClick = {
+                            if (!(if (is4k) request4kEnabled else requestEnabled)) return@Button
                             onSubmit.invoke(MovieRequest(data, movie.id, is4k, profile?.id, folder?.path))
                         },
+                        enabled = if (is4k) request4kEnabled else requestEnabled,
                     ) {
                         Text(
                             text = stringResource(R.string.submit),
