@@ -9,6 +9,7 @@ import com.github.damontecres.wholphin.api.seerr.TvRequestHttpFixture
 import com.github.damontecres.wholphin.api.seerr.TvRequestOutcome
 import com.github.damontecres.wholphin.api.seerr.model.Season
 import com.github.damontecres.wholphin.api.seerr.model.TvDetails
+import com.github.damontecres.wholphin.api.seerr.requestSession
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.BaseItem
 import com.github.damontecres.wholphin.data.model.RequestStatus
@@ -62,6 +63,7 @@ import java.util.UUID
 class SeriesRequestStateTest {
     private val dispatcher = StandardTestDispatcher()
     private val active = MutableStateFlow(true)
+    private val current = MutableStateFlow<com.github.damontecres.wholphin.services.CurrentSeerr?>(requestSession())
     private val seerr = mockk<SeerrService>(relaxed = true)
     private val client = mockk<SeerrApiClient>(relaxed = true)
     private val tvApi = mockk<TvApi>(relaxed = true)
@@ -92,8 +94,8 @@ class SeriesRequestStateTest {
         val repository = mockk<ServerRepository>(relaxed = true)
         every { repository.currentUser } returns null
         val seerrRepository = mockk<SeerrServerRepository>(relaxed = true)
-        every { seerrRepository.current } returns flowOf(null)
-        every { seerrRepository.currentUserId } returns flowOf(null)
+        every { seerrRepository.current } returns current
+        every { seerrRepository.currentUserId } returns flowOf(7)
         val gate = mockk<EnhancedFeatureGate>()
         every { gate.isEnabled(any()) } returns true
         val productState = mockk<MediaProductStateCoordinator>(relaxed = true)
@@ -146,6 +148,22 @@ class SeriesRequestStateTest {
         unmockkStatic(Toast::class)
         WholphinDispatchers.reset()
     }
+
+    @Test fun permissionLossInvalidatesPreparedMissingSeasonRequest() =
+        runTest(dispatcher) {
+            current.value = requestSession(0)
+            viewModel.request(TvRequest(SeerrRequestData(), 42, listOf(2), false, null, null))
+            runCurrent()
+            coVerify(exactly = 0) { seerr.requestTv(any(), any()) }
+        }
+
+    @Test fun disabledFourKCapabilityRejectsMissingSeasonSubmission() =
+        runTest(dispatcher) {
+            current.value = requestSession(tv4k = false)
+            viewModel.request(TvRequest(SeerrRequestData(server4kId = 20), 42, listOf(2), true, 3, "/fixture"))
+            runCurrent()
+            coVerify(exactly = 0) { seerr.requestTv(any(), any()) }
+        }
 
     @Test
     fun onlyRequestableNonlocalCardsActivateRequests() {

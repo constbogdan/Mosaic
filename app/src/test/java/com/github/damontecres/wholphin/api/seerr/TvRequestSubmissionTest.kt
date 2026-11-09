@@ -137,9 +137,30 @@ class TvRequestSubmissionTest {
             for (edit in listOf(false, true)) {
                 val fixture = TvRequestHttpFixture()
                 val wrapper = mockk<SeerrApi> { every { api } returns fixture.api }
-                val repository = mockk<SeerrServerRepository> { every { currentUserId } returns flowOf(7) }
+                val repository =
+                    mockk<SeerrServerRepository> {
+                        every { currentUserId } returns flowOf(7)
+                        every { this@mockk.current } returns flowOf(requestSession())
+                    }
                 val service = SeerrService(wrapper, repository, mockk())
-                val existing = if (edit) listOf(MediaRequest(id = 91, status = 1, requestedBy = RequestUser(id = 7))) else emptyList()
+                val existing =
+                    if (edit) {
+                        listOf(
+                            MediaRequest(
+                                id = 91,
+                                status = 1,
+                                type = "tv",
+                                seasons =
+                                    listOf(
+                                        com.github.damontecres.wholphin.api.seerr.model
+                                            .Season(seasonNumber = 2, status = 1),
+                                    ),
+                                requestedBy = RequestUser(id = 7),
+                            ),
+                        )
+                    } else {
+                        emptyList()
+                    }
                 assertEquals(
                     TvRequestOutcome.NoNewRequest,
                     service.requestTv(TvDetails(id = 42, mediaInfo = MediaInfo(requests = existing)), tvRequest()),
@@ -154,7 +175,11 @@ class TvRequestSubmissionTest {
         var current = fixture.api
         val wrapper = mockk<SeerrApi> { every { api } answers { current } }
         fixture.onResponse = { current = SeerrApiClient("http://replacement.invalid/api/v1", null, OkHttpClient()) }
-        val repository = mockk<SeerrServerRepository> { every { currentUserId } returns flowOf(7) }
+        val repository =
+            mockk<SeerrServerRepository> {
+                every { currentUserId } returns flowOf(7)
+                every { this@mockk.current } returns flowOf(requestSession())
+            }
         val service = SeerrService(wrapper, repository, mockk())
         assertThrows(CancellationException::class.java) { runBlocking { service.requestTv(TvDetails(id = 42), tvRequest()) } }
         assertEquals(1, fixture.calls.size)
@@ -162,6 +187,28 @@ class TvRequestSubmissionTest {
 
     private fun tvRequest() = TvRequest(SeerrRequestData(), 42, listOf(2), false, null, null)
 }
+
+internal fun requestSession(
+    permissions: Int = 32 or 1024,
+    movie4k: Boolean = true,
+    tv4k: Boolean = true,
+    userId: Int = 7,
+) = com.github.damontecres.wholphin.services.CurrentSeerr(
+    com.github.damontecres.wholphin.data.model
+        .SeerrServer(id = 1, url = "http://fixture.invalid"),
+    com.github.damontecres.wholphin.data.model.SeerrUser(
+        1,
+        1,
+        com.github.damontecres.wholphin.data.model.SeerrAuthMethod.API_KEY,
+        null,
+        null,
+        null,
+    ),
+    com.github.damontecres.wholphin.services
+        .SeerrUserConfig(id = userId, permissions = permissions),
+    com.github.damontecres.wholphin.api.seerr.model
+        .PublicSettings(movie4kEnabled = movie4k, series4kEnabled = tv4k),
+)
 
 /** Real OkHttp/generated transport and JSON decoding; the interceptor forbids external traffic. */
 internal class TvRequestHttpFixture(

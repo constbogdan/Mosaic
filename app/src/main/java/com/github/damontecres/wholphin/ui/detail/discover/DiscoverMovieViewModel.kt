@@ -3,6 +3,7 @@ package com.github.damontecres.wholphin.ui.detail.discover
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.damontecres.wholphin.api.seerr.SeerrApiClient
 import com.github.damontecres.wholphin.api.seerr.model.MediaInfo
 import com.github.damontecres.wholphin.api.seerr.model.MediaRequest
 import com.github.damontecres.wholphin.api.seerr.model.MovieDetails
@@ -26,6 +27,8 @@ import com.github.damontecres.wholphin.services.SeerrAcquisitionTracker
 import com.github.damontecres.wholphin.services.SeerrServerRepository
 import com.github.damontecres.wholphin.services.SeerrService
 import com.github.damontecres.wholphin.services.SeerrUserConfig
+import com.github.damontecres.wholphin.services.canRequestMovie
+import com.github.damontecres.wholphin.services.singleCancellationTarget
 import com.github.damontecres.wholphin.ui.equalsNotNull
 import com.github.damontecres.wholphin.ui.isNotNullOrBlank
 import com.github.damontecres.wholphin.ui.launchDefault
@@ -44,8 +47,11 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -79,18 +85,27 @@ class DiscoverMovieViewModel
 
         val userConfig = seerrServerRepository.current.map { it?.config }
         val requestEnabled =
-            seerrServerRepository.current.map { it?.requestMovieEnabled ?: false }
+            combine(seerrServerRepository.current, state) { current, state -> current.canRequestMovie(state.movie.successValue, false) }
         val request4kEnabled =
-            seerrServerRepository.current.map { it?.request4kMovieEnabled ?: false }
+            combine(seerrServerRepository.current, state) { current, state -> current.canRequestMovie(state.movie.successValue, true) }
 
         init {
             init()
         }
 
-        private fun fetchAndSetItem(): Deferred<MovieDetails?> =
+        private fun fetchAndSetItem(
+            expectedClient: SeerrApiClient? = null,
+            ownerId: Int? = null,
+        ): Deferred<MovieDetails?> =
             viewModelScope.async(WholphinDispatchers.IO) {
                 try {
-                    val movie = seerrService.api.moviesApi.movieMovieIdGet(movieId = item.id)
+                    val movie = (expectedClient ?: seerrService.api).moviesApi.movieMovieIdGet(movieId = item.id)
+                    currentCoroutineContext().ensureActive()
+                    if (expectedClient != null &&
+                        (seerrService.api !== expectedClient || seerrServerRepository.currentUserId.firstOrNull() != ownerId)
+                    ) {
+                        return@async null
+                    }
                     _state.update { it.copy(movie = DataLoadingState.Success(movie)) }
                     movie
                 } catch (ex: CancellationException) {
@@ -170,12 +185,9 @@ class DiscoverMovieViewModel
         private suspend fun updateCanCancel() {
             val user = userConfig.firstOrNull()
             val canCancel =
-                canUserCancelRequest(
-                    user,
-                    state.value.movie.successValue
-                        ?.mediaInfo
-                        ?.requests,
-                )
+                state.value.movie.successValue
+                    ?.mediaInfo
+                    .singleCancellationTarget(user, SeerrItemType.MOVIE, item.id) != null
             _state.update { it.copy(canCancelRequest = canCancel) }
         }
 
@@ -194,14 +206,17 @@ class DiscoverMovieViewModel
 
         fun request(request: MovieRequest) {
             viewModelScope.launchIO {
-                if (request.movieId == null) {
-                    Timber.w("Null movie ID")
-                    return@launchIO
-                }
+                val current = seerrServerRepository.current.firstOrNull()
+                val movie = state.value.movie.successValue
+                if (request.movieId != item.id || movie?.id != item.id || !current.canRequestMovie(movie, request.is4k)) return@launchIO
+                val client = seerrService.api
+                val ownerId = current?.config?.id
+                currentCoroutineContext().ensureActive()
+                if (seerrServerRepository.currentUserId.firstOrNull() != ownerId || seerrService.api !== client) return@launchIO
                 var submitted: MediaRequest? = null
                 try {
                     submitted =
-                        seerrService.api.requestApi.requestPost(
+                        client.requestApi.requestPost(
                             RequestPostRequest(
                                 is4k = request.is4k,
                                 mediaId = request.movieId,
@@ -217,12 +232,15 @@ class DiscoverMovieViewModel
                                 tags = emptyList(),
                             ),
                         )
+                    currentCoroutineContext().ensureActive()
                 } catch (ex: CancellationException) {
                     throw ex
                 } catch (ex: Exception) {
+                    if (seerrService.api !== client || seerrServerRepository.currentUserId.firstOrNull() != ownerId) return@launchIO
                     Timber.e(ex, "Error requesting %s", request.movieId)
                     showToast(context, "An error occurred")
                 }
+                if (seerrService.api !== client || seerrServerRepository.currentUserId.firstOrNull() != ownerId) return@launchIO
                 submitted?.let { response ->
                     if (!enhancedFeatureGate.isEnabled(EnhancedCapability.ACQUISITION_TRACKING)) {
                         return@let
@@ -233,31 +251,45 @@ class DiscoverMovieViewModel
                     )
                     seerrAcquisitionTracker.refreshNow()
                 }
-                fetchAndSetItem().await()
+                fetchAndSetItem(client, ownerId).await()
                 updateCanCancel()
             }
         }
 
-        fun cancelRequest(id: Int) {
+        fun cancelRequest(
+            requestId: Int,
+            is4k: Boolean,
+        ) {
             viewModelScope.launchIO {
-                state.value.movie.successValue?.mediaInfo?.requests?.firstOrNull()?.let {
-                    // TODO handle multiple requests? Or just delete self's request?
-                    try {
-                        seerrService.api.requestApi.requestRequestIdDelete(it.id.toString())
-                    } catch (ex: kotlinx.coroutines.CancellationException) {
-                        throw ex
-                    } catch (ex: Exception) {
-                        Timber.e(ex, "Error requesting %s", id)
-                        showToast(context, "An error occurred")
-                    }
-                    fetchAndSetItem().await()
+                val client = seerrService.api
+                val media =
+                    state.value.movie.successValue
+                        ?.takeIf { it.id == item.id }
+                        ?.mediaInfo ?: return@launchIO
+                val owner = seerrServerRepository.current.firstOrNull()?.config
+                val target = media.singleCancellationTarget(owner, SeerrItemType.MOVIE, item.id)
+                if (target?.id != requestId || (target.is4k == true) != is4k) return@launchIO
+                try {
+                    seerrService.cancelRequest(media, SeerrItemType.MOVIE, item.id, requestId, is4k, client)
+                    currentCoroutineContext().ensureActive()
+                    if (seerrService.api !== client || seerrServerRepository.currentUserId.firstOrNull() != owner?.id) return@launchIO
+                    fetchAndSetItem(client, owner?.id).await()
                     updateCanCancel()
+                } catch (ex: CancellationException) {
+                    throw ex
+                } catch (ex: Exception) {
+                    if (seerrService.api !== client || seerrServerRepository.currentUserId.firstOrNull() != owner?.id) return@launchIO
+                    Timber.e(ex, "Error cancelling request %s", requestId)
+                    showToast(context, "An error occurred")
                 }
             }
         }
 
         fun requestOnClick() {
             viewModelScope.launchIO {
+                val current = seerrServerRepository.current.firstOrNull()
+                val movie = state.value.movie.successValue
+                if (!current.canRequestMovie(movie, false) && !current.canRequestMovie(movie, true)) return@launchIO
                 try {
                     val data = seerrService.getProfilesAndFolders(SeerrItemType.MOVIE)
                     _state.update {
@@ -278,21 +310,6 @@ class DiscoverMovieViewModel
             }
         }
     }
-
-fun canUserCancelRequest(
-    user: SeerrUserConfig?,
-    requests: List<MediaRequest>?,
-) = (user.hasPermission(SeerrPermission.MANAGE_REQUESTS) && requests?.isNotEmpty() == true) ||
-    (
-        // User requested this
-        user.hasPermission(SeerrPermission.REQUEST) &&
-            requests
-                .orEmpty()
-                .any {
-                    equalsNotNull(it.requestedBy?.id, user?.id) &&
-                        RequestStatus.from(it.status) < RequestStatus.APPROVED
-                }
-    )
 
 data class DiscoverMovieState(
     val movie: DataLoadingState<MovieDetails> = DataLoadingState.Pending,

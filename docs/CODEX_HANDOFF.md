@@ -39,6 +39,14 @@ not current instruction.
 
 ## Non-obvious invariants and negative knowledge
 
+- Request actions check current capabilities again at submission. Standard has no separate
+  public backend enabled flag; 4K requires its public enabled flag and matching permission.
+  Request-only `status4k` consumption must not be mistaken for a completed acquisition-mapping fix.
+  TV PUT selection is owner-, media-, quality- and season-overlap-specific. Disjoint seasons
+  use POST; multiple overlapping editable requests fail closed rather than choosing one.
+  The generic Discover Cancel action is offered only for one authorized target across qualities;
+  multiple targets need a separately reviewed chooser. Owner cancellation needs pending status,
+  not a request-creation permission; managers may delete any status under the backend contract.
 - TV request POST/PUT may return a message-only 202 when no seasons remain requestable.
   This is not an asynchronous download acknowledgement and carries no request identity.
   `TvRequestSubmission` reuses generated configs/transport but decodes that outcome before

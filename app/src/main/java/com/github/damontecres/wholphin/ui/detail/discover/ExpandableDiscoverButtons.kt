@@ -93,6 +93,8 @@ fun ExpandableDiscoverButtons(
 
                         SeerrAvailability.PENDING,
                         SeerrAvailability.PROCESSING,
+                        -> canRequest
+
                         SeerrAvailability.PARTIALLY_AVAILABLE,
                         SeerrAvailability.AVAILABLE,
                         -> true
@@ -132,7 +134,9 @@ fun ExpandableDiscoverButtons(
                         .onFocusChanged(buttonOnFocusChanged),
             )
         }
-        if (availability == SeerrAvailability.PARTIALLY_AVAILABLE) {
+        if (canRequest &&
+            availability in setOf(SeerrAvailability.PARTIALLY_AVAILABLE, SeerrAvailability.AVAILABLE, SeerrAvailability.DELETED)
+        ) {
             item("request_partial") {
                 ExpandableFaButton(
                     title = R.string.request,
@@ -140,7 +144,7 @@ fun ExpandableDiscoverButtons(
                     onClick = {
                         requestOnClick.invoke()
                     },
-                    enabled = availability == SeerrAvailability.PARTIALLY_AVAILABLE,
+                    enabled = canRequest,
                     modifier =
                         Modifier
                             .onFocusChanged(buttonOnFocusChanged),

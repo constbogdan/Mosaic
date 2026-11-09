@@ -47,6 +47,7 @@ import com.github.damontecres.wholphin.data.model.canRequestMovies
 import com.github.damontecres.wholphin.preferences.UserPreferences
 import com.github.damontecres.wholphin.services.SeerrUserConfig
 import com.github.damontecres.wholphin.services.TrailerService
+import com.github.damontecres.wholphin.services.singleCancellationTarget
 import com.github.damontecres.wholphin.ui.Cards
 import com.github.damontecres.wholphin.ui.cards.DiscoverItemCard
 import com.github.damontecres.wholphin.ui.cards.DiscoverPersonRow
@@ -107,7 +108,14 @@ fun DiscoverMovieDetails(
                 movie = movie,
                 userConfig = userConfig,
                 rating = state.rating,
-                canCancel = state.canCancelRequest,
+                canCancel =
+                    movie.mediaInfo.singleCancellationTarget(
+                        userConfig,
+                        com.github.damontecres.wholphin.data.model.SeerrItemType.MOVIE,
+                        movie.id ?: 0,
+                    ) !=
+                        null,
+                canRequest = requestEnabled || request4kEnabled,
                 people = state.people,
                 trailers = state.trailers,
                 similar = state.similar,
@@ -117,7 +125,14 @@ fun DiscoverMovieDetails(
                     showRequestDialog = true
                 },
                 cancelOnClick = {
-                    movie.id?.let { viewModel.cancelRequest(it) }
+                    movie.mediaInfo
+                        .singleCancellationTarget(
+                            userConfig,
+                            com.github.damontecres.wholphin.data.model.SeerrItemType.MOVIE,
+                            movie.id ?: 0,
+                        )?.let {
+                            viewModel.cancelRequest(it.id, it.is4k == true)
+                        }
                 },
                 onClickItem = { index, item ->
                     viewModel.navigateTo(Destination.DiscoveredItem(item))
@@ -199,6 +214,7 @@ fun DiscoverMovieDetailsContent(
     onClickPerson: (DiscoverItem) -> Unit,
     onLongClickPerson: (Int, DiscoverItem) -> Unit,
     onLongClickSimilar: (Int, DiscoverItem) -> Unit,
+    canRequest: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -240,6 +256,7 @@ fun DiscoverMovieDetailsContent(
                             SeerrAvailability.from(movie.mediaInfo?.status)
                                 ?: SeerrAvailability.UNKNOWN,
                         requestOnClick = requestOnClick,
+                        pendingOnClick = requestOnClick,
                         cancelOnClick = cancelOnClick,
                         moreOnClick = moreOnClick,
                         goToOnClick = goToOnClick,
@@ -251,7 +268,7 @@ fun DiscoverMovieDetailsContent(
                                 }
                             }
                         },
-                        canRequest = userConfig.canRequestMovies,
+                        canRequest = canRequest,
                         canCancel = canCancel,
                         trailers = trailers,
                         trailerOnClick = trailerOnClick,

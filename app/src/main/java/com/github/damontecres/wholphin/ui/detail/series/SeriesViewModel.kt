@@ -44,6 +44,7 @@ import com.github.damontecres.wholphin.services.ThemeSongPlayer
 import com.github.damontecres.wholphin.services.TrailerService
 import com.github.damontecres.wholphin.services.UserPreferencesService
 import com.github.damontecres.wholphin.services.deleteItem
+import com.github.damontecres.wholphin.services.permitsRequest
 import com.github.damontecres.wholphin.ui.ItemRowFields
 import com.github.damontecres.wholphin.ui.cards.CardMediaPresentation
 import com.github.damontecres.wholphin.ui.cards.tvSeasonCardPresentation
@@ -596,6 +597,14 @@ class SeriesViewModel
             if (!enhancedFeatureGate.isEnabled(EnhancedCapability.SERIES_REQUEST_ENHANCEMENTS)) return
             viewModelScope.launchIO {
                 if (state.value.requestMediaId(seerrActive.first()) != request.tvId) return@launchIO
+                if (!seerrServerRepository.current.first().permitsRequest(
+                        com.github.damontecres.wholphin.data.model.SeerrItemType.TV,
+                        request.is4k,
+                    ) ||
+                    request.seasons.isEmpty()
+                ) {
+                    return@launchIO
+                }
                 val tv = state.value.seerrTvDetails ?: return@launchIO
                 val client = seerrService.api
                 val ownerId = seerrServerRepository.currentUserId.first()
