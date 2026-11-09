@@ -3,6 +3,9 @@ package com.github.damontecres.wholphin.ui.detail.discover
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.damontecres.wholphin.R
+import com.github.damontecres.wholphin.api.seerr.SeerrApiClient
+import com.github.damontecres.wholphin.api.seerr.TvRequestOutcome
 import com.github.damontecres.wholphin.api.seerr.model.MediaInfo
 import com.github.damontecres.wholphin.api.seerr.model.RelatedVideo
 import com.github.damontecres.wholphin.api.seerr.model.TvDetails
@@ -40,6 +43,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -89,10 +94,13 @@ class DiscoverSeriesViewModel
             init()
         }
 
-        private fun fetchAndSetItem(): Deferred<TvDetails?> =
+        private fun fetchAndSetItem(expectedClient: SeerrApiClient? = null): Deferred<TvDetails?> =
             viewModelScope.async(WholphinDispatchers.IO) {
                 try {
-                    val tv = seerrService.api.tvApi.tvTvIdGet(tvId = item.id)
+                    val client = expectedClient ?: seerrService.api
+                    val tv = client.tvApi.tvTvIdGet(tvId = item.id)
+                    currentCoroutineContext().ensureActive()
+                    if (expectedClient != null && seerrService.api !== expectedClient) return@async null
                     _state.update { it.copy(tvSeries = DataLoadingState.Success(tv)) }
                     tv
                 } catch (ex: CancellationException) {
@@ -278,16 +286,21 @@ class DiscoverSeriesViewModel
         fun request(request: TvRequest) {
             viewModelScope.launchIO {
                 state.value.tvSeries.successValue?.let { tv ->
-                    var submitted: com.github.damontecres.wholphin.api.seerr.model.MediaRequest? = null
+                    val client = seerrService.api
+                    val ownerId = seerrServerRepository.currentUserId.first()
+                    var submitted: TvRequestOutcome? = null
                     try {
                         submitted = seerrService.requestTv(tv, request)
+                        currentCoroutineContext().ensureActive()
                     } catch (ex: CancellationException) {
                         throw ex
                     } catch (ex: Exception) {
+                        if (seerrService.api !== client || seerrServerRepository.currentUserId.first() != ownerId) return@launchIO
                         Timber.e(ex, "Error requesting %s", request.tvId)
                         showToast(context, "An error occurred")
                     }
-                    submitted?.let { response ->
+                    if (seerrService.api !== client || seerrServerRepository.currentUserId.first() != ownerId) return@launchIO
+                    (submitted as? TvRequestOutcome.Submitted)?.request?.let { response ->
                         if (!enhancedFeatureGate.isEnabled(EnhancedCapability.ACQUISITION_TRACKING)) {
                             return@let
                         }
@@ -310,10 +323,15 @@ class DiscoverSeriesViewModel
                                     ),
                             ),
                         )
+                    }
+                    if (submitted != null && enhancedFeatureGate.isEnabled(EnhancedCapability.ACQUISITION_TRACKING)) {
                         seerrAcquisitionTracker.refreshNow()
                     }
+                    if (submitted == TvRequestOutcome.NoNewRequest) {
+                        showToast(context, context.getString(R.string.request_no_new_seasons))
+                    }
 
-                    fetchAndSetItem().await()?.let {
+                    fetchAndSetItem(client).await()?.let {
                         updateSeasonStatus(it)
                         updateAvailability()
                     }

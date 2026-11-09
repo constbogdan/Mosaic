@@ -1,6 +1,12 @@
 package com.github.damontecres.wholphin.ui.detail.series
 
+import android.content.Context
+import android.widget.Toast
 import androidx.lifecycle.ViewModelStore
+import com.github.damontecres.wholphin.api.seerr.SeerrApiClient
+import com.github.damontecres.wholphin.api.seerr.TvApi
+import com.github.damontecres.wholphin.api.seerr.TvRequestHttpFixture
+import com.github.damontecres.wholphin.api.seerr.TvRequestOutcome
 import com.github.damontecres.wholphin.api.seerr.model.Season
 import com.github.damontecres.wholphin.api.seerr.model.TvDetails
 import com.github.damontecres.wholphin.data.ServerRepository
@@ -10,6 +16,7 @@ import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.services.EnhancedFeatureGate
 import com.github.damontecres.wholphin.services.MediaProductStateCoordinator
 import com.github.damontecres.wholphin.services.SeasonIntegrityService
+import com.github.damontecres.wholphin.services.SeerrAcquisitionTracker
 import com.github.damontecres.wholphin.services.SeerrServerRepository
 import com.github.damontecres.wholphin.services.SeerrService
 import com.github.damontecres.wholphin.ui.detail.discover.RequestSeason
@@ -23,6 +30,9 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
+import io.mockk.verify
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -53,6 +63,10 @@ class SeriesRequestStateTest {
     private val dispatcher = StandardTestDispatcher()
     private val active = MutableStateFlow(true)
     private val seerr = mockk<SeerrService>(relaxed = true)
+    private val client = mockk<SeerrApiClient>(relaxed = true)
+    private val tvApi = mockk<TvApi>(relaxed = true)
+    private val tracker = mockk<SeerrAcquisitionTracker>(relaxed = true)
+    private val context = mockk<Context>(relaxed = true)
     private val integrity = mockk<SeasonIntegrityService>(relaxed = true)
     private val stores = ViewModelStore()
     private val seriesId = UUID.randomUUID()
@@ -63,6 +77,11 @@ class SeriesRequestStateTest {
     @Before
     fun setUp() {
         WholphinDispatchers.configure(dispatcher)
+        every { seerr.api } returns client
+        every { client.tvApi } returns tvApi
+        mockkStatic(Toast::class)
+        every { Toast.makeText(any(), any<CharSequence>(), any()) } returns mockk(relaxed = true)
+        every { context.getString(any()) } returns "No additional seasons are available to request."
         every { seerr.active } returns active
         val api = mockk<ApiClient>(relaxed = true)
         every { api.userLibraryApi } returns
@@ -84,7 +103,7 @@ class SeriesRequestStateTest {
         viewModel =
             SeriesViewModel(
                 api = api,
-                context = mockk(relaxed = true),
+                context = context,
                 serverRepository = repository,
                 navigationManager = mockk(relaxed = true),
                 itemPlaybackRepository = mockk(relaxed = true),
@@ -100,7 +119,7 @@ class SeriesRequestStateTest {
                 seerrService = seerr,
                 seasonIntegrityService = integrity,
                 mediaProductStateCoordinator = productState,
-                seerrAcquisitionTracker = mockk(relaxed = true),
+                seerrAcquisitionTracker = tracker,
                 enhancedFeatureGate = gate,
                 seerrServerRepository = seerrRepository,
                 mediaManagementService = mockk(relaxed = true),
@@ -124,6 +143,7 @@ class SeriesRequestStateTest {
     @After
     fun tearDown() {
         stores.clear()
+        unmockkStatic(Toast::class)
         WholphinDispatchers.reset()
     }
 
@@ -236,6 +256,139 @@ class SeriesRequestStateTest {
             viewModel.request(TvRequest(data, 42, listOf(2), false, null, null))
             runCurrent()
             coVerify(exactly = 1) { seerr.requestTv(any(), any()) }
+        }
+
+    @Test
+    fun post202RefreshesEligibilityWithoutQueueingOrResubmission() =
+        runTest(dispatcher) {
+            assertSubmission(edit = false, code = 202)
+        }
+
+    @Test
+    fun put202RefreshesEligibilityWithoutQueueingOrResubmission() =
+        runTest(dispatcher) {
+            assertSubmission(edit = true, code = 202)
+        }
+
+    @Test
+    fun post201PreservesQueueingAndRefresh() =
+        runTest(dispatcher) {
+            assertSubmission(edit = false, code = 201)
+        }
+
+    @Test
+    fun put200PreservesQueueingAndRefresh() =
+        runTest(dispatcher) {
+            assertSubmission(edit = true, code = 200)
+        }
+
+    private suspend fun assertSubmission(
+        edit: Boolean,
+        code: Int,
+    ) {
+        val fixture =
+            TvRequestHttpFixture(
+                code,
+                if (code ==
+                    202
+                ) {
+                    "{\"message\":\"No seasons available to request\"}"
+                } else {
+                    "{\"id\":91,\"status\":1,\"type\":\"tv\"}"
+                },
+            )
+        val refreshed = CompletableDeferred<Unit>()
+        coEvery { seerr.requestTv(any(), any()) } coAnswers { fixture.submit(edit) }
+        coEvery { tvApi.tvTvIdGet(42) } coAnswers {
+            refreshed.complete(Unit)
+            TvDetails(id = 42)
+        }
+        viewModel.request(TvRequest(SeerrRequestData(), 42, listOf(2), false, null, null))
+        refreshed.await()
+        coVerify(exactly = 1) { seerr.requestTv(any(), any()) }
+        coVerify(exactly = 1) { tvApi.tvTvIdGet(42) }
+        verify(exactly = 1) { tracker.refreshNow() }
+        verify(exactly = if (code == 202) 0 else 1) { tracker.registerQueueing(any()) }
+        if (code == 202) verify(exactly = 1) { Toast.makeText(context, "No additional seasons are available to request.", any()) }
+        assertEquals(1, fixture.calls.size)
+    }
+
+    @Test
+    fun cancellationDuringSubmissionDoesNotPublishOrRefresh() =
+        runTest(dispatcher) {
+            coEvery { seerr.requestTv(any(), any()) } throws CancellationException("cancelled")
+            viewModel.request(TvRequest(SeerrRequestData(), 42, listOf(2), false, null, null))
+            runCurrent()
+            verify(exactly = 0) { tracker.registerQueueing(any()) }
+            verify(exactly = 0) { tracker.refreshNow() }
+            coVerify(exactly = 0) { tvApi.tvTvIdGet(any()) }
+            verify(exactly = 0) { Toast.makeText(any(), any<CharSequence>(), any()) }
+        }
+
+    @Test
+    fun inactiveSeerrDiscardsLateSubmissionOutcome() =
+        runTest(dispatcher) {
+            val response = CompletableDeferred<TvRequestOutcome>()
+            coEvery { seerr.requestTv(any(), any()) } coAnswers { response.await() }
+            viewModel.request(TvRequest(SeerrRequestData(), 42, listOf(2), false, null, null))
+            runCurrent()
+            active.value = false
+            response.complete(TvRequestOutcome.NoNewRequest)
+            runCurrent()
+            verify(exactly = 0) { tracker.registerQueueing(any()) }
+            verify(exactly = 0) { tracker.refreshNow() }
+            coVerify(exactly = 0) { tvApi.tvTvIdGet(any()) }
+        }
+
+    @Test
+    fun malformedSuccessRemainsARequestFailure() =
+        runTest(dispatcher) {
+            assertSubmissionFailure(201, "{}")
+        }
+
+    @Test
+    fun httpErrorRemainsARequestFailure() =
+        runTest(dispatcher) {
+            assertSubmissionFailure(403, "{\"message\":\"forbidden\"}")
+        }
+
+    private suspend fun assertSubmissionFailure(
+        code: Int,
+        body: String,
+    ) {
+        val fixture = TvRequestHttpFixture(code, body)
+        val completed = CompletableDeferred<Unit>()
+        coEvery { seerr.requestTv(any(), any()) } coAnswers {
+            try {
+                fixture.submit()
+            } finally {
+                completed.complete(Unit)
+            }
+        }
+        viewModel.request(TvRequest(SeerrRequestData(), 42, listOf(2), false, null, null))
+        completed.await()
+        dispatcher.scheduler.runCurrent()
+        verify(exactly = 0) { tracker.refreshNow() }
+        verify(exactly = 0) { tracker.registerQueueing(any()) }
+        verify(exactly = 1) { Toast.makeText(context, "An error occurred", any()) }
+        coVerify(exactly = 0) { tvApi.tvTvIdGet(any()) }
+        assertEquals(1, fixture.calls.size)
+    }
+
+    @Test
+    fun cancelledViewModelDiscardsNonCancellableLateResponse() =
+        runTest(dispatcher) {
+            val response = CompletableDeferred<TvRequestOutcome>()
+            coEvery { seerr.requestTv(any(), any()) } coAnswers { withContext(NonCancellable) { response.await() } }
+            viewModel.request(TvRequest(SeerrRequestData(), 42, listOf(2), false, null, null))
+            runCurrent()
+            stores.clear()
+            response.complete(TvRequestOutcome.NoNewRequest)
+            runCurrent()
+            verify(exactly = 0) { tracker.registerQueueing(any()) }
+            verify(exactly = 0) { tracker.refreshNow() }
+            coVerify(exactly = 0) { tvApi.tvTvIdGet(any()) }
+            verify(exactly = 0) { Toast.makeText(any(), any<CharSequence>(), any()) }
         }
 
     @Test

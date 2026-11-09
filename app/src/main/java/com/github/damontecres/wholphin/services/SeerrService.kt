@@ -31,9 +31,12 @@ import com.github.damontecres.wholphin.ui.detail.discover.TvRequest
 import com.github.damontecres.wholphin.ui.formatBytes
 import com.github.damontecres.wholphin.ui.isNotNullOrBlank
 import com.github.damontecres.wholphin.ui.toLocalDate
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
@@ -301,7 +304,8 @@ class SeerrService
         suspend fun requestTv(
             tv: TvDetails,
             request: TvRequest,
-        ): MediaRequest {
+        ): com.github.damontecres.wholphin.api.seerr.TvRequestOutcome {
+            val client = api
             val currentUserId = seerrServerRepository.currentUserId.first()
             val currentRequest =
                 tv.mediaInfo?.requests?.firstOrNull {
@@ -314,33 +318,41 @@ class SeerrService
                     request.is4k -> request.data.server4kId
                     else -> request.data.serverId
                 }
-            return if (currentRequest != null) {
-                api.requestApi.requestRequestIdPut(
-                    requestId = currentRequest.id.toString(),
-                    requestRequestIdPutRequest =
-                        RequestRequestIdPutRequest(
+            currentCoroutineContext().ensureActive()
+            if (api !== client) throw CancellationException("Seerr session changed")
+            val outcome =
+                if (currentRequest != null) {
+                    client.tvRequestSubmission.update(
+                        id = currentRequest.id.toString(),
+                        body =
+                            RequestRequestIdPutRequest(
+                                is4k = request.is4k,
+                                mediaType = RequestRequestIdPutRequest.MediaType.TV,
+                                seasons = request.seasons,
+                                serverId = serverId,
+                                profileId = request.profileId,
+                                rootFolder = request.folder,
+                            ),
+                    )
+                } else {
+                    client.tvRequestSubmission.create(
+                        RequestPostRequest(
                             is4k = request.is4k,
-                            mediaType = RequestRequestIdPutRequest.MediaType.TV,
+                            mediaId = request.tvId,
+                            mediaType = RequestPostRequest.MediaType.TV,
                             seasons = request.seasons,
                             serverId = serverId,
                             profileId = request.profileId,
                             rootFolder = request.folder,
+                            tags = emptyList(),
                         ),
-                )
-            } else {
-                api.requestApi.requestPost(
-                    RequestPostRequest(
-                        is4k = request.is4k,
-                        mediaId = request.tvId,
-                        mediaType = RequestPostRequest.MediaType.TV,
-                        seasons = request.seasons,
-                        serverId = serverId,
-                        profileId = request.profileId,
-                        rootFolder = request.folder,
-                        tags = emptyList(),
-                    ),
-                )
+                    )
+                }
+            currentCoroutineContext().ensureActive()
+            if (api !== client || seerrServerRepository.currentUserId.first() != currentUserId) {
+                throw CancellationException("Seerr session changed")
             }
+            return outcome
         }
 
         suspend fun createImageUrl(

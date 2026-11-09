@@ -39,6 +39,12 @@ not current instruction.
 
 ## Non-obvious invariants and negative knowledge
 
+- TV request POST/PUT may return a message-only 202 when no seasons remain requestable.
+  This is not an asynchronous download acknowledgement and carries no request identity.
+  `TvRequestSubmission` reuses generated configs/transport but decodes that outcome before
+  `MediaRequest`; the generated `WithHttpInfo` methods still deserialize too early. Both TV
+  callers refresh eligibility without Queueing or resubmission on 202. Movie submission,
+  quality targeting and acquisition mappings are deliberately unchanged by this correction.
 - Stage C combines Mosaic schema 36 with upstream track persistence as Mosaic schema 37,
   not upstream schema 40 (which lacks the integrity table). Keep every older schema fixture
   and the 2-to-3 migration. Legacy track-choice conversion belongs in the 36-to-37 Room

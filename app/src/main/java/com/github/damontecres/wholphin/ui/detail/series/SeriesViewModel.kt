@@ -4,6 +4,8 @@ import android.content.Context
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.damontecres.wholphin.R
+import com.github.damontecres.wholphin.api.seerr.TvRequestOutcome
 import com.github.damontecres.wholphin.api.seerr.model.TvDetails
 import com.github.damontecres.wholphin.data.ChosenStreams
 import com.github.damontecres.wholphin.data.ExtrasItem
@@ -595,10 +597,18 @@ class SeriesViewModel
             viewModelScope.launchIO {
                 if (state.value.requestMediaId(seerrActive.first()) != request.tvId) return@launchIO
                 val tv = state.value.seerrTvDetails ?: return@launchIO
+                val client = seerrService.api
+                val ownerId = seerrServerRepository.currentUserId.first()
                 try {
                     val submitted = seerrService.requestTv(tv, request)
-                    if (enhancedFeatureGate.isEnabled(EnhancedCapability.ACQUISITION_TRACKING)) {
-                        val queueing = submitted.toSeerrRequestAcquisition()
+                    currentCoroutineContext().ensureActive()
+                    if (seerrService.api !== client || seerrServerRepository.currentUserId.first() != ownerId ||
+                        state.value.requestMediaId(seerrActive.first()) != request.tvId
+                    ) {
+                        return@launchIO
+                    }
+                    if (submitted is TvRequestOutcome.Submitted && enhancedFeatureGate.isEnabled(EnhancedCapability.ACQUISITION_TRACKING)) {
+                        val queueing = submitted.request.toSeerrRequestAcquisition()
                         val seasonCounts =
                             tv.seasons
                                 .orEmpty()
@@ -617,13 +627,27 @@ class SeriesViewModel
                                     ),
                             ),
                         )
-                        seerrAcquisitionTracker.refreshNow()
                     }
-                    val refreshed = seerrService.api.tvApi.tvTvIdGet(request.tvId)
-                    updateSeerrDetails(state.value.seasons, refreshed)
+                    if (enhancedFeatureGate.isEnabled(EnhancedCapability.ACQUISITION_TRACKING)) seerrAcquisitionTracker.refreshNow()
+                    if (submitted == TvRequestOutcome.NoNewRequest) showToast(context, context.getString(R.string.request_no_new_seasons))
+                    // The submission is already resolved; a failed read is not a failed request.
+                    try {
+                        val refreshed = client.tvApi.tvTvIdGet(request.tvId)
+                        currentCoroutineContext().ensureActive()
+                        if (seerrService.api === client && seerrServerRepository.currentUserId.first() == ownerId &&
+                            state.value.requestMediaId(seerrActive.first()) == request.tvId
+                        ) {
+                            updateSeerrDetails(state.value.seasons, refreshed)
+                        }
+                    } catch (ex: CancellationException) {
+                        throw ex
+                    } catch (ex: Exception) {
+                        Timber.e(ex, "Error refreshing request state for %s", request.tvId)
+                    }
                 } catch (ex: CancellationException) {
                     throw ex
                 } catch (ex: Exception) {
+                    if (seerrService.api !== client || seerrServerRepository.currentUserId.first() != ownerId) return@launchIO
                     Timber.e(ex, "Error requesting %s", request.tvId)
                     showToast(context, "An error occurred")
                 }
