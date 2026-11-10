@@ -65,6 +65,9 @@ Downloads, Discover, Watchlist, Collections, and Suggestions. See
 
 ### Watchlist
 
+- Phase 2 local review candidate: personal paginated destination, exclusive category filters,
+  session-scoped membership, and page/Discover-detail actions. Device acceptance and publication
+  remain separate; personal identity and backend capability failures do not become empty lists.
 - Add a dedicated destination, filtering, sorting, and grouping.
 - Reuse watchlist membership on cards and across Discover, Collections, and Suggestions.
 

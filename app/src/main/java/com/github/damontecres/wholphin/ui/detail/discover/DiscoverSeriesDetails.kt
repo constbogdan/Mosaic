@@ -292,6 +292,15 @@ fun DiscoverSeriesDetailsContent(
                                     .fillMaxWidth()
                                     .padding(top = HeaderUtils.topPadding, bottom = 16.dp),
                         )
+                        series.id?.takeIf { it > 0 }?.let { id ->
+                            com.github.damontecres.wholphin.ui.watchlist.WatchlistActionButton(
+                                com.github.damontecres.wholphin.data.model.MediaKey.Catalog(
+                                    com.github.damontecres.wholphin.data.model.CatalogMediaType.SERIES,
+                                    id,
+                                ),
+                                series.name.orEmpty(),
+                            )
+                        }
                         ExpandableDiscoverButtons(
                             availability = availability,
                             requestOnClick = requestOnClick,

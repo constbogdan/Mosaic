@@ -62,6 +62,7 @@ fun DiscoverItemCard(
     width: Dp = Cards.height2x3 * AspectRatios.TALL,
     mediaPresentation: CardMediaPresentation? = null,
     preferAcquisitionStateOverlay: Boolean = false,
+    useFallbackText: Boolean = false,
 ) {
     val focused by interactionSource.collectIsFocusedAsState()
     var focusedAfterDelay by remember { mutableStateOf(false) }
@@ -112,7 +113,7 @@ fun DiscoverItemCard(
                     watchedPercent = null,
                     numberOfVersions = -1,
                     mediaPresentation = mediaPresentation,
-                    useFallbackText = false,
+                    useFallbackText = useFallbackText,
                     contentScale = ContentScale.FillBounds,
                     modifier =
                         Modifier

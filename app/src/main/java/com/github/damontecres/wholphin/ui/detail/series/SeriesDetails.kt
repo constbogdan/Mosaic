@@ -443,6 +443,15 @@ fun SeriesDetailsContent(
                                 .bringIntoViewRequester(bringIntoViewRequester)
                                 .padding(top = HeaderUtils.topPadding, bottom = 16.dp),
                     )
+                    series.data.providerIds?.get("Tmdb")?.toIntOrNull()?.takeIf { it > 0 }?.let { id ->
+                        com.github.damontecres.wholphin.ui.watchlist.WatchlistActionButton(
+                            com.github.damontecres.wholphin.data.model.MediaKey.Catalog(
+                                com.github.damontecres.wholphin.data.model.CatalogMediaType.SERIES,
+                                id,
+                            ),
+                            series.title.orEmpty(),
+                        )
+                    }
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         modifier =

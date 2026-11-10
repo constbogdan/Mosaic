@@ -251,6 +251,15 @@ fun DiscoverMovieDetailsContent(
                                 .fillMaxWidth()
                                 .padding(top = HeaderUtils.topPadding, bottom = 16.dp),
                     )
+                    movie.id?.takeIf { it > 0 }?.let { id ->
+                        com.github.damontecres.wholphin.ui.watchlist.WatchlistActionButton(
+                            com.github.damontecres.wholphin.data.model.MediaKey.Catalog(
+                                com.github.damontecres.wholphin.data.model.CatalogMediaType.MOVIE,
+                                id,
+                            ),
+                            movie.title.orEmpty(),
+                        )
+                    }
                     ExpandableDiscoverButtons(
                         availability =
                             SeerrAvailability.from(movie.mediaInfo?.status)

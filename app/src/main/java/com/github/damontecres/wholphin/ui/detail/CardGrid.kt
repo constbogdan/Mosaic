@@ -117,6 +117,7 @@ fun <T : CardGridItem> CardGrid(
     columns: Int = 6,
     spacing: Dp = 16.dp,
     bringIntoViewSpec: BringIntoViewSpec = LocalBringIntoViewSpec.current,
+    itemKey: ((Int) -> Any)? = null,
 ) {
     val startPosition =
         remember(initialPosition, pager.size) {
@@ -342,7 +343,7 @@ fun <T : CardGridItem> CardGrid(
 //                                    Timber.v("cardWidthPx=%s", cardWidthPx)
                                 },
                     ) {
-                        items(pager.size) { index ->
+                        items(pager.size, key = itemKey) { index ->
                             val item = pager[index]
                             val details =
                                 remember(index, item, cardWidthPx, columns) {

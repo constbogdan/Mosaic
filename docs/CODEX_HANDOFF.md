@@ -31,6 +31,16 @@ not current instruction.
 
 ## Immediate continuity
 
+- Watchlist Phase 2 is an unpublished local candidate based on PR #120 and Seerr PR #57.
+  Personal access requires `/auth/me.jellyfinUserId` to match the current Jellyfin user, plus
+  the stored profile binding; shared API keys and unlinked users fail closed. A merged backend
+  PR does not establish that an emulator's configured server has the new APIs deployed.
+  Membership is session-scoped, typed, bounded and non-persistent. Generic 409/timeouts reconcile
+  via the bulk endpoint rather than implying success or resubmitting. All list queries explicitly
+  include `owner=me`, `watched=all`, `libraryStatus=any`, `sort=added_desc`; Shows sends `series`.
+  Both Discover and native Jellyfin movie/series actions share the page repository; local details
+  require an existing positive TMDB identity. Global badges and ownership remain Phase 3.
+
 - Public guidance is versioned in the repository. Optional Wiki publication remains a separate
   operator action and cannot replace engineering authority.
 - Current upstream Draft PR #106 is the human-controlled same-episode candidate. Reused-Draft

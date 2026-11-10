@@ -386,6 +386,12 @@ fun DestinationContent(
             )
         }
 
+        Destination.Watchlist -> {
+            LaunchedEffect(Unit) { onClearBackdrop.invoke() }
+            com.github.damontecres.wholphin.ui.watchlist
+                .WatchlistPage(modifier)
+        }
+
         Destination.Downloads -> {
             LaunchedEffect(Unit) { onClearBackdrop.invoke() }
             if (preferences.appPreferences.isEnhancedCapabilityEnabled(EnhancedCapability.DOWNLOADS)) {

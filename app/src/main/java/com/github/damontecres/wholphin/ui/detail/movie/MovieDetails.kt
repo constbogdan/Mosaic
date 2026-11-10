@@ -344,6 +344,15 @@ fun MovieDetailsContent(
                                 .fillMaxWidth()
                                 .padding(top = HeaderUtils.topPadding, bottom = 16.dp),
                     )
+                    movie.data.providerIds?.get("Tmdb")?.toIntOrNull()?.takeIf { it > 0 }?.let { id ->
+                        com.github.damontecres.wholphin.ui.watchlist.WatchlistActionButton(
+                            com.github.damontecres.wholphin.data.model.MediaKey.Catalog(
+                                com.github.damontecres.wholphin.data.model.CatalogMediaType.MOVIE,
+                                id,
+                            ),
+                            movie.title.orEmpty(),
+                        )
+                    }
                     ExpandablePlayButtons(
                         title = movie.title ?: "",
                         resumePosition = resumePosition,

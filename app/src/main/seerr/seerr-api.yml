@@ -89,9 +89,56 @@ components:
           readOnly: true
         requestedBy:
           $ref: '#/components/schemas/User'
+    PersonalWatchlistCreate:
+      type: object
+      required: [tmdbId, mediaType]
+      properties:
+        tmdbId: { type: integer, minimum: 1 }
+        mediaType: { type: string }
+        title: { type: string }
+    PersonalWatchlistMembership:
+      type: object
+      required: [tmdbId, mediaType, onWatchlist]
+      properties:
+        tmdbId: { type: integer, minimum: 1 }
+        mediaType: { type: string }
+        onWatchlist: { type: boolean }
+    PersonalWatchlistEntry:
+      type: object
+      required: [tmdbId, mediaType, title, createdAt]
+      properties:
+        tmdbId: { type: integer, minimum: 1 }
+        mediaType: { type: string }
+        title: { type: string }
+        createdAt: { type: string }
+        genreIds:
+          type: array
+          nullable: true
+          items: { type: integer }
+        artwork:
+          type: object
+          nullable: true
+          properties:
+            posterPath: { type: string, nullable: true }
+            backdropPath: { type: string, nullable: true }
+    PersonalWatchlistPage:
+      type: object
+      required: [page, totalPages, totalResults, source, results]
+      properties:
+        page: { type: integer }
+        totalPages: { type: integer }
+        totalResults: { type: integer }
+        source: { type: string }
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PersonalWatchlistEntry'
     User:
       type: object
       properties:
+        jellyfinUserId:
+          type: string
+          nullable: true
         id:
           type: integer
           example: 1
@@ -4807,6 +4854,7 @@ paths:
           description: Succesfully removed media item
   /watchlist:
     post:
+      operationId: watchlistAdd
       summary: Add media to watchlist
       tags:
         - watchlist
@@ -4815,16 +4863,17 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Watchlist'
+              $ref: '#/components/schemas/PersonalWatchlistCreate'
       responses:
-        '200':
+        '201':
           description: Watchlist data returned
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Watchlist'
+                $ref: '#/components/schemas/PersonalWatchlistEntry'
   /watchlist/{tmdbId}:
     delete:
+      operationId: watchlistRemove
       summary: Delete watchlist item
       description: Removes a watchlist item.
       tags:
@@ -4837,6 +4886,12 @@ paths:
           example: '1'
           schema:
             type: string
+        - in: query
+          name: mediaType
+          required: true
+          schema:
+            type: string
+            enum: [movie, tv]
       responses:
         '204':
           description: Succesfully removed watchlist item
@@ -6146,10 +6201,29 @@ paths:
                       example: Genre Name
   /discover/watchlist:
     get:
-      summary: Get the Plex watchlist.
+      operationId: watchlistPage
+      summary: Get the authenticated user's personal Watchlist.
       tags:
-        - search
+        - watchlist
       parameters:
+        - in: query
+          name: owner
+          schema: { type: string, default: me }
+        - in: query
+          name: category
+          schema: { type: string, default: all }
+        - in: query
+          name: sort
+          schema: { type: string, default: added_desc }
+        - in: query
+          name: watched
+          schema: { type: string, default: all }
+        - in: query
+          name: libraryStatus
+          schema: { type: string, default: any }
+        - in: query
+          name: includeArtwork
+          schema: { type: boolean, default: true }
         - in: query
           name: page
           schema:
@@ -6162,28 +6236,31 @@ paths:
           content:
             application/json:
               schema:
+                $ref: '#/components/schemas/PersonalWatchlistPage'
+  /watchlist/membership:
+    get:
+      operationId: watchlistMembership
+      summary: Authoritative typed membership for the authenticated user only.
+      tags: [watchlist]
+      parameters:
+        - in: query
+          name: items
+          required: true
+          description: Between 1 and 100 comma-separated movie:ID or tv:ID identities.
+          schema: { type: string }
+      responses:
+        '200':
+          description: Explicit membership for every requested identity.
+          content:
+            application/json:
+              schema:
                 type: object
+                required: [results]
                 properties:
-                  page:
-                    type: integer
-                  totalPages:
-                    type: integer
-                  totalResults:
-                    type: integer
                   results:
                     type: array
                     items:
-                      type: object
-                      properties:
-                        tmdbid:
-                          type: integer
-                          example: 1
-                        ratingKey:
-                          type: string
-                        type:
-                          type: string
-                        title:
-                          type: string
+                      $ref: '#/components/schemas/PersonalWatchlistMembership'
   /request:
     get:
       summary: Get all requests
