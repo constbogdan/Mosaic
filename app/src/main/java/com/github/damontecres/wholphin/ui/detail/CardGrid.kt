@@ -38,6 +38,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -52,6 +53,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onLayoutRectChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -87,6 +89,14 @@ interface CardGridItem {
     val sortName: String
 }
 
+internal fun gridLeadingSlots(
+    positionOffset: Int,
+    columns: Int,
+): Int {
+    require(positionOffset >= 0 && columns > 0)
+    return positionOffset % columns
+}
+
 data class GridItemDetails<T : CardGridItem>(
     val item: T?,
     val index: Int,
@@ -117,7 +127,19 @@ fun <T : CardGridItem> CardGrid(
     columns: Int = 6,
     spacing: Dp = 16.dp,
     bringIntoViewSpec: BringIntoViewSpec = LocalBringIntoViewSpec.current,
+    itemKey: ((Int) -> Any)? = null,
+    totalItems: Int = pager.size,
+    positionOffset: Int = 0,
+    // Keep a paged window in its absolute visual columns. GridCells.Fixed(columns)
+    // makes this configured value the actual number of columns, independent of page size.
+    alignWindowToAbsoluteRows: Boolean = false,
+    focusAnchorKey: Any? = null,
+    focusRequestEpoch: Long = 0,
+    onGridFocusChanged: ((Boolean) -> Unit)? = null,
+    onFirstRowUp: (() -> Boolean)? = null,
+    backToTopOnBack: Boolean = true,
 ) {
+    val leadingEmptySlots = if (alignWindowToAbsoluteRows) gridLeadingSlots(positionOffset, columns) else 0
     val startPosition =
         remember(initialPosition, pager.size) {
             initialPosition.coerceIn(0, (pager.size - 1).coerceAtLeast(0))
@@ -128,11 +150,26 @@ fun <T : CardGridItem> CardGrid(
     val gridState =
         rememberLazyGridState(
             cacheWindow = LazyLayoutCacheWindow(aheadFraction = 2f, behindFraction = 0.5f),
-            initialFirstVisibleItemIndex = focusedIndex,
+            initialFirstVisibleItemIndex = focusedIndex + leadingEmptySlots,
         )
     val scope = rememberCoroutineScope()
     val firstFocus = remember { FocusRequester() }
     val zeroFocus = remember { FocusRequester() }
+    val anchoredIndex =
+        focusAnchorKey?.let { anchor ->
+            pager.indices.firstOrNull { index -> pager[index] != null && itemKey?.invoke(index) == anchor }
+        }
+    LaunchedEffect(anchoredIndex) {
+        if (anchoredIndex != null) focusedIndex = anchoredIndex
+    }
+    LaunchedEffect(focusRequestEpoch) {
+        if (focusRequestEpoch > 0 && anchoredIndex != null) {
+            focusedIndex = anchoredIndex
+            gridState.scrollToItem(anchoredIndex + leadingEmptySlots)
+            withFrameNanos { }
+            gridFocusRequester.tryRequestFocus()
+        }
+    }
     var previouslyFocusedIndex by rememberSaveable { mutableIntStateOf(0) }
 
     var alphabetFocus by remember { mutableStateOf(false) }
@@ -156,11 +193,11 @@ fun <T : CardGridItem> CardGrid(
         alphabetFocus = false
     }
 
-    val useBackToJump = true // uiConfig.preferences.interfacePreferences.scrollTopOnBack
+    val useBackToJump = backToTopOnBack // uiConfig.preferences.interfacePreferences.scrollTopOnBack
     val showFooter = true // uiConfig.preferences.interfacePreferences.showPositionFooter
     val useJumpRemoteButtons = true // uiConfig.preferences.interfacePreferences.pageWithRemoteButtons
     val jump2 =
-        remember {
+        remember(pager.size, columns) {
             if (pager.size >= 25_000) {
                 columns * 2000
             } else if (pager.size >= 7_000) {
@@ -172,7 +209,7 @@ fun <T : CardGridItem> CardGrid(
             }
         }
     val jump1 =
-        remember {
+        remember(pager.size, columns) {
             if (pager.size >= 25_000) {
                 columns * 500
             } else if (pager.size >= 7_000) {
@@ -185,19 +222,19 @@ fun <T : CardGridItem> CardGrid(
         }
 
     val jump =
-        remember {
+        remember(pager.size, leadingEmptySlots) {
             { jump: Int ->
                 scope.launch(ExceptionHandler()) {
                     val newPosition =
-                        (gridState.firstVisibleItemIndex + jump).coerceIn(0..<pager.size)
+                        (gridState.firstVisibleItemIndex - leadingEmptySlots + jump).coerceIn(0..<pager.size)
                     if (DEBUG) Timber.d("newPosition=$newPosition")
                     focusOn(newPosition)
-                    gridState.scrollToItem(newPosition, 0)
+                    gridState.scrollToItem(newPosition + leadingEmptySlots, 0)
                 }
             }
         }
     val jumpToTop =
-        remember {
+        remember(columns) {
             {
                 scope.launch(ExceptionHandler()) {
                     if (currentFocusedIndex < (columns * 6)) {
@@ -213,7 +250,7 @@ fun <T : CardGridItem> CardGrid(
         }
 
     val jumpToLetter: (Char) -> Unit =
-        remember {
+        remember(leadingEmptySlots) {
             { letter: Char ->
                 scope.launch(ExceptionHandler()) {
                     val jumpPosition =
@@ -223,7 +260,7 @@ fun <T : CardGridItem> CardGrid(
                     Timber.d("Alphabet jump to $jumpPosition")
                     if (jumpPosition >= 0) {
                         pager.getOrNull(jumpPosition)
-                        gridState.scrollToItem(jumpPosition)
+                        gridState.scrollToItem(jumpPosition + leadingEmptySlots)
                         focusOn(jumpPosition)
                         alphabetFocus = true
                     }
@@ -250,7 +287,15 @@ fun <T : CardGridItem> CardGrid(
             modifier =
                 modifier
                     .fillMaxSize()
-                    .onKeyEvent {
+                    .onPreviewKeyEvent {
+                        if (it.type == KeyEventType.KeyDown && it.key == Key.DirectionUp &&
+                            focusedIndex < columns - leadingEmptySlots && onFirstRowUp?.invoke() == true
+                        ) {
+                            true
+                        } else {
+                            false
+                        }
+                    }.onKeyEvent {
                         if (DEBUG) Timber.d("onKeyEvent: ${it.nativeKeyEvent}")
                         if (useBackToJump && it.key == Key.Back && it.nativeKeyEvent.isLongPress) {
                             longPressing = true
@@ -325,6 +370,7 @@ fun <T : CardGridItem> CardGrid(
                         modifier =
                             Modifier
                                 .fillMaxSize()
+                                .onFocusChanged { onGridFocusChanged?.invoke(it.hasFocus) }
                                 .focusGroup()
                                 .focusRestorer(firstFocus)
                                 .focusProperties {
@@ -342,12 +388,20 @@ fun <T : CardGridItem> CardGrid(
 //                                    Timber.v("cardWidthPx=%s", cardWidthPx)
                                 },
                     ) {
-                        items(pager.size) { index ->
+                        items(leadingEmptySlots, key = { "grid-leading-slot-${positionOffset - leadingEmptySlots + it}" }) {
+                            Spacer(Modifier)
+                        }
+                        items(pager.size, key = itemKey) { index ->
                             val item = pager[index]
                             val details =
-                                remember(index, item, cardWidthPx, columns) {
+                                remember(index, item, cardWidthPx, columns, focusAnchorKey) {
                                     val mod =
-                                        if ((index == currentFocusedIndex) or (currentFocusedIndex < 0 && index == 0)) {
+                                        if ((focusAnchorKey != null && itemKey?.invoke(index) == focusAnchorKey) ||
+                                            (
+                                                focusAnchorKey == null &&
+                                                    ((index == currentFocusedIndex) or (currentFocusedIndex < 0 && index == 0))
+                                            )
+                                        ) {
                                             if (DEBUG) Timber.d("Adding firstFocus to focusedIndex $index")
                                             Modifier
                                                 .focusRequester(firstFocus)
@@ -411,7 +465,7 @@ fun <T : CardGridItem> CardGrid(
                                     .align(Alignment.BottomCenter)
                                     .background(AppColors.TransparentBlack50),
                         ) {
-                            val index = (focusedIndex + 1).takeIf { it > 0 } ?: "?"
+                            val index = (positionOffset + focusedIndex + 1).takeIf { it > 0 } ?: "?"
 //                        if (focusedIndex >= 0) {
 //                            focusedIndex + 1
 //                        } else {
@@ -420,7 +474,7 @@ fun <T : CardGridItem> CardGrid(
                             Text(
                                 modifier = Modifier.padding(4.dp),
                                 color = MaterialTheme.colorScheme.onBackground,
-                                text = "$index / ${pager.size}",
+                                text = "$index / $totalItems",
                             )
                         }
                     }

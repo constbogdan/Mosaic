@@ -345,6 +345,19 @@ fun MovieDetailsContent(
                                 .padding(top = HeaderUtils.topPadding, bottom = 16.dp),
                     )
                     ExpandablePlayButtons(
+                        additionalAction =
+                            movie.data.providerIds?.get("Tmdb")?.toIntOrNull()?.takeIf { it > 0 }?.let { id ->
+                                @Composable { actionModifier ->
+                                    com.github.damontecres.wholphin.ui.watchlist.WatchlistActionButton(
+                                        com.github.damontecres.wholphin.data.model.MediaKey.Catalog(
+                                            com.github.damontecres.wholphin.data.model.CatalogMediaType.MOVIE,
+                                            id,
+                                        ),
+                                        movie.title.orEmpty(),
+                                        modifier = actionModifier,
+                                    )
+                                }
+                            },
                         title = movie.title ?: "",
                         resumePosition = resumePosition,
                         watched = dto.userData?.played ?: false,

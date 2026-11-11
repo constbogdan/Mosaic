@@ -149,6 +149,9 @@ sealed class Destination(
     data object Discover : Destination(false)
 
     @Serializable
+    data object Watchlist : Destination(false)
+
+    @Serializable
     data object Downloads : Destination(false)
 
     @Serializable

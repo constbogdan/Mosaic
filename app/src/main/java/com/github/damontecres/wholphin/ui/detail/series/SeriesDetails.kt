@@ -515,6 +515,24 @@ fun SeriesDetailsContent(
                                     }
                                 },
                         )
+                        series.data.providerIds?.get("Tmdb")?.toIntOrNull()?.takeIf { it > 0 }?.let { id ->
+                            com.github.damontecres.wholphin.ui.watchlist.WatchlistActionButton(
+                                com.github.damontecres.wholphin.data.model.MediaKey.Catalog(
+                                    com.github.damontecres.wholphin.data.model.CatalogMediaType.SERIES,
+                                    id,
+                                ),
+                                series.title.orEmpty(),
+                                modifier =
+                                    Modifier.onFocusChanged {
+                                        if (it.isFocused) {
+                                            position = HEADER_ROW
+                                            scope.launch(ExceptionHandler()) {
+                                                bringIntoViewRequester.bringIntoView()
+                                            }
+                                        }
+                                    },
+                            )
+                        }
                         TrailerButton(
                             trailers = trailers,
                             trailerOnClick = trailerOnClick,

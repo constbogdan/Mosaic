@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -62,6 +64,8 @@ fun DiscoverItemCard(
     width: Dp = Cards.height2x3 * AspectRatios.TALL,
     mediaPresentation: CardMediaPresentation? = null,
     preferAcquisitionStateOverlay: Boolean = false,
+    useFallbackText: Boolean = false,
+    savedToWatchlist: Boolean = false,
 ) {
     val focused by interactionSource.collectIsFocusedAsState()
     var focusedAfterDelay by remember { mutableStateOf(false) }
@@ -112,7 +116,7 @@ fun DiscoverItemCard(
                     watchedPercent = null,
                     numberOfVersions = -1,
                     mediaPresentation = mediaPresentation,
-                    useFallbackText = false,
+                    useFallbackText = useFallbackText,
                     contentScale = ContentScale.FillBounds,
                     modifier =
                         Modifier
@@ -144,6 +148,9 @@ fun DiscoverItemCard(
                     null,
                     -> {
                     }
+                }
+                if (savedToWatchlist) {
+                    WatchlistIndicator(Modifier.align(Alignment.BottomEnd))
                 }
                 val acquisitionOverlayState =
                     mediaPresentation?.acquisitionState?.takeIf { preferAcquisitionStateOverlay }
@@ -218,6 +225,27 @@ fun DiscoverItemCard(
                         .enableMarquee(focusedAfterDelay),
             )
         }
+    }
+}
+
+@Composable
+private fun WatchlistIndicator(modifier: Modifier = Modifier) {
+    val label = stringResource(R.string.watchlist_saved)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier =
+            modifier
+                .padding(end = 4.dp, bottom = Cards.playedPercentHeight + 4.dp)
+                .size(24.dp)
+                .background(AppColors.TransparentBlack50, RoundedCornerShape(25))
+                .semantics { contentDescription = label },
+    ) {
+        Text(
+            text = "\uf02e",
+            fontFamily = FontAwesome,
+            fontSize = 16.sp,
+            color = Color.White,
+        )
     }
 }
 

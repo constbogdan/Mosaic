@@ -146,6 +146,11 @@ class NavDrawerViewModel
                     )
                 }
 
+                NavDrawerItem.Watchlist -> {
+                    setIndex(index)
+                    navigationManager.navigateToFromDrawer(Destination.Watchlist)
+                }
+
                 is ServerNavDrawerItem -> {
                     setIndex(index)
                     navigationManager.navigateToFromDrawer(item.destination)
@@ -177,6 +182,7 @@ class NavDrawerViewModel
                             is ServerNavDrawerItem -> it.destination
                             is NavDrawerItem.Favorites -> Destination.Favorites
                             is NavDrawerItem.Discover -> Destination.Discover
+                            is NavDrawerItem.Watchlist -> Destination.Watchlist
                             else -> null
                         }
                     }
@@ -252,6 +258,12 @@ sealed interface NavDrawerItem {
             get() = "a_discover"
 
         override fun name(context: Context): String = context.getString(R.string.discover)
+    }
+
+    object Watchlist : NavDrawerItem {
+        override val id: String = "a_watchlist"
+
+        override fun name(context: Context): String = context.getString(R.string.watchlist)
     }
 }
 
@@ -739,6 +751,10 @@ fun NavigationDrawerScope.NavItem(
 
                 NavDrawerItem.Discover -> {
                     R.string.fa_magnifying_glass_plus
+                }
+
+                NavDrawerItem.Watchlist -> {
+                    R.string.fa_list_ul
                 }
 
                 is ServerNavDrawerItem -> {
