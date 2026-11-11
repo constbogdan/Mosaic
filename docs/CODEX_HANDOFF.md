@@ -37,9 +37,40 @@ not current instruction.
   PR does not establish that an emulator's configured server has the new APIs deployed.
   Membership is session-scoped, typed, bounded and non-persistent. Generic 409/timeouts reconcile
   via the bulk endpoint rather than implying success or resubmitting. All list queries explicitly
-  include `owner=me`, `watched=all`, `libraryStatus=any`, `sort=added_desc`; Shows sends `series`.
+  include `owner=me`, `sort=added_desc`; Shows sends `series`. Watchlist Owned/Watched filters
+  default to `libraryStatus=any` / `watched=all` and persist in the existing AppPreferences
+  DataStore under the complete personal Seerr/Jellyfin identity. Owned No deliberately uses
+  `absent` (never physical, excluding archived/deleted history), per operator approval; Yes uses
+  shared physical `active`, not Jellyfin access/playability. Watched No deliberately includes Unknown.
+  Filter query keys include both selections; changes cancel/reset paging without clearing membership.
+  The right-aligned Watchlist toolbar reuses Library's ExpandableFaButton dimensions and spacing,
+  with film/check icons, neutral/blue/red tint and focus-only labels. OK cycles All/Yes/No;
+  query completion must not steal focus from the toolbar while a filter is being cycled.
+  Optional artwork.releaseDate (movies) / firstAirDate (series) feeds the existing shared card year
+  through the tolerant catalog-date parser. Older backends omit these fields and still load;
+  visible years require the separate Seerr enrichment update to be deployed. Dates reuse its
+  bounded artwork lookup; do not invent years or add per-card requests.
   Both Discover and native Jellyfin movie/series actions share the page repository; local details
   require an existing positive TMDB identity. Global badges and ownership remain Phase 3.
+  Grid key callbacks must capture the rendered screen-state snapshot, not live delegated state:
+  category resets otherwise empty the key lookup before Compose removes the outgoing grid.
+  Random focus must be transferred only after the target and available adjacent pages form one
+  published window; publishing page P before P-1 visibly shifts its index and can restore the
+  wrong card. The typed catalog identity, not the mutable local grid index, anchors detail return
+  and in-flight prepend focus. A 20-item API page need not be a whole visual row: CardGrid uses
+  its configured `GridCells.Fixed(columns)` count and the absolute window offset to insert
+  non-focusable leading slots, preserving card columns across prepends without coupling paging
+  to a particular screen width. Keep slot keys absolute so LazyGridState can anchor visible
+  card keys when the window grows.
+  Android TV Back also reaches the activity dispatcher; a grid key-up focus transfer alone can
+  appear to work for a frame and then pop Watchlist. Handle grid Back through a focus-scoped
+  Compose BackHandler, leaving toolbar Back to the ordinary navigation stack.
+  Watchlist reuses CardGrid's focus/footer and poster layout; its denominator is the API total,
+  not loaded rows. Prefetch is sequential, three grid rows ahead, and retains append failures for retry.
+  Saved badges belong inside DiscoverItemCard's scaled poster, below top-corner status overlays
+  and above the progress rail. The optional presentation flag stays off outside Watchlist (Phase 3).
+  Detail bookmarks belong inside the existing native/Discover action rows and reuse ExpandablePlayButton,
+  including focus expansion and row focus callbacks. Unknown membership is disabled, not an inferred add.
 
 - Public guidance is versioned in the repository. Optional Wiki publication remains a separate
   operator action and cannot replace engineering authority.

@@ -121,6 +121,8 @@ components:
           properties:
             posterPath: { type: string, nullable: true }
             backdropPath: { type: string, nullable: true }
+            releaseDate: { type: string, nullable: true }
+            firstAirDate: { type: string, nullable: true }
     PersonalWatchlistPage:
       type: object
       required: [page, totalPages, totalResults, source, results]

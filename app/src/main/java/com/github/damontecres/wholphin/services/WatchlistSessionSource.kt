@@ -13,7 +13,9 @@ import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.data.model.SeerrItemType
 import com.github.damontecres.wholphin.data.model.WatchlistCategory
 import com.github.damontecres.wholphin.data.model.WatchlistEntry
+import com.github.damontecres.wholphin.data.model.WatchlistFilters
 import com.github.damontecres.wholphin.data.model.WatchlistPage
+import com.github.damontecres.wholphin.ui.toLocalDate
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.jellyfin.sdk.model.api.ImageType
@@ -87,14 +89,15 @@ internal class PersonalWatchlistBackend(
     override suspend fun page(
         category: WatchlistCategory,
         page: Int,
+        filters: WatchlistFilters,
     ): WatchlistPage {
         val result =
             client.watchlistApi.watchlistPage(
                 owner = "me",
                 category = category.query,
                 sort = "added_desc",
-                watched = "all",
-                libraryStatus = "any",
+                watched = filters.watchedQuery,
+                libraryStatus = filters.libraryStatus,
                 includeArtwork = true,
                 page = page,
             )
@@ -119,7 +122,10 @@ internal class PersonalWatchlistBackend(
                         subtitle = null,
                         overview = null,
                         availability = SeerrAvailability.UNKNOWN,
-                        releaseDate = null,
+                        releaseDate =
+                            toLocalDate(
+                                if (key.mediaType == CatalogMediaType.MOVIE) row.artwork?.releaseDate else row.artwork?.firstAirDate,
+                            )?.takeIf { it.year in 1..9999 },
                         posterUrl = row.artwork?.posterPath?.let { current.imageUrlBuilder(ImageType.PRIMARY, it) },
                         backDropUrl = row.artwork?.backdropPath?.let { current.imageUrlBuilder(ImageType.BACKDROP, it) },
                         logoUrl = null,

@@ -280,4 +280,6 @@ message AppPreferences {
   ExperimentalPreferences experimental_preferences = 14;
   EnhancedFeaturesPreferences enhanced_features_preferences = 15;
   UpdateChannel update_channel = 16;
+  // Keyed by the existing personal Watchlist identity (Seerr and Jellyfin user/server).
+  map<string, string> watchlist_filters = 17;
 }

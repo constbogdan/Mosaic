@@ -12,6 +12,8 @@ import com.github.damontecres.wholphin.data.model.SeerrAuthMethod
 import com.github.damontecres.wholphin.data.model.SeerrServer
 import com.github.damontecres.wholphin.data.model.SeerrUser
 import com.github.damontecres.wholphin.data.model.WatchlistCategory
+import com.github.damontecres.wholphin.data.model.WatchlistFilter
+import com.github.damontecres.wholphin.data.model.WatchlistFilters
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -114,6 +116,102 @@ class WatchlistContractTest {
                 ).forEach { (key, value) ->
                     assertEquals(value, request.url.queryParameter(key))
                 }
+            }
+        }
+
+    @Test fun everyCombinedFilterUsesServerPaginationTotalsAndNoPerCardMetadataRequests() =
+        runTest {
+            val requests = mutableListOf<Request>()
+            val backend =
+                backend { request ->
+                    requests += request
+                    200 to """{"page":2,"totalPages":3,"totalResults":47,"source":"local","results":[
+                    {"tmdbId":7,"mediaType":"movie","title":"Movie","createdAt":"2026-11-10T00:00:00Z"},
+                    {"tmdbId":7,"mediaType":"tv","title":"Series","createdAt":"2026-11-10T00:00:00Z","watchState":"unknown"}
+                ]}"""
+                }
+            for (category in WatchlistCategory.entries) {
+                for (owned in WatchlistFilter.entries) {
+                    for (watched in WatchlistFilter.entries) {
+                        val result = backend.page(category, 2, WatchlistFilters(owned, watched))
+                        assertEquals(47, result.totalResults)
+                        assertEquals(3, result.totalPages)
+                        assertEquals(2, result.entries.size)
+                        assertTrue(result.entries.all { it.item.releaseDate == null })
+                        assertEquals(category.query, requests.last().url.queryParameter("category"))
+                        assertEquals(listOf("any", "active", "absent")[owned.ordinal], requests.last().url.queryParameter("libraryStatus"))
+                        assertEquals(
+                            listOf("all", "watched", "not_watched")[watched.ordinal],
+                            requests.last().url.queryParameter("watched"),
+                        )
+                    }
+                }
+            }
+            assertEquals(36, requests.size)
+            assertTrue(requests.all { it.url.encodedPath == "/api/v1/discover/watchlist" && it.url.queryParameter("page") == "2" })
+        }
+
+    @Test fun optionalCatalogDatesUseTypedIdentityAndExistingArtworkWithoutExtraRequests() =
+        runTest {
+            var requests = 0
+            val page =
+                backend {
+                    requests++
+                    200 to """{"page":1,"totalPages":1,"totalResults":2,"source":"local","results":[
+                    {"tmdbId":7,"mediaType":"movie","title":"Movie","createdAt":"2026-11-10T00:00:00Z",
+                     "artwork":{"posterPath":"/movie.jpg","backdropPath":"/backdrop.jpg","releaseDate":"1999-03-31","firstAirDate":"2020-01-01"}},
+                    {"tmdbId":7,"mediaType":"tv","title":"Series","createdAt":"2026-11-10T00:00:00Z",
+                     "artwork":{"posterPath":"/series.jpg","firstAirDate":"2024-02-29","releaseDate":"2000-01-01"}}
+                ]}"""
+                }.page(WatchlistCategory.ALL, 1)
+            assertEquals(1, requests)
+            assertEquals(listOf(1999, 2024), page.entries.map { it.item.releaseDate?.year })
+            assertEquals(listOf("/movie.jpg", "/series.jpg"), page.entries.map { it.posterPath })
+            assertTrue(page.entries.all { it.item.posterUrl != null })
+            assertNotNull(
+                page.entries
+                    .first()
+                    .item.backDropUrl,
+            )
+            assertNotEquals(page.entries.first().key, page.entries.last().key)
+        }
+
+    @Test fun missingMalformedAndWrongMediaDatesNeverPreventWatchlistLoading() =
+        runTest {
+            val artwork =
+                listOf(
+                    "null",
+                    "{}",
+                    """{"releaseDate":null,"firstAirDate":null}""",
+                    """{"releaseDate":"","firstAirDate":""}""",
+                    """{"releaseDate":"2023-02-29","firstAirDate":"2024-02-30"}""",
+                    """{"releaseDate":"not a date","firstAirDate":"2024-01-01T00:00:00Z"}""",
+                    """{"releaseDate":"0000-01-01","firstAirDate":"0000-01-01"}""",
+                )
+            for (value in artwork) {
+                val page =
+                    backend {
+                        200 to """{"page":1,"totalPages":1,"totalResults":2,"source":"local","results":[
+                        {"tmdbId":7,"mediaType":"movie","title":"Movie","createdAt":"2026-11-10T00:00:00Z","artwork":$value},
+                        {"tmdbId":7,"mediaType":"tv","title":"Series","createdAt":"2026-11-10T00:00:00Z","artwork":$value}
+                    ]}"""
+                    }.page(WatchlistCategory.ALL, 1)
+                assertEquals(2, page.entries.size)
+                assertTrue(page.entries.all { it.item.releaseDate == null })
+            }
+            for ((type, wrongDate) in listOf("movie" to "firstAirDate", "tv" to "releaseDate")) {
+                val page =
+                    backend {
+                        200 to """{"page":1,"totalPages":1,"totalResults":1,"source":"local","results":[
+                        {"tmdbId":7,"mediaType":"$type","title":"Saved","createdAt":"2026-11-10T00:00:00Z",
+                         "artwork":{"$wrongDate":"2024-01-01"}}
+                    ]}"""
+                    }.page(WatchlistCategory.ALL, 1)
+                assertNull(
+                    page.entries
+                        .single()
+                        .item.releaseDate,
+                )
             }
         }
 

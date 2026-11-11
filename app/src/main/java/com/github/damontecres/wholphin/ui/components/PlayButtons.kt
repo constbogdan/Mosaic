@@ -89,6 +89,7 @@ fun ExpandablePlayButtons(
     chooseVersionParams: ChooseVersionParams?,
     buttonOnFocusChanged: (FocusState) -> Unit,
     modifier: Modifier = Modifier,
+    additionalAction: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val resources = LocalResources.current
     val firstFocus = remember { FocusRequester() }
@@ -182,6 +183,11 @@ fun ExpandablePlayButtons(
             )
         }
 
+        if (additionalAction != null) {
+            item("additional_action") {
+                additionalAction(Modifier.onFocusChanged(buttonOnFocusChanged))
+            }
+        }
         if (trailers != null) {
             item("trailers") {
                 TrailerButton(

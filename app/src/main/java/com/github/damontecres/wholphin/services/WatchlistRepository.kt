@@ -2,6 +2,7 @@ package com.github.damontecres.wholphin.services
 
 import com.github.damontecres.wholphin.data.model.MediaKey
 import com.github.damontecres.wholphin.data.model.WatchlistCategory
+import com.github.damontecres.wholphin.data.model.WatchlistFilters
 import com.github.damontecres.wholphin.data.model.WatchlistMembership
 import com.github.damontecres.wholphin.data.model.WatchlistPage
 import kotlinx.coroutines.CancellationException
@@ -21,6 +22,7 @@ internal interface WatchlistBackend {
     suspend fun page(
         category: WatchlistCategory,
         page: Int,
+        filters: WatchlistFilters = WatchlistFilters(),
     ): WatchlistPage
 
     suspend fun membership(keys: Set<MediaKey.Catalog>): Map<MediaKey.Catalog, Boolean>
@@ -68,7 +70,7 @@ class WatchlistRepository internal constructor(
     private val lock = Any()
     private var session: WatchlistSession? = null
     private val lookups = Mutex()
-    private val pages = LinkedHashMap<Pair<WatchlistCategory, Int>, WatchlistPage>()
+    private val pages = LinkedHashMap<Triple<WatchlistCategory, WatchlistFilters, Int>, WatchlistPage>()
     private val observed = LinkedHashMap<MediaKey.Catalog, Long>()
     private var capability: WatchlistSession? = null
     private val _state = MutableStateFlow(WatchlistSnapshot())
@@ -99,6 +101,7 @@ class WatchlistRepository internal constructor(
         category: WatchlistCategory,
         page: Int,
         refresh: Boolean = false,
+        filters: WatchlistFilters = WatchlistFilters(),
     ): WatchlistPage =
         lookups.withLock {
             require(page > 0)
@@ -108,9 +111,9 @@ class WatchlistRepository internal constructor(
                 captured = current()
                 revision = _state.value.revision
                 if (refresh && page == 1) pages.clear()
-                if (!refresh) pages[category to page]?.let { return@withLock it }
+                if (!refresh) pages[Triple(category, filters, page)]?.let { return@withLock it }
             }
-            val result = captured.backend.page(category, page)
+            val result = captured.backend.page(category, page, filters)
             require(result.page == page && result.totalPages >= page && result.totalResults >= 0)
             // This endpoint distinguishes the Phase 1 capability from an older/Plex list.
             var verifiedMembership: Map<MediaKey.Catalog, Boolean>? = null
@@ -127,7 +130,7 @@ class WatchlistRepository internal constructor(
             }
             synchronized(lock) {
                 if (!valid(captured) || revision != _state.value.revision) throw CancellationException("Watchlist page superseded")
-                pages[category to page] = result
+                pages[Triple(category, filters, page)] = result
                 while (pages.size > 8) pages.remove(pages.keys.first())
                 result.entries.filterNot { it.key in _state.value.busy }.forEach {
                     val member = verifiedMembership?.get(it.key) != false
