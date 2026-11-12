@@ -8,7 +8,6 @@ import com.github.damontecres.wholphin.api.seerr.model.MediaInfo
 import com.github.damontecres.wholphin.api.seerr.model.MediaRequest
 import com.github.damontecres.wholphin.api.seerr.model.MovieDetails
 import com.github.damontecres.wholphin.api.seerr.model.RelatedVideo
-import com.github.damontecres.wholphin.api.seerr.model.RequestPostRequest
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.DiscoverItem
 import com.github.damontecres.wholphin.data.model.DiscoverRating
@@ -20,15 +19,18 @@ import com.github.damontecres.wholphin.data.model.Trailer
 import com.github.damontecres.wholphin.data.model.hasPermission
 import com.github.damontecres.wholphin.data.model.toSeerrRequestAcquisition
 import com.github.damontecres.wholphin.services.BackdropService
+import com.github.damontecres.wholphin.services.CurrentSeerr
 import com.github.damontecres.wholphin.services.EnhancedCapability
 import com.github.damontecres.wholphin.services.EnhancedFeatureGate
 import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.services.SeerrAcquisitionTracker
+import com.github.damontecres.wholphin.services.SeerrConnectionStatus
 import com.github.damontecres.wholphin.services.SeerrServerRepository
 import com.github.damontecres.wholphin.services.SeerrService
 import com.github.damontecres.wholphin.services.SeerrUserConfig
 import com.github.damontecres.wholphin.services.canRequestMovie
 import com.github.damontecres.wholphin.services.singleCancellationTarget
+import com.github.damontecres.wholphin.services.submitMovieRequest
 import com.github.damontecres.wholphin.ui.equalsNotNull
 import com.github.damontecres.wholphin.ui.isNotNullOrBlank
 import com.github.damontecres.wholphin.ui.launchDefault
@@ -51,13 +53,18 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemKind
 import timber.log.Timber
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.cancellation.CancellationException
 
 @HiltViewModel(assistedFactory = DiscoverMovieViewModel.Factory::class)
@@ -82,6 +89,37 @@ class DiscoverMovieViewModel
 
         private val _state = MutableStateFlow(DiscoverMovieState())
         val state: StateFlow<DiscoverMovieState> = _state
+
+        private data class ProfileSession(
+            val current: CurrentSeerr,
+            val client: SeerrApiClient,
+        )
+
+        @Volatile private var profileSession: ProfileSession? = null
+
+        @Volatile private var openingSession: ProfileSession? = null
+        private val profileEpoch = AtomicInteger(0)
+
+        @Volatile private var profileLoadJob: Job? = null
+        private val requestInFlight = AtomicBoolean(false)
+
+        init {
+            viewModelScope.launch(WholphinDispatchers.Main.immediate) {
+                seerrServerRepository.connection.collect {
+                    openingSession?.let { session -> if (!isCurrent(session)) closeRequestDialog() }
+                }
+            }
+        }
+
+        private fun activeSession(): ProfileSession? =
+            (seerrServerRepository.connection.value.connection as? SeerrConnectionStatus.Success)
+                ?.current
+                ?.let { ProfileSession(it, seerrService.api) }
+
+        private fun isCurrent(session: ProfileSession): Boolean {
+            val active = activeSession()
+            return active?.current == session.current && active.client === session.client
+        }
 
         val userConfig = seerrServerRepository.current.map { it?.config }
         val requestEnabled =
@@ -205,54 +243,53 @@ class DiscoverMovieViewModel
         }
 
         fun request(request: MovieRequest) {
+            val prepared = profileSession ?: return
+            val snapshot = state.value
+            if (requestInFlight.get() || snapshot.profileLoading != LoadingState.Success || request.is4k ||
+                request.data != snapshot.requestData || request.movieId != item.id ||
+                request !in
+                listOfNotNull(
+                    movieRequestForQuality(snapshot.requestData, item.id, MOVIE_PROFILE_1080P_HDR),
+                    movieRequestForQuality(snapshot.requestData, item.id, MOVIE_PROFILE_2160P_HDR),
+                ) || !isCurrent(prepared) || !prepared.current.canRequestMovie(snapshot.movie.successValue, false)
+            ) {
+                return
+            }
+            if (!requestInFlight.compareAndSet(false, true)) return
             viewModelScope.launchIO {
-                val current = seerrServerRepository.current.firstOrNull()
-                val movie = state.value.movie.successValue
-                if (request.movieId != item.id || movie?.id != item.id || !current.canRequestMovie(movie, request.is4k)) return@launchIO
-                val client = seerrService.api
-                val ownerId = current?.config?.id
-                currentCoroutineContext().ensureActive()
-                if (seerrServerRepository.currentUserId.firstOrNull() != ownerId || seerrService.api !== client) return@launchIO
-                var submitted: MediaRequest? = null
                 try {
-                    submitted =
-                        client.requestApi.requestPost(
-                            RequestPostRequest(
-                                is4k = request.is4k,
-                                mediaId = request.movieId,
-                                mediaType = RequestPostRequest.MediaType.MOVIE,
-                                serverId =
-                                    when {
-                                        request.profileId == null && request.folder == null -> null
-                                        request.is4k -> request.data.server4kId
-                                        else -> request.data.serverId
-                                    },
-                                profileId = request.profileId,
-                                rootFolder = request.folder,
-                                tags = emptyList(),
-                            ),
-                        )
+                    if (!isCurrent(prepared)) return@launchIO
+                    val fresh = prepared.client.moviesApi.movieMovieIdGet(movieId = item.id)
                     currentCoroutineContext().ensureActive()
+                    if (!isCurrent(prepared) || !prepared.current.canRequestMovie(fresh, false)) return@launchIO
+                    val submitted = prepared.client.submitMovieRequest(request)
+                    currentCoroutineContext().ensureActive()
+                    if (!isCurrent(prepared)) return@launchIO
+                    if (enhancedFeatureGate.isEnabled(EnhancedCapability.ACQUISITION_TRACKING)) {
+                        try {
+                            val queueing = submitted.toSeerrRequestAcquisition()
+                            seerrAcquisitionTracker.registerQueueing(
+                                queueing.copy(request = queueing.request.copy(discoverItem = item)),
+                            )
+                            seerrAcquisitionTracker.refreshNow()
+                        } catch (ex: CancellationException) {
+                            throw ex
+                        } catch (ex: Exception) {
+                            Timber.e(ex, "Movie acquisition tracking failed after request submission")
+                        }
+                    }
+                    fetchAndSetItem(prepared.client, prepared.current.config.id).await()
+                    updateCanCancel()
                 } catch (ex: CancellationException) {
                     throw ex
                 } catch (ex: Exception) {
-                    if (seerrService.api !== client || seerrServerRepository.currentUserId.firstOrNull() != ownerId) return@launchIO
-                    Timber.e(ex, "Error requesting %s", request.movieId)
-                    showToast(context, "An error occurred")
-                }
-                if (seerrService.api !== client || seerrServerRepository.currentUserId.firstOrNull() != ownerId) return@launchIO
-                submitted?.let { response ->
-                    if (!enhancedFeatureGate.isEnabled(EnhancedCapability.ACQUISITION_TRACKING)) {
-                        return@let
+                    if (isCurrent(prepared)) {
+                        Timber.e(ex, "Error requesting %s", request.movieId)
+                        showToast(context, "An error occurred")
                     }
-                    val queueing = response.toSeerrRequestAcquisition()
-                    seerrAcquisitionTracker.registerQueueing(
-                        queueing.copy(request = queueing.request.copy(discoverItem = item)),
-                    )
-                    seerrAcquisitionTracker.refreshNow()
+                } finally {
+                    requestInFlight.set(false)
                 }
-                fetchAndSetItem(client, ownerId).await()
-                updateCanCancel()
             }
         }
 
@@ -285,29 +322,68 @@ class DiscoverMovieViewModel
             }
         }
 
-        fun requestOnClick() {
-            viewModelScope.launchIO {
-                val current = seerrServerRepository.current.firstOrNull()
-                val movie = state.value.movie.successValue
-                if (!current.canRequestMovie(movie, false) && !current.canRequestMovie(movie, true)) return@launchIO
-                try {
-                    val data = seerrService.getProfilesAndFolders(SeerrItemType.MOVIE)
-                    _state.update {
-                        it.copy(
-                            profileLoading = LoadingState.Success,
-                            requestData = data,
-                        )
-                    }
-                } catch (ex: Exception) {
-                    Timber.e(ex, "Error getting profiles & folders")
-                    showToast(context, "Error getting profiles & folders: ${ex.localizedMessage}")
-                    _state.update {
-                        it.copy(
-                            profileLoading = LoadingState.Success,
-                        )
+        fun requestOnClick(): Boolean {
+            val session = activeSession() ?: return false
+            if (requestInFlight.get() || !session.current.canRequestMovie(state.value.movie.successValue, false)) return false
+            val epoch = profileEpoch.incrementAndGet()
+            profileLoadJob?.cancel()
+            profileSession = null
+            openingSession = session
+            _state.update { it.copy(profileLoading = LoadingState.Loading, requestData = SeerrRequestData()) }
+            profileLoadJob =
+                viewModelScope.launchIO {
+                    try {
+                        val shouldLoad =
+                            withContext(WholphinDispatchers.Main.immediate) {
+                                if (epoch != profileEpoch.get()) {
+                                    false
+                                } else if (!isCurrent(session)) {
+                                    closeRequestDialog()
+                                    false
+                                } else {
+                                    true
+                                }
+                            }
+                        if (!shouldLoad) return@launchIO
+                        val data = seerrService.getProfilesAndFolders(SeerrItemType.MOVIE, include4k = false)
+                        currentCoroutineContext().ensureActive()
+                        // Opening, closing, connection invalidation and publication share Main.
+                        // There is no suspension between the final check and the two state writes.
+                        withContext(WholphinDispatchers.Main.immediate) {
+                            if (epoch == profileEpoch.get()) {
+                                if (!isCurrent(session)) {
+                                    closeRequestDialog()
+                                } else {
+                                    profileSession = session
+                                    _state.update { it.copy(profileLoading = LoadingState.Success, requestData = data) }
+                                }
+                            }
+                        }
+                    } catch (ex: CancellationException) {
+                        throw ex
+                    } catch (ex: Exception) {
+                        withContext(WholphinDispatchers.Main.immediate) {
+                            if (epoch == profileEpoch.get()) {
+                                if (!isCurrent(session)) {
+                                    closeRequestDialog()
+                                } else {
+                                    Timber.e(ex, "Error getting profiles & folders")
+                                    showToast(context, "Error getting profiles & folders: ${ex.localizedMessage}")
+                                    _state.update { it.copy(profileLoading = LoadingState.Error(ex), requestData = SeerrRequestData()) }
+                                }
+                            }
+                        }
                     }
                 }
-            }
+            return true
+        }
+
+        fun closeRequestDialog() {
+            profileEpoch.incrementAndGet()
+            profileLoadJob?.cancel()
+            profileSession = null
+            openingSession = null
+            _state.update { it.copy(profileLoading = LoadingState.Pending, requestData = SeerrRequestData()) }
         }
     }
 

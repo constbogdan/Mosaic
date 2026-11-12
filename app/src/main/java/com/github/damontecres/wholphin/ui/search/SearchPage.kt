@@ -95,6 +95,7 @@ fun SearchPage(
     modifier: Modifier = Modifier,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
+    val quickMovieRequest = com.github.damontecres.wholphin.ui.discover.LocalQuickMovieRequest.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val state by viewModel.state.collectAsState()
@@ -384,6 +385,7 @@ fun SearchPage(
                         onPlayItem = onPlayItem,
                         onClickPosition = { setPosition(it) },
                         onClickDiscover = onClickDiscover,
+                        onLongClickDiscover = { quickMovieRequest.open(it) },
                         positionCallback = positionCallback,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -398,6 +400,7 @@ fun SearchPage(
                         onPlayItem = onPlayItem,
                         onClickPosition = { setPosition(it) },
                         onClickDiscover = onClickDiscover,
+                        onLongClickDiscover = { quickMovieRequest.open(it) },
                         positionCallback = positionCallback,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -460,6 +463,7 @@ fun SearchPage(
                                     onClickItem = onClickItem,
                                     onLongClickItem = { _, _ -> },
                                     onClickDiscover = onClickDiscover,
+                                    onLongClickDiscover = { quickMovieRequest.open(it) },
                                     onClickPosition = { setPosition(it) },
                                     cardContent = { _, _, _, _, _ -> },
                                     modifier = Modifier.fillMaxWidth(),
@@ -544,6 +548,7 @@ fun SearchCombinedResults(
     onPlayItem: (Int, BaseItem) -> Unit,
     onClickPosition: (RowColumn) -> Unit,
     onClickDiscover: (Int, DiscoverItem) -> Unit,
+    onLongClickDiscover: (DiscoverItem) -> Unit = {},
     positionCallback: (columns: Int, position: Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -609,7 +614,7 @@ fun SearchCombinedResults(
                     items = result.items,
                     focusRequester = focusRequester,
                     onClickItem = onClickDiscover,
-                    onLongClickItem = { _, _ -> },
+                    onLongClickItem = { _, item -> onLongClickDiscover(item) },
                     onPlayItem = { _, _ -> },
                     onClickPosition = onClickPosition,
                     positionCallback = positionCallback,
@@ -680,6 +685,7 @@ fun SearchRowResult(
     onClickPosition: (RowColumn) -> Unit,
     modifier: Modifier = Modifier,
     onClickDiscover: ((Int, DiscoverItem) -> Unit)? = null,
+    onLongClickDiscover: (DiscoverItem) -> Unit = {},
     cardContent: @Composable (
         index: Int,
         item: BaseItem?,
@@ -732,7 +738,7 @@ fun SearchRowResult(
                         onClickPosition.invoke(RowColumn(rowIndex, index))
                         onClickDiscover?.invoke(index, item)
                     },
-                    onLongClickItem = { _, _ -> },
+                    onLongClickItem = { _, item -> onLongClickDiscover(item) },
                     modifier = modifier.focusRequester(focusRequester),
                     cardContent = { index: Int, item: DiscoverItem?, mod: Modifier, onClick: () -> Unit, onLongClick: () -> Unit ->
                         DiscoverItemCard(

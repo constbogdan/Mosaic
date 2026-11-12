@@ -258,6 +258,7 @@ fun DiscoverRequestGrid(
             },
         ),
 ) {
+    val quickMovieRequest = LocalQuickMovieRequest.current
     val state by viewModel.state.collectAsState()
 
     var showHeader by rememberSaveable { mutableStateOf(state.startIndex < 6) }
@@ -301,7 +302,7 @@ fun DiscoverRequestGrid(
                     onClickItem = { index, item ->
                         viewModel.navigationManager.navigateTo(item.destination)
                     },
-                    onLongClickItem = { index, item -> },
+                    onLongClickItem = { _, item -> quickMovieRequest.open(item) },
                     onClickPlay = { _, _ -> },
                     letterPosition = { 0 },
                     gridFocusRequester = gridFocusRequester,

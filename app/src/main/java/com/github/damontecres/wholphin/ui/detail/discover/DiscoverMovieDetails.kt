@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -58,11 +59,13 @@ import com.github.damontecres.wholphin.ui.components.HeaderUtils
 import com.github.damontecres.wholphin.ui.components.LoadingPage
 import com.github.damontecres.wholphin.ui.data.ItemDetailsDialog
 import com.github.damontecres.wholphin.ui.data.ItemDetailsDialogInfo
+import com.github.damontecres.wholphin.ui.discover.QuickMovieConfirmGate
 import com.github.damontecres.wholphin.ui.nav.Destination
 import com.github.damontecres.wholphin.ui.rememberInt
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 import com.github.damontecres.wholphin.util.DataLoadingState
 import com.github.damontecres.wholphin.util.ExceptionHandler
+import com.github.damontecres.wholphin.util.LoadingState
 import kotlinx.coroutines.launch
 import org.jellyfin.sdk.model.api.BaseItemKind
 
@@ -76,6 +79,7 @@ fun DiscoverMovieDetails(
             creationCallback = { it.create(destination.item) },
         ),
 ) {
+    val quickMovieRequest = com.github.damontecres.wholphin.ui.discover.LocalQuickMovieRequest.current
     val resources = LocalResources.current
     val context = LocalContext.current
     LifecycleResumeEffect(Unit) {
@@ -85,10 +89,16 @@ fun DiscoverMovieDetails(
     val state by viewModel.state.collectAsState()
     val userConfig by viewModel.userConfig.collectAsState(null)
     val requestEnabled by viewModel.requestEnabled.collectAsState(false)
-    val request4kEnabled by viewModel.request4kEnabled.collectAsState(false)
 
     var overviewDialog by remember { mutableStateOf<ItemDetailsDialogInfo?>(null) }
     var showRequestDialog by remember { mutableStateOf(false) }
+    val requestGate = remember { QuickMovieConfirmGate() }
+    LaunchedEffect(showRequestDialog, state.profileLoading) {
+        if (showRequestDialog && state.profileLoading == LoadingState.Pending) {
+            requestGate.clear()
+            showRequestDialog = false
+        }
+    }
 
     when (val st = state.movie) {
         is DataLoadingState.Error -> {
@@ -115,14 +125,14 @@ fun DiscoverMovieDetails(
                         movie.id ?: 0,
                     ) !=
                         null,
-                canRequest = requestEnabled || request4kEnabled,
+                canRequest = requestEnabled,
                 people = state.people,
                 trailers = state.trailers,
                 similar = state.similar,
                 recommended = state.recommended,
                 requestOnClick = {
-                    viewModel.requestOnClick()
-                    showRequestDialog = true
+                    requestGate.resetAfterClick()
+                    if (viewModel.requestOnClick()) showRequestDialog = true
                 },
                 cancelOnClick = {
                     movie.mediaInfo
@@ -154,8 +164,7 @@ fun DiscoverMovieDetails(
                 },
                 moreOnClick = {},
                 onLongClickPerson = { index, person -> },
-                onLongClickSimilar = { index, similar ->
-                },
+                onLongClickSimilar = { _, similar -> quickMovieRequest.open(similar) },
                 trailerOnClick = {
                     TrailerService.onClick(context, it, viewModel::navigateTo)
                 },
@@ -166,13 +175,27 @@ fun DiscoverMovieDetails(
                     loading = state.profileLoading,
                     data = state.requestData,
                     requestEnabled = requestEnabled,
-                    request4kEnabled = request4kEnabled,
                     movie = movie,
+                    posterUrl = destination.item.posterUrl,
+                    rating = state.rating,
                     onSubmit = {
                         viewModel.request(it)
+                        requestGate.clear()
                         showRequestDialog = false
+                        viewModel.closeRequestDialog()
                     },
-                    onDismissRequest = { showRequestDialog = false },
+                    onDismissRequest = {
+                        requestGate.clear()
+                        showRequestDialog = false
+                        viewModel.closeRequestDialog()
+                    },
+                    confirmationReady = requestGate.released,
+                    confirmAction = requestGate::consumeConfirmation,
+                    dialogModifier =
+                        Modifier.onPreviewKeyEvent { event ->
+                            val native = event.nativeKeyEvent
+                            requestGate.onKey(native.action, native.keyCode, native.repeatCount)
+                        },
                 )
             }
         }

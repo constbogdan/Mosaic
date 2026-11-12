@@ -84,6 +84,7 @@ fun DiscoverSeriesDetails(
             creationCallback = { it.create(destination.item) },
         ),
 ) {
+    val quickMovieRequest = com.github.damontecres.wholphin.ui.discover.LocalQuickMovieRequest.current
     val context = LocalContext.current
     val resources = LocalResources.current
     val state by viewModel.state.collectAsState()
@@ -167,7 +168,7 @@ fun DiscoverSeriesDetails(
                 moreOnClick = {
                 },
                 onLongClickPerson = { _, _ -> },
-                onLongClickSimilar = { _, _ -> },
+                onLongClickSimilar = { _, similar -> quickMovieRequest.open(similar) },
             )
         }
     }

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="465" viewBox="0 0 880 465" role="img" aria-label="2160p 4K UHD">
+<defs>
+  <linearGradient id="black" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#292728"/><stop offset=".62" stop-color="#1d1b1c"/><stop offset="1" stop-color="#0e0e0f"/></linearGradient>
+  <linearGradient id="gold" x1="0" y1="0" x2="1" y2=".7"><stop stop-color="#ffe797"/><stop offset=".37" stop-color="#f8cd62"/><stop offset=".73" stop-color="#f4c45a"/><stop offset="1" stop-color="#cf871f"/></linearGradient>
+  <linearGradient id="letters" x1="0" y1="0" x2="1" y2=".6"><stop stop-color="#d89427"/><stop offset=".46" stop-color="#ffe58b"/><stop offset=".76" stop-color="#f4bd48"/><stop offset="1" stop-color="#d89424"/></linearGradient>
+  <clipPath id="shape"><rect width="880" height="465" rx="73"/></clipPath>
+</defs>
+<g clip-path="url(#shape)">
+  <rect width="880" height="465" fill="url(#black)"/>
+  <path d="M 830 0 L 880 0 L 880 284 L 270 284 Z" fill="#050505" opacity=".36"/>
+  <rect y="284" width="880" height="181" fill="url(#gold)"/>
+  <path d="M0 284H880" stroke="#ffdc76" stroke-width="3"/>
+</g>
+<text x="440" y="224" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="192" letter-spacing="-6" fill="url(#letters)"><tspan font-weight="750">2160</tspan><tspan font-weight="300" font-size="180">p</tspan></text>
+<g fill="#0b0a0a"><text x="440" y="418" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="109" letter-spacing="1"><tspan font-weight="750">4K</tspan><tspan font-weight="300"> UHD</tspan></text></g>
+</svg>

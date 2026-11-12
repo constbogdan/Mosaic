@@ -79,6 +79,7 @@ fun DiscoverPersonPage(
             creationCallback = { it.create(person) },
         ),
 ) {
+    val quickMovieRequest = com.github.damontecres.wholphin.ui.discover.LocalQuickMovieRequest.current
     val credits by viewModel.credits.collectAsState()
 
     when (val state = credits) {
@@ -121,8 +122,7 @@ fun DiscoverPersonPage(
                         onClickItem = { index: Int, item: DiscoverItem ->
                             viewModel.navigationManager.navigateTo(Destination.DiscoveredItem(item))
                         },
-                        onLongClickItem = { index: Int, item: DiscoverItem ->
-                        },
+                        onLongClickItem = { _: Int, item: DiscoverItem -> quickMovieRequest.open(item) },
                         onClickPlay = { _, item ->
                         },
                         initialPosition = startIndex,
