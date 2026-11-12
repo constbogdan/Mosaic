@@ -235,6 +235,7 @@ fun PersonPage(
             creationCallback = { it.create(destination.itemId) },
         ),
 ) {
+    val quickMovieRequest = com.github.damontecres.wholphin.ui.discover.LocalQuickMovieRequest.current
     val state by viewModel.state.collectAsState()
     when (val st = state.person) {
         is DataLoadingState.Error -> {
@@ -289,6 +290,7 @@ fun PersonPage(
                 onClickDiscover = { index, item ->
                     viewModel.navigationManager.navigateTo(item.destination)
                 },
+                onLongClickDiscover = { quickMovieRequest.open(it) },
                 onClickViewMoreDiscover = {
                     state.discoverPerson?.let {
                         viewModel.navigationManager.navigateTo(
@@ -340,6 +342,7 @@ fun PersonPageContent(
     overviewOnClick: () -> Unit,
     favoriteOnClick: () -> Unit,
     onClickDiscover: (Int, DiscoverItem) -> Unit,
+    onLongClickDiscover: (DiscoverItem) -> Unit,
     onClickViewMoreDiscover: () -> Unit,
     enableViewMoreDiscover: Boolean,
     modifier: Modifier = Modifier,
@@ -453,7 +456,7 @@ fun PersonPageContent(
                         position = RowColumn(DISCOVER_ROW, index)
                         onClickDiscover.invoke(index, item)
                     },
-                    onLongClickItem = { _, _ -> },
+                    onLongClickItem = { _, item -> onLongClickDiscover(item) },
                     onCardFocus = {},
                     focusRequester = focusRequester,
                     enableViewMore = enableViewMoreDiscover,

@@ -419,7 +419,10 @@ class SeerrService
             }
         }
 
-        suspend fun getProfilesAndFolders(type: SeerrItemType): SeerrRequestData {
+        suspend fun getProfilesAndFolders(
+            type: SeerrItemType,
+            include4k: Boolean = true,
+        ): SeerrRequestData {
             var result = SeerrRequestData()
             val current = seerrServerRepository.current.firstOrNull()
             if (current != null && current.config.hasPermission(SeerrPermission.REQUEST_ADVANCED)) {
@@ -449,7 +452,7 @@ class SeerrService
                                 )
                         }
                     }
-                    if (radarr4k != null && radarr4k.id != null) {
+                    if (include4k && radarr4k != null && radarr4k.id != null) {
                         val settings = api.serviceApi.serviceRadarrRadarrIdGet(radarr4k.id)
                         setProfilesAndFolder(
                             settings.profiles,
@@ -491,7 +494,7 @@ class SeerrService
                                 )
                         }
                     }
-                    if (sonarr4k != null && sonarr4k.id != null) {
+                    if (include4k && sonarr4k != null && sonarr4k.id != null) {
                         val settings = api.serviceApi.serviceSonarrSonarrIdGet(sonarr4k.id)
                         setProfilesAndFolder(
                             settings.profiles,

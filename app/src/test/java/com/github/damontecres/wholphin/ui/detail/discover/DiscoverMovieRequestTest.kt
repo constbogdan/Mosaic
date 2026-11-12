@@ -18,9 +18,12 @@ import com.github.damontecres.wholphin.services.CurrentSeerr
 import com.github.damontecres.wholphin.services.EnhancedFeatureGate
 import com.github.damontecres.wholphin.services.SeerrAcquisitionTracker
 import com.github.damontecres.wholphin.services.SeerrApi
+import com.github.damontecres.wholphin.services.SeerrConnectionStatus
 import com.github.damontecres.wholphin.services.SeerrServerRepository
 import com.github.damontecres.wholphin.services.SeerrService
+import com.github.damontecres.wholphin.services.SeerrState
 import com.github.damontecres.wholphin.util.DataLoadingState
+import com.github.damontecres.wholphin.util.LoadingState
 import com.github.damontecres.wholphin.util.WholphinDispatchers
 import com.github.damontecres.wholphin.util.configure
 import com.github.damontecres.wholphin.util.reset
@@ -37,24 +40,143 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import okio.Buffer
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DiscoverMovieRequestTest {
+    @Test fun synopsisAutoScrollWaitsMovesBothWaysAndRepeatsAtEighteenDpPerSecond() =
+        runTest {
+            val movements = mutableListOf<Triple<Long, Int, Int>>()
+            val job =
+                backgroundScope.launch {
+                    // A 72 px overflow at 36 px/s (18 dp/s on a 2x display) takes two seconds per direction.
+                    runMovieSynopsisAutoScroll(72, 36f) { target, duration ->
+                        movements += Triple(testScheduler.currentTime, target, duration)
+                        delay(duration.toLong()) // Model the native scroll animation's completion.
+                    }
+                }
+            runCurrent()
+            advanceTimeBy(4999)
+            runCurrent()
+            assertTrue(movements.isEmpty())
+            advanceTimeBy(1)
+            runCurrent()
+            assertEquals(listOf(Triple(5000L, 72, 2000)), movements)
+            advanceTimeBy(3999)
+            runCurrent()
+            assertEquals(1, movements.size)
+            advanceTimeBy(1)
+            runCurrent()
+            assertEquals(Triple(9000L, 0, 2000), movements.last())
+            advanceTimeBy(6999)
+            runCurrent()
+            assertEquals(2, movements.size)
+            advanceTimeBy(1)
+            runCurrent()
+            assertEquals(Triple(16000L, 72, 2000), movements.last())
+            job.cancel()
+        }
+
+    @Test fun synopsisAutoScrollDoesNothingWithoutMeasuredOverflow() =
+        runTest {
+            val movements = mutableListOf<Int>()
+            val job = backgroundScope.launch { runMovieSynopsisAutoScroll(0, 36f) { target, _ -> movements += target } }
+            runCurrent()
+            assertTrue(job.isCompleted)
+            advanceTimeBy(20000)
+            runCurrent()
+            assertTrue(movements.isEmpty())
+        }
+
+    @Test fun synopsisAutoScrollCancellationStopsAnInFlightAnimation() =
+        runTest {
+            var movements = 0
+            val job =
+                backgroundScope.launch {
+                    runMovieSynopsisAutoScroll(72, 36f) { _, _ ->
+                        movements++
+                        awaitCancellation()
+                    }
+                }
+            advanceTimeBy(5000)
+            runCurrent()
+            assertEquals(1, movements)
+            job.cancel()
+            runCurrent()
+            advanceTimeBy(20000)
+            runCurrent()
+            assertEquals(1, movements)
+        }
+
+    @Test fun namedHdrProfilesUseExactStandardRadarrIdentity() {
+        val data =
+            SeerrRequestData(
+                serverId = 11,
+                server4kId = 22,
+                profiles = listOf(SeerrProfile(7, MOVIE_PROFILE_1080P_HDR, true), SeerrProfile(9, MOVIE_PROFILE_2160P_HDR, false)),
+                profiles4k = listOf(SeerrProfile(99, MOVIE_PROFILE_2160P_HDR, true)),
+                rootFolders = listOf(SeerrRootFolder(1, "/fallback", "", false), SeerrRootFolder(2, "/default", "", true)),
+            )
+        val normal = movieRequestForQuality(data, 42, MOVIE_PROFILE_1080P_HDR)
+        val ultra = movieRequestForQuality(data, 42, MOVIE_PROFILE_2160P_HDR)
+        assertEquals(7, normal?.profileId)
+        assertEquals(9, ultra?.profileId)
+        assertEquals(false, ultra?.is4k)
+        assertEquals(11, ultra?.data?.serverId)
+        assertEquals("/default", ultra?.folder)
+    }
+
+    @Test fun unknownAmbiguousOrFourKOnlyProfilesCannotProduceAction() {
+        val profile = SeerrProfile(9, MOVIE_PROFILE_2160P_HDR, true)
+        assertNull(movieRequestForQuality(SeerrRequestData(serverId = 11, profiles4k = listOf(profile)), 42, MOVIE_PROFILE_2160P_HDR))
+        assertNull(
+            movieRequestForQuality(
+                SeerrRequestData(serverId = 11, profiles = listOf(profile, profile.copy(id = 10))),
+                42,
+                MOVIE_PROFILE_2160P_HDR,
+            ),
+        )
+        assertNull(movieRequestForQuality(SeerrRequestData(serverId = -1, profiles = listOf(profile)), 42, MOVIE_PROFILE_2160P_HDR))
+        assertNull(movieRequestForQuality(SeerrRequestData(serverId = 11, profiles = listOf(profile)), 42, MOVIE_PROFILE_1080P_HDR))
+    }
+
+    @Test fun zeroBasedDefaultRadarrServerProducesStandardRequests() {
+        val data =
+            SeerrRequestData(
+                serverId = 0,
+                profiles = listOf(SeerrProfile(12, MOVIE_PROFILE_1080P_HDR, true), SeerrProfile(8, MOVIE_PROFILE_2160P_HDR, false)),
+            )
+        val normal = movieRequestForQuality(data, 42, MOVIE_PROFILE_1080P_HDR)
+        val ultra = movieRequestForQuality(data, 42, MOVIE_PROFILE_2160P_HDR)
+        assertEquals(0, normal?.data?.serverId)
+        assertEquals(12, normal?.profileId)
+        assertEquals(false, normal?.is4k)
+        assertEquals(0, ultra?.data?.serverId)
+        assertEquals(8, ultra?.profileId)
+        assertEquals(false, ultra?.is4k)
+    }
+
     private val dispatcher = StandardTestDispatcher()
     private val current = MutableStateFlow<CurrentSeerr?>(requestSession())
+    private val connection = MutableStateFlow(SeerrState(SeerrConnectionStatus.Success(current.value!!)))
     private val service = mockk<SeerrService>(relaxed = true)
     private val client = mockk<SeerrApiClient>(relaxed = true)
     private val movies = mockk<MoviesApi>(relaxed = true)
@@ -62,6 +184,11 @@ class DiscoverMovieRequestTest {
     private val http = TvRequestHttpFixture(201, "{\"id\":91,\"status\":1,\"type\":\"movie\"}")
     private val stores = ViewModelStore()
     private var details = MovieDetails(id = 42, mediaInfo = MediaInfo(id = 84, tmdbId = 42, status = 1, status4k = 1))
+    private val profileData =
+        SeerrRequestData(
+            serverId = 0,
+            profiles = listOf(SeerrProfile(12, MOVIE_PROFILE_1080P_HDR, true), SeerrProfile(8, MOVIE_PROFILE_2160P_HDR, false)),
+        )
     private var refreshed: CompletableDeferred<Unit>? = null
     private lateinit var model: DiscoverMovieViewModel
 
@@ -72,9 +199,11 @@ class DiscoverMovieRequestTest {
         every { service.api } returns client
         every { client.moviesApi } returns movies
         every { client.requestApi } returns http.api.requestApi
+        coEvery { service.getProfilesAndFolders(com.github.damontecres.wholphin.data.model.SeerrItemType.MOVIE, false) } returns profileData
         val repository =
             mockk<SeerrServerRepository> {
                 every { this@mockk.current } returns this@DiscoverMovieRequestTest.current
+                every { connection } returns this@DiscoverMovieRequestTest.connection
                 every { currentUserId } returns this@DiscoverMovieRequestTest.current.map { it?.config?.id }
             }
         val wrapper = mockk<SeerrApi> { every { api } returns client }
@@ -114,21 +243,195 @@ class DiscoverMovieRequestTest {
 
     @Test fun standardOnly() = runTest(dispatcher) { assertQualities(requestSession(32), true, false) }
 
-    @Test fun ordinaryUhdProfileUsesStandardRadarrWithoutFourKCapability() =
+    @Test fun ordinary2160ProfileUsesStandardRadarrWithoutFourKCapability() =
         runTest(dispatcher) {
             current.value = requestSession(movie4k = false, tv4k = false)
-            val profile = SeerrProfile(9, "UHD", true)
-            refreshed = CompletableDeferred()
-            model.request(MovieRequest(SeerrRequestData(serverId = 11, profiles = listOf(profile)), 42, false, profile.id, null))
+            connection.value = SeerrState(SeerrConnectionStatus.Success(current.value!!))
+            assertTrue(model.requestOnClick())
             runCurrent()
-            refreshed!!.await()
+            val request = movieRequestForQuality(model.state.value.requestData, 42, MOVIE_PROFILE_2160P_HDR)!!
+            val responded = CompletableDeferred<Unit>()
+            http.onResponse = { responded.complete(Unit) }
+            model.request(request)
+            runCurrent()
+            responded.await()
             val call = http.calls.single()
             val body = Buffer().also { call.body!!.writeTo(it) }.readUtf8()
             val submitted = Serializer.kotlinxSerializationJson.decodeFromString<RequestPostRequest>(body)
             assertEquals("POST", call.method)
-            assertEquals(11, submitted.serverId)
-            assertEquals(profile.id, submitted.profileId)
+            assertEquals(0, submitted.serverId)
+            assertEquals(8, submitted.profileId)
             assertEquals(false, submitted.is4k)
+        }
+
+    @Test fun reopeningClearsOldProfilesAndFailedRefreshCannotRestoreThem() =
+        runTest(dispatcher) {
+            assertTrue(model.requestOnClick())
+            runCurrent()
+            assertEquals(LoadingState.Success, model.state.value.profileLoading)
+            model.closeRequestDialog()
+            val pending = CompletableDeferred<SeerrRequestData>()
+            coEvery { service.getProfilesAndFolders(com.github.damontecres.wholphin.data.model.SeerrItemType.MOVIE, false) } coAnswers
+                { pending.await() }
+            assertTrue(model.requestOnClick())
+            assertEquals(LoadingState.Loading, model.state.value.profileLoading)
+            assertEquals(-1, model.state.value.requestData.serverId)
+            runCurrent()
+            pending.completeExceptionally(IllegalStateException("fixture"))
+            runCurrent()
+            assertTrue(model.state.value.profileLoading is LoadingState.Error)
+            assertEquals(-1, model.state.value.requestData.serverId)
+            assertTrue(http.calls.isEmpty())
+        }
+
+    @Test fun olderProfileResponseCannotReplaceNewerOpening() =
+        runTest(dispatcher) {
+            val old = CompletableDeferred<SeerrRequestData>()
+            coEvery { service.getProfilesAndFolders(com.github.damontecres.wholphin.data.model.SeerrItemType.MOVIE, false) } coAnswers {
+                withContext(NonCancellable) { old.await() }
+            }
+            assertTrue(model.requestOnClick())
+            runCurrent()
+            model.closeRequestDialog()
+            coEvery { service.getProfilesAndFolders(com.github.damontecres.wholphin.data.model.SeerrItemType.MOVIE, false) } returns
+                profileData.copy(serverId = 11)
+            assertTrue(model.requestOnClick())
+            runCurrent()
+            assertEquals(11, model.state.value.requestData.serverId)
+            old.complete(profileData.copy(serverId = 99))
+            runCurrent()
+            assertEquals(11, model.state.value.requestData.serverId)
+        }
+
+    @Test fun fetchedProfilesQueuedForPublicationCannotReplaceNewerOpeningOrSubmissionSnapshot() =
+        runTest(dispatcher) {
+            // Separate schedulers let the fetch finish on IO while its Main publication waits.
+            val worker = StandardTestDispatcher(TestCoroutineScheduler())
+            WholphinDispatchers.IO = worker
+            val oldData = profileData.copy(serverId = 99)
+            val old = CompletableDeferred<SeerrRequestData>()
+            coEvery { service.getProfilesAndFolders(com.github.damontecres.wholphin.data.model.SeerrItemType.MOVIE, false) } coAnswers {
+                old.await()
+            }
+            assertTrue(model.requestOnClick())
+            worker.scheduler.runCurrent() // A waits for Main to authorize the fetch.
+            runCurrent()
+            worker.scheduler.runCurrent() // A is now waiting for its response.
+            old.complete(oldData)
+            worker.scheduler.runCurrent() // A has fetched; publication is queued on Main.
+            assertEquals(LoadingState.Loading, model.state.value.profileLoading)
+
+            model.closeRequestDialog()
+            coEvery { service.getProfilesAndFolders(com.github.damontecres.wholphin.data.model.SeerrItemType.MOVIE, false) } returns
+                profileData.copy(serverId = 11)
+            assertTrue(model.requestOnClick())
+            assertEquals(LoadingState.Loading, model.state.value.profileLoading)
+            runCurrent() // A cannot publish after B has invalidated its epoch.
+            worker.scheduler.runCurrent()
+            runCurrent()
+            worker.scheduler.runCurrent()
+            runCurrent()
+            assertEquals(LoadingState.Success, model.state.value.profileLoading)
+            assertEquals(11, model.state.value.requestData.serverId)
+
+            val oldRequest = movieRequestForQuality(oldData, 42, MOVIE_PROFILE_1080P_HDR)!!
+            model.request(oldRequest)
+            worker.scheduler.runCurrent()
+            assertTrue(http.calls.isEmpty())
+            val currentRequest = movieRequestForQuality(model.state.value.requestData, 42, MOVIE_PROFILE_1080P_HDR)!!
+            val responded = CompletableDeferred<Unit>()
+            http.onResponse = { responded.complete(Unit) }
+            model.request(currentRequest)
+            worker.scheduler.runCurrent()
+            responded.await()
+            val body =
+                Buffer()
+                    .also {
+                        http.calls
+                            .single()
+                            .body!!
+                            .writeTo(it)
+                    }.readUtf8()
+            assertEquals(11, Serializer.kotlinxSerializationJson.decodeFromString<RequestPostRequest>(body).serverId)
+        }
+
+    @Test fun fetchedProfilesQueuedForPublicationCannotRestoreClosedDialog() =
+        runTest(dispatcher) {
+            val worker = StandardTestDispatcher(TestCoroutineScheduler())
+            WholphinDispatchers.IO = worker
+            val old = CompletableDeferred<SeerrRequestData>()
+            coEvery { service.getProfilesAndFolders(com.github.damontecres.wholphin.data.model.SeerrItemType.MOVIE, false) } coAnswers {
+                old.await()
+            }
+            assertTrue(model.requestOnClick())
+            worker.scheduler.runCurrent()
+            runCurrent()
+            worker.scheduler.runCurrent()
+            old.complete(profileData)
+            worker.scheduler.runCurrent() // A has fetched; publication is queued on Main.
+            model.closeRequestDialog()
+            runCurrent()
+            assertEquals(LoadingState.Pending, model.state.value.profileLoading)
+            assertEquals(-1, model.state.value.requestData.serverId)
+            model.request(movieRequestForQuality(profileData, 42, MOVIE_PROFILE_1080P_HDR)!!)
+            worker.scheduler.runCurrent()
+            assertTrue(http.calls.isEmpty())
+        }
+
+    @Test fun accountSwitchDuringProfileLoadingInvalidatesDialogData() =
+        runTest(dispatcher) {
+            val pending = CompletableDeferred<SeerrRequestData>()
+            coEvery { service.getProfilesAndFolders(com.github.damontecres.wholphin.data.model.SeerrItemType.MOVIE, false) } coAnswers {
+                withContext(NonCancellable) { pending.await() }
+            }
+            assertTrue(model.requestOnClick())
+            runCurrent()
+            current.value = requestSession(userId = 8)
+            connection.value = SeerrState(SeerrConnectionStatus.Success(current.value!!))
+            runCurrent()
+            assertEquals(LoadingState.Pending, model.state.value.profileLoading)
+            pending.complete(profileData)
+            runCurrent()
+            assertEquals(-1, model.state.value.requestData.serverId)
+            assertTrue(http.calls.isEmpty())
+        }
+
+    @Test fun clientSwitchDuringProfileLoadingDiscardsTheOldServerProfiles() =
+        runTest(dispatcher) {
+            val pending = CompletableDeferred<SeerrRequestData>()
+            coEvery { service.getProfilesAndFolders(com.github.damontecres.wholphin.data.model.SeerrItemType.MOVIE, false) } coAnswers {
+                pending.await()
+            }
+            assertTrue(model.requestOnClick())
+            runCurrent()
+            every { service.api } returns mockk<SeerrApiClient>()
+            pending.complete(profileData)
+            runCurrent()
+            assertEquals(LoadingState.Pending, model.state.value.profileLoading)
+            assertEquals(-1, model.state.value.requestData.serverId)
+            assertTrue(http.calls.isEmpty())
+        }
+
+    @Test fun dismissedDialogCannotStartAnotherPostWhileFirstIsPending() =
+        runTest(dispatcher) {
+            assertTrue(model.requestOnClick())
+            runCurrent()
+            val request = movieRequestForQuality(model.state.value.requestData, 42, MOVIE_PROFILE_1080P_HDR)!!
+            val pending = CompletableDeferred<MovieDetails>()
+            coEvery { movies.movieMovieIdGet(42) } coAnswers { pending.await() }
+            model.request(request)
+            model.request(request) // Repeated activation before the dialog closes.
+            model.closeRequestDialog()
+            assertFalse(model.requestOnClick())
+            model.request(request)
+            runCurrent()
+            assertTrue(http.calls.isEmpty())
+            val responded = CompletableDeferred<Unit>()
+            http.onResponse = { responded.complete(Unit) }
+            pending.complete(details)
+            responded.await()
+            runCurrent()
+            assertEquals(1, http.calls.size)
         }
 
     @Test fun fourKOnly() = runTest(dispatcher) { assertQualities(requestSession(1024), false, true) }
@@ -172,9 +475,12 @@ class DiscoverMovieRequestTest {
 
     @Test fun permissionLossWithPreviouslyPreparedDialogPayloadMakesNoPost() =
         runTest(dispatcher) {
-            val prepared = movieRequest(false)
+            assertTrue(model.requestOnClick())
+            runCurrent()
+            val prepared = movieRequestForQuality(model.state.value.requestData, 42, MOVIE_PROFILE_1080P_HDR)!!
             assertEquals(true, model.requestEnabled.first())
             current.value = requestSession(0)
+            connection.value = SeerrState(SeerrConnectionStatus.Success(current.value!!))
             model.request(prepared)
             runCurrent()
             assertTrue(http.calls.isEmpty())
@@ -269,17 +575,11 @@ class DiscoverMovieRequestTest {
         fourK: Boolean,
     ) {
         current.value = session
+        connection.value = SeerrState(SeerrConnectionStatus.Success(session))
         assertEquals(standard, model.requestEnabled.first())
         assertEquals(fourK, model.request4kEnabled.first())
-        for ((is4k, allowed) in listOf(false to standard, true to fourK)) {
-            val before = http.calls.size
-            http.body = "{\"id\":91,\"status\":1,\"type\":\"movie\",\"is4k\":$is4k}"
-            refreshed = CompletableDeferred()
-            model.request(movieRequest(is4k))
-            dispatcher.scheduler.runCurrent()
-            if (allowed) refreshed!!.await()
-            assertEquals(before + if (allowed) 1 else 0, http.calls.size)
-        }
+        // Eligibility remains separately observable; the redesigned details dialog submits standard profiles only.
+        assertTrue(http.calls.isEmpty())
     }
 
     private suspend fun assertCancellation(

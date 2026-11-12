@@ -114,6 +114,7 @@ fun DiscoverSearchPage(
     modifier: Modifier = Modifier,
     viewModel: DiscoverSearchViewModel = hiltViewModel(),
 ) {
+    val quickMovieRequest = LocalQuickMovieRequest.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val seerrResults by viewModel.seerrResults.collectAsState()
@@ -251,6 +252,7 @@ fun DiscoverSearchPage(
             onPlayItem = { _, _ -> },
             onClickPosition = { position = it.column },
             onClickDiscover = onClickDiscover,
+            onLongClickDiscover = { quickMovieRequest.open(it) },
             positionCallback = { columns, index ->
                 position = index
                 positionCallback.invoke(columns, index)

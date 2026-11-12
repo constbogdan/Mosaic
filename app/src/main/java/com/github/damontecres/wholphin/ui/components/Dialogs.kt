@@ -418,6 +418,7 @@ fun BasicDialog(
     onDismissRequest: () -> Unit,
     properties: DialogProperties = DialogProperties(),
     elevation: Dp = 1.dp,
+    modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     Dialog(
@@ -426,7 +427,7 @@ fun BasicDialog(
     ) {
         Box(
             modifier =
-                Modifier
+                modifier
                     .shadow(elevation = elevation, shape = RoundedCornerShape(8.dp))
                     .background(
                         MaterialTheme.colorScheme.surfaceColorAtElevation(elevation),

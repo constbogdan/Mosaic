@@ -199,6 +199,7 @@ fun SeerrRequestsPage(
     modifier: Modifier = Modifier,
     viewModel: SeerrRequestsViewModel = hiltViewModel(),
 ) {
+    val quickMovieRequest = LocalQuickMovieRequest.current
     val state by viewModel.state.collectAsState(SeerrRequestsState.EMPTY)
     val columns = 6
 
@@ -244,8 +245,7 @@ fun SeerrRequestsPage(
                         onClickItem = { index: Int, item: RequestGridItem ->
                             viewModel.navigationManager.navigateTo(Destination.DiscoveredItem(item.item))
                         },
-                        onLongClickItem = { index: Int, item: RequestGridItem ->
-                        },
+                        onLongClickItem = { _: Int, item: RequestGridItem -> quickMovieRequest.open(item.item) },
                         onClickPlay = { _, item ->
                         },
                         letterPosition = { c: Char -> 0 },

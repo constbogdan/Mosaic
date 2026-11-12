@@ -63,6 +63,7 @@ fun WatchlistPage(
     modifier: Modifier = Modifier,
     viewModel: WatchlistViewModel = hiltViewModel(),
 ) {
+    val quickMovieRequest = com.github.damontecres.wholphin.ui.discover.LocalQuickMovieRequest.current
     // Outgoing lazy-grid keys must keep the same row snapshot during a category reset.
     val state = viewModel.state.collectAsState().value
     val membership by viewModel.repository.state.collectAsState()
@@ -165,7 +166,13 @@ fun WatchlistPage(
                         backToTopOnBack = false,
                         itemKey = { state.entries[it].gridId },
                         onClickItem = { _, item -> viewModel.open(item) },
-                        onLongClickItem = { _, item -> menu = item },
+                        onLongClickItem = { _, item ->
+                            if (item.item.type == com.github.damontecres.wholphin.data.model.SeerrItemType.MOVIE) {
+                                quickMovieRequest.open(item.item) { menu = item }
+                            } else {
+                                menu = item
+                            }
+                        },
                         onClickPlay = { _, _ -> },
                         letterPosition = { 0 },
                         gridFocusRequester = tab.contentFocusRequester,

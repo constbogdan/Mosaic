@@ -31,6 +31,25 @@ not current instruction.
 
 ## Immediate continuity
 
+- Movie Quick Request Phase 1 is an uncommitted local candidate on
+  `feat/movie-quick-request`, based on merged Watchlist main `accf48a1`. It overlays existing
+  Seerr-backed movie grids; Jellyfin-local cards and TV remain untouched. Reuse
+  `CurrentSeerr.canRequestMovie(movie, false)` on a fresh movie response, and recheck just before
+  the shared normal-quality POST. The details action's combined standard/4K decision is not safe
+  for this entry point. `RequestMovieDialog` needs explicit confirmation in single-quality
+  configurations, where its existing details path otherwise auto-submits. A long OK release can
+  arrive before asynchronous metadata resolves, so consume it at the grid host or dialog root
+  before arming confirmation. Capture the originating Seerr session synchronously: resolving it
+  after dispatch can turn an old card action into a new account's request. For standard-only
+  profile loading, do not fetch the 4K Radarr configuration. The normal details Request action must
+  use standard eligibility alone: combined standard/4K eligibility exposes a dead standard dialog
+  for 4K-only titles. Each details-dialog opening clears prior profiles before display and binds
+  its response to the opening account/client and epoch; closing invalidates that profile context,
+  but must not release an already-started POST's single-flight guard. A Quick Request opening can
+  abort before dialog state is published, so drain the initiating held OK through key-up and then
+  restore ordinary card input; a null-to-null dialog-state effect cannot perform that cleanup.
+  Fresh is not a Mosaic card surface yet.
+
 - Watchlist Phase 2 is an unpublished local candidate based on PR #120 and Seerr PR #57.
   Personal access requires `/auth/me.jellyfinUserId` to match the current Jellyfin user, plus
   the stored profile binding; shared API keys and unlinked users fail closed. A merged backend

@@ -340,6 +340,7 @@ fun SeerrDiscoverPage(
     modifier: Modifier = Modifier,
     viewModel: SeerrDiscoverViewModel = hiltViewModel(),
 ) {
+    val quickMovieRequest = LocalQuickMovieRequest.current
     val state by viewModel.state.collectAsState()
     val ratingMap by viewModel.rating.collectAsState()
 
@@ -475,7 +476,7 @@ fun SeerrDiscoverPage(
                         position = RowColumn(rowIndex, index)
                         viewModel.navigationManager.navigateTo(item.destination)
                     },
-                    onLongClickItem = { index, item -> },
+                    onLongClickItem = { _, item -> quickMovieRequest.open(item) },
                     onCardFocus = { index ->
                         position = RowColumn(rowIndex, index)
                         positionCallback.invoke(position)
