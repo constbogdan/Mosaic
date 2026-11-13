@@ -385,7 +385,7 @@ fun SearchPage(
                         onPlayItem = onPlayItem,
                         onClickPosition = { setPosition(it) },
                         onClickDiscover = onClickDiscover,
-                        onLongClickDiscover = { quickMovieRequest.open(it) },
+                        onLongClickDiscover = { item -> quickMovieRequest.open(item, onOpenDetails = { onClickDiscover(0, item) }) },
                         positionCallback = positionCallback,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -400,7 +400,7 @@ fun SearchPage(
                         onPlayItem = onPlayItem,
                         onClickPosition = { setPosition(it) },
                         onClickDiscover = onClickDiscover,
-                        onLongClickDiscover = { quickMovieRequest.open(it) },
+                        onLongClickDiscover = { item -> quickMovieRequest.open(item, onOpenDetails = { onClickDiscover(0, item) }) },
                         positionCallback = positionCallback,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -463,7 +463,9 @@ fun SearchPage(
                                     onClickItem = onClickItem,
                                     onLongClickItem = { _, _ -> },
                                     onClickDiscover = onClickDiscover,
-                                    onLongClickDiscover = { quickMovieRequest.open(it) },
+                                    onLongClickDiscover = { item ->
+                                        quickMovieRequest.open(item, onOpenDetails = { onClickDiscover(0, item) })
+                                    },
                                     onClickPosition = { setPosition(it) },
                                     cardContent = { _, _, _, _, _ -> },
                                     modifier = Modifier.fillMaxWidth(),

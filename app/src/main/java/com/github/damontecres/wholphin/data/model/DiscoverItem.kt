@@ -130,10 +130,12 @@ data class DiscoverItem(
 data class DiscoverRating(
     val criticRating: Int?,
     val audienceRating: Float?,
+    val audienceScore: Int? = null,
 ) {
     constructor(rating: MovieMovieIdRatingsGet200Response) : this(
         criticRating = rating.criticsScore,
         audienceRating = rating.audienceScore?.div(10f),
+        audienceScore = rating.audienceScore,
     )
     constructor(rating: TvTvIdRatingsGet200Response) : this(
         criticRating = rating.criticsScore,

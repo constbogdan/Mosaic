@@ -117,6 +117,7 @@ fun DiscoverMovieDetailsHeader(
             movie.genres?.mapNotNull { it.name }?.letNotEmpty {
                 GenreText(it, Modifier.padding(start = HeaderUtils.startPadding))
             }
+            OriginalLanguageText(movie.originalLanguage, Modifier.padding(start = HeaderUtils.startPadding))
 
             val tagline = remember { movie.tagline?.takeIf { it.isNotNullOrBlank() } }
             tagline?.let {

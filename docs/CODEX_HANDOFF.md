@@ -38,17 +38,28 @@ not current instruction.
   the shared normal-quality POST. The details action's combined standard/4K decision is not safe
   for this entry point. `RequestMovieDialog` needs explicit confirmation in single-quality
   configurations, where its existing details path otherwise auto-submits. A long OK release can
-  arrive before asynchronous metadata resolves, so consume it at the grid host or dialog root
-  before arming confirmation. Capture the originating Seerr session synchronously: resolving it
+  arrive before asynchronous metadata resolves. The card host must observe that release but let it
+  reach the originating TV Card before mounting the dialog: consuming it in the host's preview
+  handler leaves the long-click gesture unfinished and loses the first later short OK. The dialog
+  still gates the original hold/repeats and requires a separate full press for an action. Capture
+  the originating Seerr session synchronously: resolving it
   after dispatch can turn an old card action into a new account's request. For standard-only
   profile loading, do not fetch the 4K Radarr configuration. The normal details Request action must
   use standard eligibility alone: combined standard/4K eligibility exposes a dead standard dialog
   for 4K-only titles. Each details-dialog opening clears prior profiles before display and binds
   its response to the opening account/client and epoch; closing invalidates that profile context,
   but must not release an already-started POST's single-flight guard. A Quick Request opening can
-  abort before dialog state is published, so drain the initiating held OK through key-up and then
+  abort before dialog state is published, so observe the initiating held OK through key-up and then
   restore ordinary card input; a null-to-null dialog-state effect cannot perform that cleanup.
-  Fresh is not a Mosaic card surface yet.
+  Fresh is not a Mosaic card surface in this worktree yet, but its separate worktree uses the same
+  Quick Request host. The host must not mount the early opening state until fetched MovieDetails
+  passes standard-request eligibility: otherwise available or already-requested movies flash a
+  loading dialog before policy dismissal. Publish the verified movie before profile loading so
+  eligible dialogs still show loading promptly. Keep the early state for held-OK/session tracking
+  and independent rating work; metadata failures and their subsequent Retry stay visible without
+  reintroducing the initial flash. A stale Quick Request loader must return the current state from
+  its atomic update when its opening token no longer matches; a nullable `takeIf(... )?.copy(...)`
+  would instead clear a newer dialog after a rapid dismiss/reopen.
 
 - Watchlist Phase 2 is an unpublished local candidate based on PR #120 and Seerr PR #57.
   Personal access requires `/auth/me.jellyfinUserId` to match the current Jellyfin user, plus

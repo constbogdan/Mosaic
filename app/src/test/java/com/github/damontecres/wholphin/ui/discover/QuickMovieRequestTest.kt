@@ -6,8 +6,10 @@ import com.github.damontecres.wholphin.api.seerr.SeerrApiClient
 import com.github.damontecres.wholphin.api.seerr.TvRequestHttpFixture
 import com.github.damontecres.wholphin.api.seerr.model.MediaInfo
 import com.github.damontecres.wholphin.api.seerr.model.MovieDetails
+import com.github.damontecres.wholphin.api.seerr.model.MovieMovieIdRatingsGet200Response
 import com.github.damontecres.wholphin.api.seerr.requestSession
 import com.github.damontecres.wholphin.data.model.DiscoverItem
+import com.github.damontecres.wholphin.data.model.DiscoverRating
 import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.data.model.SeerrItemType
 import com.github.damontecres.wholphin.services.CurrentSeerr
@@ -23,6 +25,7 @@ import com.github.damontecres.wholphin.util.WholphinDispatchers
 import com.github.damontecres.wholphin.util.configure
 import com.github.damontecres.wholphin.util.reset
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
@@ -61,6 +64,7 @@ class QuickMovieRequestTest {
         every { client.moviesApi } returns movies
         every { client.requestApi } returns http.api.requestApi
         coEvery { movies.movieMovieIdGet(42) } answers { movie }
+        coEvery { movies.movieMovieIdRatingsGet(42) } returns MovieMovieIdRatingsGet200Response(criticsScore = 86, audienceScore = 75)
         coEvery { service.getProfilesAndFolders(SeerrItemType.MOVIE, false) } returns SeerrRequestData()
         val repository =
             mockk<SeerrServerRepository> {
@@ -100,6 +104,231 @@ class QuickMovieRequestTest {
             )
         }
 
+    @Test fun ratingStartsBeforeMetadataEligibilityAndProfilesWithoutBlockingDialog() =
+        runTest(dispatcher) {
+            val metadata = CompletableDeferred<MovieDetails>()
+            val profiles = CompletableDeferred<SeerrRequestData>()
+            coEvery { movies.movieMovieIdGet(42) } coAnswers { metadata.await() }
+            coEvery { service.getProfilesAndFolders(SeerrItemType.MOVIE, false) } coAnswers { profiles.await() }
+            model.open(item)
+            runCurrent()
+            coVerify(exactly = 1) { movies.movieMovieIdRatingsGet(42) }
+            assertEquals(
+                86,
+                model.state.value
+                    ?.rating
+                    ?.criticRating,
+            )
+            assertEquals(
+                75,
+                model.state.value
+                    ?.rating
+                    ?.audienceScore,
+            )
+            assertEquals(
+                7.5f,
+                model.state.value
+                    ?.rating
+                    ?.audienceRating,
+            )
+            assertTrue(model.state.value!!.loading)
+            assertNull(model.state.value?.movie)
+            assertFalse(model.state.value!!.presentable)
+
+            metadata.complete(movie)
+            runCurrent()
+            assertTrue(model.state.value!!.loading)
+            assertTrue(model.state.value!!.presentable)
+            profiles.complete(SeerrRequestData())
+            runCurrent()
+            assertFalse(model.state.value!!.loading)
+            assertEquals(
+                86,
+                model.state.value
+                    ?.rating
+                    ?.criticRating,
+            )
+            coVerify(exactly = 1) { movies.movieMovieIdRatingsGet(42) }
+        }
+
+    @Test fun movieRatingPreservesAudiencePercentageIncludingZeroAndMissingFields() {
+        val both = DiscoverRating(MovieMovieIdRatingsGet200Response(criticsScore = 86, audienceScore = 75))
+        assertEquals(86, both.criticRating)
+        assertEquals(75, both.audienceScore)
+        assertEquals(7.5f, both.audienceRating)
+
+        val zero = DiscoverRating(MovieMovieIdRatingsGet200Response(audienceScore = 0))
+        assertNull(zero.criticRating)
+        assertEquals(0, zero.audienceScore)
+        assertEquals(0f, zero.audienceRating)
+
+        val absent = DiscoverRating(MovieMovieIdRatingsGet200Response(criticsScore = 42))
+        assertEquals(42, absent.criticRating)
+        assertNull(absent.audienceScore)
+        assertNull(absent.audienceRating)
+    }
+
+    @Test fun ratingFailureDoesNotBlockEligibilityProfilesOrRetry() =
+        runTest(dispatcher) {
+            coEvery { movies.movieMovieIdRatingsGet(42) } throws IllegalStateException("fixture rating failure")
+            coEvery { service.getProfilesAndFolders(SeerrItemType.MOVIE, false) } throws IllegalStateException("fixture profiles failure")
+            model.open(item)
+            runCurrent()
+            assertTrue(model.state.value!!.error)
+            assertNull(model.state.value?.rating)
+            coEvery { service.getProfilesAndFolders(SeerrItemType.MOVIE, false) } returns SeerrRequestData()
+            model.retry()
+            runCurrent()
+            assertFalse(model.state.value!!.error)
+            assertFalse(model.state.value!!.loading)
+            assertNull(model.state.value?.rating)
+            coVerify(exactly = 1) { movies.movieMovieIdRatingsGet(42) }
+            assertTrue(http.calls.isEmpty())
+        }
+
+    @Test fun dismissalCancelsPendingRatingWithoutPublishingIt() =
+        runTest(dispatcher) {
+            val response = CompletableDeferred<MovieMovieIdRatingsGet200Response>()
+            val cancelled = CompletableDeferred<Unit>()
+            coEvery { movies.movieMovieIdRatingsGet(42) } coAnswers {
+                try {
+                    response.await()
+                } finally {
+                    cancelled.complete(Unit)
+                }
+            }
+            model.open(item)
+            runCurrent()
+            coVerify(exactly = 1) { movies.movieMovieIdRatingsGet(42) }
+            model.dismiss()
+            runCurrent()
+            assertTrue(cancelled.isCompleted)
+            assertNull(model.state.value)
+            assertTrue(http.calls.isEmpty())
+        }
+
+    @Test fun sessionChangeRejectsRatingAtFinalPublication() =
+        runTest(dispatcher) {
+            model.open(item)
+            runCurrent()
+            val opening = model.state.value!!
+            val nextSession = requestSession(userId = 8)
+            connection.value = SeerrState(SeerrConnectionStatus.Success(nextSession))
+            model.publishRating(opening.token, opening.session, DiscoverRating(42, null))
+            assertEquals(
+                86,
+                model.state.value
+                    ?.rating
+                    ?.criticRating,
+            )
+            current.value = nextSession
+            runCurrent()
+            assertNull(model.state.value)
+        }
+
+    @Test fun rapidSameMovieReopenRejectsOldRatingAtFinalPublication() =
+        runTest(dispatcher) {
+            model.open(item)
+            runCurrent()
+            val old = model.state.value!!
+            model.dismiss()
+            model.open(item)
+            runCurrent()
+            val newer = model.state.value!!
+            assertTrue(newer.token != old.token)
+            model.publishRating(old.token, old.session, DiscoverRating(42, null))
+            assertEquals(
+                86,
+                model.state.value
+                    ?.rating
+                    ?.criticRating,
+            )
+            assertEquals(newer.token, model.state.value?.token)
+            coVerify(exactly = 2) { movies.movieMovieIdRatingsGet(42) }
+        }
+
+    @Test fun staleMetadataProfilesAndErrorsCannotReplaceNewOpening() =
+        runTest(dispatcher) {
+            var metadataCalls = 0
+            val secondMovie = CompletableDeferred<MovieDetails>()
+            coEvery { movies.movieMovieIdGet(42) } coAnswers {
+                if (++metadataCalls == 1) movie else secondMovie.await()
+            }
+            model.open(item)
+            runCurrent()
+            val old = model.state.value!!
+            model.dismiss()
+            model.open(item)
+            runCurrent()
+            val newer = model.state.value!!
+            assertTrue(newer.token != old.token)
+            assertTrue(newer.loading)
+            assertNull(newer.movie)
+
+            // Simulate an old worker passing its outer check just before dismissal/reopening.
+            model.updateIfCurrent(old.token, old.session) { it.copy(movie = movie, presentable = true) }
+            model.updateIfCurrent(old.token, old.session) { it.copy(data = SeerrRequestData(), loading = false) }
+            model.updateIfCurrent(old.token, old.session) { it.copy(error = true, loading = false) }
+            assertEquals(newer, model.state.value)
+            assertTrue(http.calls.isEmpty())
+
+            secondMovie.complete(movie)
+            runCurrent()
+            assertEquals(newer.token, model.state.value?.token)
+            assertFalse(model.state.value!!.loading)
+        }
+
+    @Test fun posterNavigationClaimsOneCurrentOpeningAndDoesNotSubmit() =
+        runTest(dispatcher) {
+            var navigations = 0
+            model.open(item, onOpenDetails = { navigations++ })
+            runCurrent()
+            val opening = model.state.value!!
+            val navigate = model.takePosterNavigation(opening)
+            assertNull(model.state.value)
+            navigate?.invoke()
+            assertEquals(1, navigations)
+            assertNull(model.takePosterNavigation(opening))
+            assertTrue(http.calls.isEmpty())
+
+            model.open(item, onOpenDetails = { navigations++ })
+            runCurrent()
+            assertNull(model.takePosterNavigation(opening))
+            assertEquals(1, navigations)
+            assertTrue(model.state.value != null)
+        }
+
+    @Test fun posterNavigationIsInvalidatedBySessionChangeAndDismissal() =
+        runTest(dispatcher) {
+            var navigations = 0
+            model.open(item, onOpenDetails = { navigations++ })
+            runCurrent()
+            val opening = model.state.value!!
+            connection.value = SeerrState(SeerrConnectionStatus.Success(requestSession(userId = 8)))
+            assertNull(model.takePosterNavigation(opening))
+            assertEquals(0, navigations)
+            assertNull(model.state.value)
+            assertTrue(http.calls.isEmpty())
+        }
+
+    @Test fun cardReleaseCompletesTheOriginatingGestureWithoutArmingRequestConfirmation() {
+        val gate = QuickMovieConfirmGate()
+        gate.reset()
+        assertTrue(gate.onCardKey(0, 23, 1))
+        assertFalse(gate.onCardKey(1, 23))
+        assertTrue(gate.released)
+        assertFalse(gate.consumeConfirmation())
+        assertFalse(gate.onKey(0, 23))
+        assertFalse(gate.onKey(1, 23))
+        assertTrue(gate.consumeConfirmation())
+
+        gate.reset()
+        gate.abortOpening()
+        assertFalse(gate.onCardKey(1, 23))
+        assertFalse(gate.onCardKey(0, 23))
+        assertFalse(gate.consumeConfirmation())
+    }
+
     @Test fun pendingProcessingAvailableAndBlocklistedMoviesRetainSecondaryAction() =
         runTest(dispatcher) {
             for (status in listOf(2, 3, 5, 6)) {
@@ -110,6 +339,45 @@ class QuickMovieRequestTest {
                 assertNull(model.state.value)
                 assertEquals(1, fallback)
             }
+            assertTrue(http.calls.isEmpty())
+        }
+
+    @Test fun ineligibleMovieNeverPresentsDialogAndOriginalOkReleaseCannotSubmit() =
+        runTest(dispatcher) {
+            val metadata = CompletableDeferred<MovieDetails>()
+            val input = QuickMovieConfirmGate()
+            movie = movie.copy(mediaInfo = movie.mediaInfo?.copy(status = SeerrAvailability.AVAILABLE.status))
+            coEvery { movies.movieMovieIdGet(42) } coAnswers { metadata.await() }
+            var fallback = 0
+
+            model.open(item, onUnavailable = { fallback++ }, onStart = input::reset, onAbort = input::abortOpening)
+            runCurrent()
+            assertFalse(model.state.value!!.presentable)
+            metadata.complete(movie)
+            runCurrent()
+            assertNull(model.state.value)
+            assertEquals(1, fallback)
+            assertFalse(input.onCardKey(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DPAD_CENTER))
+            assertFalse(input.onCardKey(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DPAD_CENTER))
+            assertFalse(input.onCardKey(android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DPAD_CENTER))
+            assertFalse(input.consumeConfirmation())
+            assertTrue(http.calls.isEmpty())
+        }
+
+    @Test fun deniedMoviePermissionNeverPresentsDialog() =
+        runTest(dispatcher) {
+            current.value = requestSession(permissions = 0)
+            connection.value = SeerrState(SeerrConnectionStatus.Success(current.value!!))
+            runCurrent()
+            val metadata = CompletableDeferred<MovieDetails>()
+            coEvery { movies.movieMovieIdGet(42) } coAnswers { metadata.await() }
+
+            model.open(item)
+            runCurrent()
+            assertFalse(model.state.value!!.presentable)
+            metadata.complete(movie)
+            runCurrent()
+            assertNull(model.state.value)
             assertTrue(http.calls.isEmpty())
         }
 
@@ -172,12 +440,22 @@ class QuickMovieRequestTest {
             assertTrue(http.calls.isEmpty())
         }
 
-    @Test fun metadataFailureIsVisibleWithoutSubmission() =
+    @Test fun metadataFailureAndRetryRemainPresentableWithoutSubmission() =
         runTest(dispatcher) {
             coEvery { movies.movieMovieIdGet(42) } throws IllegalStateException("fixture")
             model.open(item)
             runCurrent()
             assertTrue(model.state.value!!.error)
+            assertTrue(model.state.value!!.presentable)
+            val metadata = CompletableDeferred<MovieDetails>()
+            coEvery { movies.movieMovieIdGet(42) } coAnswers { metadata.await() }
+            model.retry()
+            runCurrent()
+            assertTrue(model.state.value!!.loading)
+            assertTrue(model.state.value!!.presentable)
+            metadata.complete(movie)
+            runCurrent()
+            assertTrue(model.state.value!!.presentable)
             assertTrue(http.calls.isEmpty())
         }
 

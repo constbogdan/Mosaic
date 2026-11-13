@@ -4,6 +4,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -34,12 +35,14 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,6 +55,7 @@ import com.github.damontecres.wholphin.api.seerr.model.MovieDetails
 import com.github.damontecres.wholphin.data.model.DiscoverItem
 import com.github.damontecres.wholphin.data.model.DiscoverRating
 import com.github.damontecres.wholphin.ui.components.ErrorMessage
+import com.github.damontecres.wholphin.ui.components.PopcornRating
 import com.github.damontecres.wholphin.ui.components.TomatoRating
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 import com.github.damontecres.wholphin.util.LoadingState
@@ -71,6 +75,7 @@ internal fun MovieRequestDialogContent(
     confirmationReady: Boolean,
     onSubmit: (MovieRequest) -> Unit,
     confirmAction: () -> Boolean,
+    onPosterClick: (() -> Unit)? = null,
 ) {
     val movieId = movie?.id
     val title = movie?.title ?: fallbackItem?.title
@@ -85,12 +90,23 @@ internal fun MovieRequestDialogContent(
     val synopsisPixelsPerSecond = with(LocalDensity.current) { 18.dp.toPx() }
     val firstFocus = remember { FocusRequester() }
     val secondFocus = remember { FocusRequester() }
+    val posterFocus = remember { FocusRequester() }
+    var posterFocused by remember { mutableStateOf(false) }
+    val posterInteraction = remember { MutableInteractionSource() }
     val can1080 = loading == LoadingState.Success && requestEnabled && confirmationReady && !submitted && action1080 != null
     val can2160 = loading == LoadingState.Success && requestEnabled && confirmationReady && !submitted && action2160 != null
 
-    LaunchedEffect(can1080, can2160, movieId) {
-        if (!initialFocusAssigned && (can1080 || can2160)) {
-            val target = if (can1080) firstFocus else secondFocus
+    val canPosterFallback = onPosterClick != null && loading == LoadingState.Success && !can1080 && !can2160
+    LaunchedEffect(can1080, can2160, canPosterFallback, movieId) {
+        if (!initialFocusAssigned && (can1080 || can2160 || canPosterFallback)) {
+            val target =
+                if (can1080) {
+                    firstFocus
+                } else if (can2160) {
+                    secondFocus
+                } else {
+                    posterFocus
+                }
             repeat(3) {
                 withFrameNanos { }
                 if (target.tryRequestFocus()) {
@@ -128,6 +144,27 @@ internal fun MovieRequestDialogContent(
                 .padding(20.dp),
     ) {
         val posterShape = RoundedCornerShape(16.dp)
+        val posterDescription = stringResource(R.string.view_movie_details, title.orEmpty())
+        val posterActionModifier =
+            if (onPosterClick != null) {
+                Modifier
+                    .testTag("movieRequestPoster")
+                    .focusRequester(posterFocus)
+                    .focusProperties {
+                        right =
+                            if (can1080) {
+                                firstFocus
+                            } else if (can2160) {
+                                secondFocus
+                            } else {
+                                FocusRequester.Default
+                            }
+                    }.semantics { contentDescription = posterDescription }
+                    .onFocusChanged { posterFocused = it.isFocused }
+                    .clickable(interactionSource = posterInteraction, indication = null, onClick = onPosterClick)
+            } else {
+                Modifier
+            }
         Box(
             contentAlignment = Alignment.Center,
             modifier =
@@ -135,7 +172,8 @@ internal fun MovieRequestDialogContent(
                     .width(272.dp)
                     .height(408.dp)
                     .clip(posterShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .then(posterActionModifier),
         ) {
             Text(title.orEmpty(), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(20.dp))
             val imageUrl = posterUrl ?: fallbackItem?.posterUrl
@@ -146,6 +184,9 @@ internal fun MovieRequestDialogContent(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
+            }
+            if (posterFocused && onPosterClick != null) {
+                Box(Modifier.matchParentSize().border(3.dp, MaterialTheme.colorScheme.border, posterShape))
             }
         }
         Column(modifier = Modifier.weight(1f).fillMaxSize()) {
@@ -175,8 +216,26 @@ internal fun MovieRequestDialogContent(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                TomatoRating(rating?.criticRating?.toFloat())
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.width(184.dp).height(32.dp).testTag("movieRequestRatingSlot"),
+                ) {
+                    Box(
+                        contentAlignment = Alignment.CenterEnd,
+                        modifier = Modifier.width(88.dp).height(32.dp).testTag("movieRequestCriticsSlot"),
+                    ) {
+                        TomatoRating(rating?.criticRating?.toFloat())
+                    }
+                    Box(
+                        contentAlignment = Alignment.CenterEnd,
+                        modifier = Modifier.width(88.dp).height(32.dp).testTag("movieRequestAudienceSlot"),
+                    ) {
+                        PopcornRating(rating?.audienceScore)
+                    }
+                }
             }
+            OriginalLanguageText(movie?.originalLanguage, Modifier.padding(top = 6.dp))
             Box(Modifier.weight(1f).fillMaxWidth().padding(top = 26.dp, bottom = 18.dp)) {
                 when (loading) {
                     is LoadingState.Error -> {
@@ -205,7 +264,16 @@ internal fun MovieRequestDialogContent(
                 verticalAlignment = Alignment.Bottom,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                QualityButton(R.drawable.request_1080p, "1080p HDR", can1080, Modifier.focusRequester(firstFocus), { focusedQuality = 1 }) {
+                QualityButton(
+                    R.drawable.request_1080p,
+                    "1080p HDR",
+                    can1080,
+                    Modifier.focusRequester(firstFocus).focusProperties {
+                        left =
+                            posterFocus
+                    },
+                    { focusedQuality = 1 },
+                ) {
                     val request = action1080 ?: return@QualityButton
                     if (submitted || !confirmAction()) return@QualityButton
                     submitted = true
@@ -215,7 +283,7 @@ internal fun MovieRequestDialogContent(
                     R.drawable.request_2160p,
                     "2160p HDR",
                     can2160,
-                    Modifier.focusRequester(secondFocus),
+                    Modifier.focusRequester(secondFocus).focusProperties { left = if (can1080) firstFocus else posterFocus },
                     { focusedQuality = 2 },
                 ) {
                     val request = action2160 ?: return@QualityButton

@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.res.stringResource
@@ -63,15 +64,16 @@ import javax.inject.Inject
 
 /** Only Seerr-backed movie cards call this; TV and Jellyfin-local cards retain their actions. */
 class QuickMovieRequestActions(
-    private val openAction: (DiscoverItem, () -> Unit) -> Unit,
+    private val openAction: (DiscoverItem, () -> Unit, (() -> Unit)?) -> Unit,
 ) {
     fun open(
         item: DiscoverItem,
         onUnavailable: () -> Unit = {},
-    ) = openAction(item, onUnavailable)
+        onOpenDetails: (() -> Unit)? = null,
+    ) = openAction(item, onUnavailable, onOpenDetails)
 }
 
-val LocalQuickMovieRequest = staticCompositionLocalOf { QuickMovieRequestActions { _, _ -> } }
+val LocalQuickMovieRequest = staticCompositionLocalOf { QuickMovieRequestActions { _, _, _ -> } }
 
 /** An opening long press cannot also confirm the dialog, even if its key repeats reach the dialog. */
 internal class QuickMovieConfirmGate {
@@ -104,6 +106,34 @@ internal class QuickMovieConfirmGate {
     /** Consume the original held key through release, then restore ordinary card input. */
     fun abortOpening() {
         phase = if (phase == Phase.OPENING_PRESS || phase == Phase.ABORTING_PRESS) Phase.ABORTING_PRESS else Phase.IDLE
+    }
+
+    /** The card must receive its own key-up to finish the long-click gesture before the dialog takes focus. */
+    fun onCardKey(
+        action: Int,
+        keyCode: Int,
+        repeatCount: Int = 0,
+    ): Boolean {
+        if (action == KeyEvent.ACTION_UP &&
+            keyCode in setOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)
+        ) {
+            when (phase) {
+                Phase.OPENING_PRESS -> {
+                    phase = Phase.AWAITING_NEW_PRESS
+                    return false
+                }
+
+                Phase.ABORTING_PRESS -> {
+                    clear()
+                    return false
+                }
+
+                else -> {
+                    Unit
+                }
+            }
+        }
+        return onKey(action, keyCode, repeatCount)
     }
 
     fun onKey(
@@ -158,12 +188,16 @@ internal class QuickMovieConfirmGate {
 internal data class QuickMovieRequestState(
     val item: DiscoverItem,
     val session: QuickMovieSession,
+    val token: Int = 0,
+    val onOpenDetails: (() -> Unit)? = null,
     val movie: MovieDetails? = null,
     val rating: DiscoverRating? = null,
     val data: SeerrRequestData = SeerrRequestData(),
     val loading: Boolean = true,
     val error: Boolean = false,
     val submitting: Boolean = false,
+    /** True after eligibility or a retryable load error; retained while retrying. */
+    val presentable: Boolean = false,
 )
 
 internal data class QuickMovieSession(
@@ -183,6 +217,8 @@ class QuickMovieRequestViewModel
         private val mutableState = MutableStateFlow<QuickMovieRequestState?>(null)
         internal val state: StateFlow<QuickMovieRequestState?> = mutableState
         private var loadJob: Job? = null
+        private val ratingJobLock = Any()
+        private var ratingJob: Job? = null
         private var submitJob: Job? = null
         private var episode = 0
         private val opening = AtomicBoolean(false)
@@ -202,6 +238,7 @@ class QuickMovieRequestViewModel
             onUnavailable: () -> Unit = {},
             onStart: () -> Unit = {},
             onAbort: () -> Unit = {},
+            onOpenDetails: (() -> Unit)? = null,
         ) {
             if (item.type != SeerrItemType.MOVIE) return
             if (item.id <= 0) {
@@ -236,8 +273,9 @@ class QuickMovieRequestViewModel
                         if (mutableState.value != null || !sameSession(session)) return@launchIO
                         val token = ++episode
                         unavailableAction = onUnavailable
-                        mutableState.value = QuickMovieRequestState(item, session)
+                        mutableState.value = QuickMovieRequestState(item, session, token = token, onOpenDetails = onOpenDetails)
                         published.set(true)
+                        loadRating(token)
                         load(token)
                     } catch (ex: CancellationException) {
                         throw ex
@@ -265,6 +303,63 @@ class QuickMovieRequestViewModel
         private suspend fun sameSession(session: QuickMovieSession): Boolean =
             seerrService.api === session.client && seerrServerRepository.current.firstOrNull() == session.current
 
+        /** A stale loader must leave a newer opening untouched, including its loading state. */
+        internal fun updateIfCurrent(
+            token: Int,
+            session: QuickMovieSession,
+            transform: (QuickMovieRequestState) -> QuickMovieRequestState,
+        ) {
+            mutableState.update { state ->
+                if (state?.token == token &&
+                    state.session.current == session.current &&
+                    state.session.client === session.client &&
+                    episode == token &&
+                    (seerrServerRepository.connection.value.connection as? SeerrConnectionStatus.Success)?.current == session.current &&
+                    runCatching { seerrService.api }.getOrNull() === session.client
+                ) {
+                    transform(state)
+                } else {
+                    state
+                }
+            }
+        }
+
+        private fun loadRating(token: Int) {
+            synchronized(ratingJobLock) {
+                val original = mutableState.value?.takeIf { it.token == token } ?: return
+                ratingJob?.cancel()
+                ratingJob =
+                    viewModelScope.launchIO {
+                        try {
+                            val rating =
+                                getDiscoverRating(original.item.id) {
+                                    DiscoverRating(
+                                        original.session.client.moviesApi
+                                            .movieMovieIdRatingsGet(movieId = original.item.id),
+                                    )
+                                }
+                            currentCoroutineContext().ensureActive()
+                            if (token == episode && sameSession(original.session)) {
+                                publishRating(token, original.session, rating)
+                            }
+                        } catch (ex: CancellationException) {
+                            throw ex
+                        } catch (ex: Exception) {
+                            Timber.e(ex, "Quick movie rating loading failed")
+                        }
+                    }
+            }
+        }
+
+        /** The state CAS must reject an old response even if dismissal/reopening follows the outer session check. */
+        internal fun publishRating(
+            token: Int,
+            session: QuickMovieSession,
+            rating: DiscoverRating?,
+        ) {
+            updateIfCurrent(token, session) { it.copy(rating = rating) }
+        }
+
         private fun load(token: Int) {
             val original = mutableState.value ?: return
             loadJob?.cancel()
@@ -282,26 +377,11 @@ class QuickMovieRequestViewModel
                             fallback?.invoke()
                             return@launchIO
                         }
+                        updateIfCurrent(token, original.session) { it.copy(movie = movie, presentable = true) }
                         val data = seerrService.getProfilesAndFolders(SeerrItemType.MOVIE, include4k = false)
                         currentCoroutineContext().ensureActive()
                         if (token != episode || !sameSession(original.session)) return@launchIO
-                        mutableState.update {
-                            it
-                                ?.takeIf { state ->
-                                    state.item.id == original.item.id
-                                }?.copy(movie = movie, data = data, loading = false)
-                        }
-                        val rating =
-                            getDiscoverRating(original.item.id) {
-                                DiscoverRating(
-                                    original.session.client.moviesApi
-                                        .movieMovieIdRatingsGet(movieId = original.item.id),
-                                )
-                            }
-                        currentCoroutineContext().ensureActive()
-                        if (token == episode && sameSession(original.session)) {
-                            mutableState.update { it?.takeIf { state -> state.item.id == original.item.id }?.copy(rating = rating) }
-                        }
+                        updateIfCurrent(token, original.session) { it.copy(movie = movie, data = data, loading = false) }
                     } catch (ex: CancellationException) {
                         throw ex
                     } catch (ex: Exception) {
@@ -309,7 +389,7 @@ class QuickMovieRequestViewModel
                         if (token == episode &&
                             sameSession(original.session)
                         ) {
-                            mutableState.update { it?.copy(loading = false, error = true) }
+                            updateIfCurrent(token, original.session) { it.copy(loading = false, error = true, presentable = true) }
                         }
                     }
                 }
@@ -320,6 +400,20 @@ class QuickMovieRequestViewModel
             if (original.loading || original.submitting || !original.error) return
             mutableState.update { it?.copy(loading = true, error = false) }
             load(episode)
+        }
+
+        /** Claim this opening once, before returning control to its originating card's navigation callback. */
+        internal fun takePosterNavigation(expected: QuickMovieRequestState): (() -> Unit)? {
+            val active = mutableState.value ?: return null
+            if (active.token != expected.token || active.token != episode || active.submitting) return null
+            val callback = active.onOpenDetails ?: return null
+            val current = (seerrServerRepository.connection.value.connection as? SeerrConnectionStatus.Success)?.current
+            if (current != active.session.current || runCatching { seerrService.api }.getOrNull() !== active.session.client) {
+                dismiss()
+                return null
+            }
+            dismiss()
+            return callback
         }
 
         fun submit(request: MovieRequest) {
@@ -366,7 +460,7 @@ class QuickMovieRequestViewModel
                         if (token == episode &&
                             sameSession(original.session)
                         ) {
-                            mutableState.update { it?.copy(error = true, submitting = false) }
+                            updateIfCurrent(token, original.session) { it.copy(error = true, submitting = false) }
                         }
                     }
                 }
@@ -379,6 +473,10 @@ class QuickMovieRequestViewModel
             mutableState.value = null
             unavailableAction = null
             loadJob?.cancel()
+            synchronized(ratingJobLock) {
+                ratingJob?.cancel()
+                ratingJob = null
+            }
             submitJob?.cancel()
         }
     }
@@ -392,9 +490,19 @@ fun QuickMovieRequestHost(
 ) {
     val state by viewModel.state.collectAsState()
     val confirmationGate = remember { QuickMovieConfirmGate() }
+    var readyToken by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(sessionKey) {
         confirmationGate.abortOpening()
         viewModel.dismiss()
+    }
+    LaunchedEffect(state?.token, confirmationGate.released) {
+        readyToken = null
+        val openingToken = state?.token
+        if (openingToken != null && confirmationGate.released) {
+            // Finish dispatching the originating card's key-up before moving focus to a dialog window.
+            withFrameNanos { }
+            if (viewModel.state.value?.token == openingToken && confirmationGate.released) readyToken = openingToken
+        }
     }
     val inputGuard =
         Modifier.onPreviewKeyEvent { event ->
@@ -403,20 +511,20 @@ fun QuickMovieRequestHost(
         }
     val actions =
         remember(viewModel) {
-            QuickMovieRequestActions { item, onUnavailable ->
-                viewModel.open(item, onUnavailable, confirmationGate::reset, confirmationGate::abortOpening)
+            QuickMovieRequestActions { item, onUnavailable, onOpenDetails ->
+                viewModel.open(item, onUnavailable, confirmationGate::reset, confirmationGate::abortOpening, onOpenDetails)
             }
         }
     CompositionLocalProvider(LocalQuickMovieRequest provides actions) {
         Box(
             Modifier.fillMaxSize().onPreviewKeyEvent { event ->
                 val native = event.nativeKeyEvent
-                confirmationGate.onKey(native.action, native.keyCode, native.repeatCount)
+                confirmationGate.onCardKey(native.action, native.keyCode, native.repeatCount)
             },
         ) {
             content()
         }
-        state?.let { current ->
+        state?.takeIf { it.token == readyToken && it.presentable }?.let { current ->
             val movie = current.movie
             if (!current.error) {
                 RequestMovieDialog(
@@ -427,6 +535,18 @@ fun QuickMovieRequestHost(
                     posterUrl = current.item.posterUrl,
                     rating = current.rating,
                     fallbackItem = current.item,
+                    onPosterClick =
+                        current.onOpenDetails?.takeUnless { current.submitting }?.let {
+                            {
+                                if (confirmationGate.consumeConfirmation()) {
+                                    val navigate = viewModel.takePosterNavigation(current)
+                                    if (navigate != null) {
+                                        confirmationGate.clear()
+                                        navigate()
+                                    }
+                                }
+                            }
+                        },
                     onSubmit = { request ->
                         viewModel.submit(request)
                     },

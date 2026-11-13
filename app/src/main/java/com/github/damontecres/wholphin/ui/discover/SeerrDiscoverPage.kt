@@ -476,7 +476,12 @@ fun SeerrDiscoverPage(
                         position = RowColumn(rowIndex, index)
                         viewModel.navigationManager.navigateTo(item.destination)
                     },
-                    onLongClickItem = { _, item -> quickMovieRequest.open(item) },
+                    onLongClickItem = { index, item ->
+                        quickMovieRequest.open(item, onOpenDetails = {
+                            position = RowColumn(rowIndex, index)
+                            viewModel.navigationManager.navigateTo(item.destination)
+                        })
+                    },
                     onCardFocus = { index ->
                         position = RowColumn(rowIndex, index)
                         positionCallback.invoke(position)

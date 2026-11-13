@@ -245,7 +245,11 @@ fun SeerrRequestsPage(
                         onClickItem = { index: Int, item: RequestGridItem ->
                             viewModel.navigationManager.navigateTo(Destination.DiscoveredItem(item.item))
                         },
-                        onLongClickItem = { _: Int, item: RequestGridItem -> quickMovieRequest.open(item.item) },
+                        onLongClickItem = { _: Int, item: RequestGridItem ->
+                            quickMovieRequest.open(item.item, onOpenDetails = {
+                                viewModel.navigationManager.navigateTo(Destination.DiscoveredItem(item.item))
+                            })
+                        },
                         onClickPlay = { _, item ->
                         },
                         letterPosition = { c: Char -> 0 },

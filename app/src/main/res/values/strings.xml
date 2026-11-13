@@ -957,6 +957,8 @@
 
     <string name="preferred_subtitle_language">Preferred subtitle language</string>
     <string name="preferred_audio_language">Preferred audio language</string>
+    <string name="original_language">Original language: %1$s</string>
+    <string name="view_movie_details">View movie details: %1$s</string>
     <string name="override_user_profile_settings">More user profile settings</string>
     <string name="override_user_profile_settings_summary">Override your user profile settings from the server</string>
     <string name="any_language">Any language</string>

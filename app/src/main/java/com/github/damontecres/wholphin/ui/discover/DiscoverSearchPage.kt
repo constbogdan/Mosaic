@@ -252,7 +252,7 @@ fun DiscoverSearchPage(
             onPlayItem = { _, _ -> },
             onClickPosition = { position = it.column },
             onClickDiscover = onClickDiscover,
-            onLongClickDiscover = { quickMovieRequest.open(it) },
+            onLongClickDiscover = { item -> quickMovieRequest.open(item, onOpenDetails = { onClickDiscover(0, item) }) },
             positionCallback = { columns, index ->
                 position = index
                 positionCallback.invoke(columns, index)

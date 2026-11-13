@@ -122,7 +122,11 @@ fun DiscoverPersonPage(
                         onClickItem = { index: Int, item: DiscoverItem ->
                             viewModel.navigationManager.navigateTo(Destination.DiscoveredItem(item))
                         },
-                        onLongClickItem = { _: Int, item: DiscoverItem -> quickMovieRequest.open(item) },
+                        onLongClickItem = { _: Int, item: DiscoverItem ->
+                            quickMovieRequest.open(item, onOpenDetails = {
+                                viewModel.navigationManager.navigateTo(Destination.DiscoveredItem(item))
+                            })
+                        },
                         onClickPlay = { _, item ->
                         },
                         initialPosition = startIndex,

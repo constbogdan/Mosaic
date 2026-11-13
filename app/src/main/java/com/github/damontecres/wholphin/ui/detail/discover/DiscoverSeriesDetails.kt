@@ -168,7 +168,9 @@ fun DiscoverSeriesDetails(
                 moreOnClick = {
                 },
                 onLongClickPerson = { _, _ -> },
-                onLongClickSimilar = { _, similar -> quickMovieRequest.open(similar) },
+                onLongClickSimilar = { _, similar ->
+                    quickMovieRequest.open(similar, onOpenDetails = { viewModel.navigateTo(Destination.DiscoveredItem(similar)) })
+                },
             )
         }
     }
@@ -507,6 +509,7 @@ fun DiscoverSeriesDetailsHeader(
             series.genres?.mapNotNull { it.name }?.letNotEmpty {
                 GenreText(it, Modifier.padding(start = HeaderUtils.startPadding, bottom = 4.dp))
             }
+            OriginalLanguageText(series.originalLanguage, Modifier.padding(start = HeaderUtils.startPadding))
             series.overview?.let { overview ->
                 OverviewText(
                     overview = overview,

@@ -164,7 +164,9 @@ fun DiscoverMovieDetails(
                 },
                 moreOnClick = {},
                 onLongClickPerson = { index, person -> },
-                onLongClickSimilar = { _, similar -> quickMovieRequest.open(similar) },
+                onLongClickSimilar = { _, similar ->
+                    quickMovieRequest.open(similar, onOpenDetails = { viewModel.navigateTo(Destination.DiscoveredItem(similar)) })
+                },
                 trailerOnClick = {
                     TrailerService.onClick(context, it, viewModel::navigateTo)
                 },

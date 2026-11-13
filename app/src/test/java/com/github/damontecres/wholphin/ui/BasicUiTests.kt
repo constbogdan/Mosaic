@@ -4,11 +4,14 @@ import android.app.Application
 import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
@@ -47,6 +50,7 @@ import androidx.tv.material3.Text
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.model.CatalogMediaType
 import com.github.damontecres.wholphin.data.model.DiscoverItem
+import com.github.damontecres.wholphin.data.model.DiscoverRating
 import com.github.damontecres.wholphin.data.model.MediaKey
 import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.data.model.SeerrItemType
@@ -69,9 +73,11 @@ import com.github.damontecres.wholphin.ui.components.ExpandablePlayButtons
 import com.github.damontecres.wholphin.ui.components.MinButtonSize
 import com.github.damontecres.wholphin.ui.detail.CardGrid
 import com.github.damontecres.wholphin.ui.detail.discover.ExpandableDiscoverButtons
+import com.github.damontecres.wholphin.ui.detail.discover.OriginalLanguageText
 import com.github.damontecres.wholphin.ui.detail.discover.RequestMovieDialog
 import com.github.damontecres.wholphin.ui.detail.discover.SeerrProfile
 import com.github.damontecres.wholphin.ui.detail.discover.SeerrRequestData
+import com.github.damontecres.wholphin.ui.detail.discover.originalLanguageName
 import com.github.damontecres.wholphin.ui.discover.QuickMovieConfirmGate
 import com.github.damontecres.wholphin.ui.setup.SwitchServerContent
 import com.github.damontecres.wholphin.ui.setup.SwitchServerViewModel
@@ -277,6 +283,307 @@ class BasicUiTests {
 
     @Test
     @Config(qualifiers = "w960dp-h540dp-land")
+    fun quick_movie_request_back_then_first_short_ok_opens_originating_card() {
+        val gate = QuickMovieConfirmGate()
+        val showing = mutableStateOf(false)
+        val dialogReady = mutableStateOf(false)
+        var details = 0
+        var openings = 0
+        var submissions = 0
+        val item = DiscoverItem(42, SeerrItemType.MOVIE, "Fixture", null, null, SeerrAvailability.UNKNOWN, null, null, null, null, null)
+        val dismiss = {
+            gate.clear()
+            showing.value = false
+        }
+        val cardGuard =
+            Modifier.onPreviewKeyEvent { event ->
+                val native = event.nativeKeyEvent
+                gate.onCardKey(native.action, native.keyCode, native.repeatCount)
+            }
+        val dialogGuard =
+            Modifier.onPreviewKeyEvent { event ->
+                val native = event.nativeKeyEvent
+                gate.onKey(native.action, native.keyCode, native.repeatCount)
+            }
+        composeTestRule.setContent {
+            WholphinTheme {
+                LaunchedEffect(showing.value, gate.released) {
+                    dialogReady.value = false
+                    if (showing.value && gate.released) {
+                        withFrameNanos { }
+                        dialogReady.value = showing.value && gate.released
+                    }
+                }
+                Box(cardGuard) {
+                    DiscoverItemCard(item, onClick = { details++ }, onLongClick = {
+                        openings++
+                        gate.reset()
+                        showing.value = true
+                    }, useFallbackText = true)
+                }
+                if (dialogReady.value) {
+                    RequestMovieDialog(
+                        loading = LoadingState.Success,
+                        data = SeerrRequestData(serverId = 11, profiles = listOf(SeerrProfile(7, "1080p HDR", true))),
+                        requestEnabled = true,
+                        movie =
+                            com.github.damontecres.wholphin.api.seerr.model
+                                .MovieDetails(id = 42, title = "Fixture"),
+                        onSubmit = { submissions++ },
+                        confirmAction = gate::consumeConfirmation,
+                        onDismissRequest = dismiss,
+                        confirmationReady = gate.released,
+                        dialogModifier = dialogGuard,
+                    )
+                }
+            }
+        }
+        val card = composeTestRule.onNode(hasClickAction())
+        card.requestFocus().performKeyInput {
+            keyDown(Key.DirectionCenter)
+            advanceEventTime(800)
+            keyUp(Key.DirectionCenter)
+        }
+        Assert.assertEquals(1, openings)
+        Assert.assertTrue(showing.value)
+        // Exercise the same callback that BasicDialog invokes for Back; Robolectric does not dispatch dialog-window Back.
+        composeTestRule.runOnIdle { dismiss() }
+        Assert.assertFalse(showing.value)
+        Assert.assertEquals(0, submissions)
+        card.assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        Assert.assertEquals(1, details)
+        card.performKeyInput {
+            keyDown(Key.DirectionCenter)
+            advanceEventTime(800)
+            keyUp(Key.DirectionCenter)
+        }
+        Assert.assertEquals(2, openings)
+        Assert.assertEquals(0, submissions)
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
+    fun quick_movie_poster_is_focusable_only_when_navigation_is_supplied_and_never_submits() {
+        var navigations = 0
+        var submissions = 0
+        composeTestRule.setContent {
+            WholphinTheme {
+                RequestMovieDialog(
+                    loading = LoadingState.Success,
+                    data = SeerrRequestData(serverId = 0, profiles = listOf(SeerrProfile(12, "1080p HDR", true))),
+                    requestEnabled = true,
+                    movie =
+                        com.github.damontecres.wholphin.api.seerr.model
+                            .MovieDetails(id = 42, title = "Fixture"),
+                    onSubmit = { submissions++ },
+                    onDismissRequest = {},
+                    onPosterClick = { navigations++ },
+                )
+            }
+        }
+        composeTestRule.onNodeWithContentDescription("1080p HDR").assertIsFocused().performKeyInput { pressKey(Key.DirectionLeft) }
+        composeTestRule.onNodeWithTag("movieRequestPoster").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        Assert.assertEquals(1, navigations)
+        Assert.assertEquals(0, submissions)
+        composeTestRule.onNodeWithTag("movieRequestPoster").performKeyInput { pressKey(Key.DirectionRight) }
+        composeTestRule.onNodeWithContentDescription("1080p HDR").assertIsFocused()
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
+    fun quick_movie_poster_is_focus_fallback_when_quality_actions_are_unavailable() {
+        var navigations = 0
+        var submissions = 0
+        composeTestRule.setContent {
+            WholphinTheme {
+                RequestMovieDialog(
+                    loading = LoadingState.Success,
+                    data = SeerrRequestData(),
+                    requestEnabled = true,
+                    movie =
+                        com.github.damontecres.wholphin.api.seerr.model
+                            .MovieDetails(id = 42, title = "Fixture"),
+                    onSubmit = { submissions++ },
+                    onDismissRequest = {},
+                    onPosterClick = { navigations++ },
+                )
+            }
+        }
+        composeTestRule.onNodeWithTag("movieRequestPoster").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        Assert.assertEquals(1, navigations)
+        Assert.assertEquals(0, submissions)
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
+    fun original_language_uses_existing_movie_and_series_codes_without_unknown_labels() {
+        val movie =
+            com.github.damontecres.wholphin.api.seerr.model
+                .MovieDetails(originalLanguage = "en")
+        val series =
+            com.github.damontecres.wholphin.api.seerr.model
+                .TvDetails(originalLanguage = "ja")
+        val movieLanguage = originalLanguageName(movie.originalLanguage)
+        val seriesLanguage = originalLanguageName(series.originalLanguage)
+        Assert.assertTrue(!movieLanguage.isNullOrBlank() && movieLanguage != "en")
+        Assert.assertTrue(!seriesLanguage.isNullOrBlank() && seriesLanguage != "ja")
+        Assert.assertEquals(null, originalLanguageName(null))
+        Assert.assertEquals(null, originalLanguageName("und"))
+        Assert.assertEquals(null, originalLanguageName("zz"))
+        Assert.assertEquals(null, originalLanguageName("  "))
+        composeTestRule.setContent {
+            WholphinTheme {
+                Column {
+                    OriginalLanguageText(movie.originalLanguage)
+                    OriginalLanguageText(series.originalLanguage)
+                    OriginalLanguageText("und")
+                }
+            }
+        }
+        composeTestRule.onNodeWithText("Original language: $movieLanguage").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Original language: $seriesLanguage").assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("Original language: Unknown").assertCountEquals(0)
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
+    fun quick_movie_request_metadata_shows_original_language_and_omits_missing_values() {
+        val language = mutableStateOf<String?>("en")
+        composeTestRule.setContent {
+            WholphinTheme {
+                RequestMovieDialog(
+                    loading = LoadingState.Success,
+                    data = SeerrRequestData(serverId = 0, profiles = listOf(SeerrProfile(12, "1080p HDR", true))),
+                    requestEnabled = true,
+                    movie =
+                        com.github.damontecres.wholphin.api.seerr.model.MovieDetails(
+                            id = 42,
+                            title = "Fixture",
+                            originalLanguage = language.value,
+                        ),
+                    onSubmit = {},
+                    onDismissRequest = {},
+                    onPosterClick = {},
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("Original language: ${originalLanguageName("en")}").assertIsDisplayed()
+        composeTestRule.runOnIdle { language.value = null }
+        composeTestRule.onAllNodesWithText("Original language: ${originalLanguageName("en")}").assertCountEquals(0)
+        composeTestRule.runOnIdle { language.value = "und" }
+        composeTestRule.onAllNodesWithText("Original language: Unknown").assertCountEquals(0)
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
+    fun normal_movie_request_metadata_shows_original_language_without_poster_navigation() {
+        composeTestRule.setContent {
+            WholphinTheme {
+                RequestMovieDialog(
+                    loading = LoadingState.Success,
+                    data = SeerrRequestData(serverId = 0, profiles = listOf(SeerrProfile(12, "1080p HDR", true))),
+                    requestEnabled = true,
+                    movie =
+                        com.github.damontecres.wholphin.api.seerr.model.MovieDetails(
+                            id = 42,
+                            title = "Fixture",
+                            originalLanguage = "ja",
+                        ),
+                    rating = DiscoverRating(86, 7.5f, 75),
+                    onSubmit = {},
+                    onDismissRequest = {},
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("Original language: ${originalLanguageName("ja")}").assertIsDisplayed()
+        composeTestRule.onNodeWithText("86%").assertIsDisplayed()
+        composeTestRule.onNodeWithText("75%").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("audienceUprightIcon").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("movieRequestPoster").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
+    fun movie_request_rating_arrives_in_place_without_changing_quality_focus() {
+        val rating = mutableStateOf<DiscoverRating?>(null)
+        composeTestRule.setContent {
+            WholphinTheme {
+                RequestMovieDialog(
+                    loading = LoadingState.Success,
+                    data = SeerrRequestData(serverId = 0, profiles = listOf(SeerrProfile(12, "1080p HDR", true))),
+                    requestEnabled = true,
+                    movie =
+                        com.github.damontecres.wholphin.api.seerr.model.MovieDetails(
+                            id = 42,
+                            title = "Fixture",
+                            originalLanguage = "en",
+                            releaseDate = "2026-01-01",
+                            overview = "A fixture synopsis",
+                        ),
+                    rating = rating.value,
+                    onSubmit = {},
+                    onDismissRequest = {},
+                    onPosterClick = {},
+                )
+            }
+        }
+        val quality = composeTestRule.onNodeWithContentDescription("1080p HDR")
+        quality.assertIsFocused()
+        val slot = composeTestRule.onNodeWithTag("movieRequestRatingSlot")
+        val before = slot.getUnclippedBoundsInRoot()
+        val criticsBefore = composeTestRule.onNodeWithTag("movieRequestCriticsSlot").getUnclippedBoundsInRoot()
+        val audienceBefore = composeTestRule.onNodeWithTag("movieRequestAudienceSlot").getUnclippedBoundsInRoot()
+        val factsBefore = composeTestRule.onNodeWithText("2026").getUnclippedBoundsInRoot()
+        val languageBefore = composeTestRule.onNodeWithText("Original language: ${originalLanguageName("en")}").getUnclippedBoundsInRoot()
+        val synopsisBefore = composeTestRule.onNodeWithText("A fixture synopsis").getUnclippedBoundsInRoot()
+        val qualityBefore = quality.getUnclippedBoundsInRoot()
+        composeTestRule.onAllNodesWithText("86%").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("75%").assertCountEquals(0)
+        composeTestRule.runOnIdle { rating.value = DiscoverRating(86, 7.5f, 75) }
+        composeTestRule.onNodeWithText("86%").assertIsDisplayed()
+        composeTestRule.onNodeWithText("75%").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("audienceUprightIcon").assertIsDisplayed()
+        Assert.assertEquals(before, slot.getUnclippedBoundsInRoot())
+        Assert.assertEquals(criticsBefore, composeTestRule.onNodeWithTag("movieRequestCriticsSlot").getUnclippedBoundsInRoot())
+        Assert.assertEquals(audienceBefore, composeTestRule.onNodeWithTag("movieRequestAudienceSlot").getUnclippedBoundsInRoot())
+        Assert.assertEquals(factsBefore, composeTestRule.onNodeWithText("2026").getUnclippedBoundsInRoot())
+        Assert.assertEquals(
+            languageBefore,
+            composeTestRule.onNodeWithText("Original language: ${originalLanguageName("en")}").getUnclippedBoundsInRoot(),
+        )
+        Assert.assertEquals(synopsisBefore, composeTestRule.onNodeWithText("A fixture synopsis").getUnclippedBoundsInRoot())
+        Assert.assertEquals(qualityBefore, quality.getUnclippedBoundsInRoot())
+        quality.assertIsFocused()
+        composeTestRule.onNodeWithText("Original language: ${originalLanguageName("en")}").assertIsDisplayed()
+
+        composeTestRule.runOnIdle { rating.value = DiscoverRating(86, null) }
+        composeTestRule.onNodeWithText("86%").assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("75%").assertCountEquals(0)
+        composeTestRule.onNodeWithTag("audienceUprightIcon").assertDoesNotExist()
+
+        composeTestRule.runOnIdle { rating.value = DiscoverRating(null, 7.5f, 75) }
+        composeTestRule.onAllNodesWithText("86%").assertCountEquals(0)
+        composeTestRule.onNodeWithText("75%").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("audienceUprightIcon").assertIsDisplayed()
+
+        composeTestRule.runOnIdle { rating.value = DiscoverRating(null, 4.2f, 42) }
+        composeTestRule.onNodeWithText("42%").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("audienceSpilledIcon").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("audienceUprightIcon").assertDoesNotExist()
+
+        composeTestRule.runOnIdle { rating.value = DiscoverRating(null, 0f, 0) }
+        composeTestRule.onNodeWithText("0%").assertIsDisplayed()
+
+        composeTestRule.runOnIdle { rating.value = DiscoverRating(null, null) }
+        composeTestRule.onAllNodesWithText("0%").assertCountEquals(0)
+        composeTestRule.onNodeWithTag("audienceSpilledIcon").assertDoesNotExist()
+        Assert.assertEquals(before, slot.getUnclippedBoundsInRoot())
+        Assert.assertEquals(qualityBefore, quality.getUnclippedBoundsInRoot())
+        quality.assertIsFocused()
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
     fun movie_details_never_submits_until_a_quality_button_is_pressed() {
         var submissions = 0
         composeTestRule.setContent {
@@ -295,6 +602,7 @@ class BasicUiTests {
         }
         composeTestRule.waitForIdle()
         Assert.assertEquals(0, submissions)
+        composeTestRule.onNodeWithTag("movieRequestPoster").assertDoesNotExist()
         composeTestRule.onNodeWithContentDescription("1080p HDR").requestFocus().performClickEnter()
         composeTestRule.waitForIdle()
         Assert.assertEquals(1, submissions)
