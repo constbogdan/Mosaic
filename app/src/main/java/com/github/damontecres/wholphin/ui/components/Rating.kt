@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -147,6 +148,35 @@ fun TomatoRating(
                     ),
                 contentDescription = null,
                 modifier = Modifier.height(height),
+                tint = Color.Unspecified,
+            )
+        }
+    }
+}
+
+private fun audienceIconResource(score: Int): Int =
+    if (score >= 60) R.drawable.ic_rotten_tomatoes_audience_upright else R.drawable.ic_rotten_tomatoes_audience_spilled
+
+@Composable
+fun PopcornRating(
+    rating: Int?,
+    modifier: Modifier = Modifier,
+) {
+    val score = rating?.takeIf { it in 0..100 }
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier,
+    ) {
+        if (score != null) {
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+                Text(text = "$score%", maxLines = 1)
+            }
+            val height = with(LocalDensity.current) { LocalTextStyle.current.fontSize.toDp() * .8f }
+            Icon(
+                painter = painterResource(audienceIconResource(score)),
+                contentDescription = null,
+                modifier = Modifier.height(height).testTag(if (score >= 60) "audienceUprightIcon" else "audienceSpilledIcon"),
                 tint = Color.Unspecified,
             )
         }

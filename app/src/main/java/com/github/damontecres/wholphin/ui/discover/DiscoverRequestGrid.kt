@@ -302,7 +302,9 @@ fun DiscoverRequestGrid(
                     onClickItem = { index, item ->
                         viewModel.navigationManager.navigateTo(item.destination)
                     },
-                    onLongClickItem = { _, item -> quickMovieRequest.open(item) },
+                    onLongClickItem = { _, item ->
+                        quickMovieRequest.open(item, onOpenDetails = { viewModel.navigationManager.navigateTo(item.destination) })
+                    },
                     onClickPlay = { _, _ -> },
                     letterPosition = { 0 },
                     gridFocusRequester = gridFocusRequester,

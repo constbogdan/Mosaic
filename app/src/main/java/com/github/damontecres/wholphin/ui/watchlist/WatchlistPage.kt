@@ -168,7 +168,7 @@ fun WatchlistPage(
                         onClickItem = { _, item -> viewModel.open(item) },
                         onLongClickItem = { _, item ->
                             if (item.item.type == com.github.damontecres.wholphin.data.model.SeerrItemType.MOVIE) {
-                                quickMovieRequest.open(item.item) { menu = item }
+                                quickMovieRequest.open(item.item, onUnavailable = { menu = item }, onOpenDetails = { viewModel.open(item) })
                             } else {
                                 menu = item
                             }

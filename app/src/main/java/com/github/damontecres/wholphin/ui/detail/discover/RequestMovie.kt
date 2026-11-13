@@ -38,6 +38,7 @@ fun RequestMovieDialog(
     rating: DiscoverRating? = null,
     fallbackItem: DiscoverItem? = null,
     confirmAction: () -> Boolean = { true },
+    onPosterClick: (() -> Unit)? = null,
 ) {
     BasicDialog(
         onDismissRequest = onDismissRequest,
@@ -55,6 +56,7 @@ fun RequestMovieDialog(
             onSubmit = onSubmit,
             confirmAction = confirmAction,
             confirmationReady = confirmationReady,
+            onPosterClick = onPosterClick,
         )
     }
 }
