@@ -398,6 +398,18 @@ fun DestinationContent(
                 .FreshPage(modifier)
         }
 
+        Destination.Collections -> {
+            LaunchedEffect(Unit) { onClearBackdrop.invoke() }
+            com.github.damontecres.wholphin.ui.collections
+                .CollectionsPage(modifier)
+        }
+
+        is Destination.SeerrCollection -> {
+            LaunchedEffect(Unit) { onClearBackdrop.invoke() }
+            com.github.damontecres.wholphin.ui.collections
+                .SeerrCollectionDetails(destination, modifier)
+        }
+
         Destination.Downloads -> {
             LaunchedEffect(Unit) { onClearBackdrop.invoke() }
             if (preferences.appPreferences.isEnhancedCapabilityEnabled(EnhancedCapability.DOWNLOADS)) {
