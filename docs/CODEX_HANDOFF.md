@@ -51,15 +51,24 @@ not current instruction.
   but must not release an already-started POST's single-flight guard. A Quick Request opening can
   abort before dialog state is published, so observe the initiating held OK through key-up and then
   restore ordinary card input; a null-to-null dialog-state effect cannot perform that cleanup.
-  Fresh is not a Mosaic card surface in this worktree yet, but its separate worktree uses the same
-  Quick Request host. The host must not mount the early opening state until fetched MovieDetails
-  passes standard-request eligibility: otherwise available or already-requested movies flash a
+  Fresh now uses the same Quick Request host; its movie-card action supplies the originating
+  details callback so poster navigation and Back retain typed card focus. The host must not mount
+  the early opening state until fetched MovieDetails passes standard-request eligibility:
+  otherwise available or already-requested movies flash a
   loading dialog before policy dismissal. Publish the verified movie before profile loading so
   eligible dialogs still show loading promptly. Keep the early state for held-OK/session tracking
   and independent rating work; metadata failures and their subsequent Retry stay visible without
   reintroducing the initial flash. A stale Quick Request loader must return the current state from
   its atomic update when its opening token no longer matches; a nullable `takeIf(... )?.copy(...)`
   would instead clear a newer dialog after a rapid dismiss/reopen.
+
+- Fresh uses Seerr's server-side 20-item pages and optional `category` parameter. Animation and
+  Documentary are cross-media classifications: send `mediaType=all` with `category=animation` or
+  `category=documentary`, never a movie/TV-only filter. The generated Kotlin client is derived
+  from `app/src/main/seerr/seerr-api.yml`; generated files are not committed. A category or sort
+  change cancels and resets paging; delayed responses are rejected by the ViewModel generation.
+  Offset pages can shift as Fresh changes during browsing, so an append with changed total or
+  duplicate typed identity restarts from page one once and retains typed focus where possible.
 
 - Watchlist Phase 2 is an unpublished local candidate based on PR #120 and Seerr PR #57.
   Personal access requires `/auth/me.jellyfinUserId` to match the current Jellyfin user, plus

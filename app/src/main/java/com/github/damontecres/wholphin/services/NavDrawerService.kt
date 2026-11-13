@@ -197,6 +197,7 @@ class NavDrawerService
                     add(NavDrawerItem.Favorites)
                     if (discoverActive) {
                         add(NavDrawerItem.Discover)
+                        add(NavDrawerItem.Fresh)
                         add(NavDrawerItem.Watchlist)
                     }
                 }

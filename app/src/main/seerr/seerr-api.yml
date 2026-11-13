@@ -871,6 +871,46 @@ components:
           type: string
         mediaInfo:
           $ref: '#/components/schemas/MediaInfo'
+    FreshStatus:
+      type: object
+      required: [status, refreshing, backfillComplete, itemCount, pendingWork]
+      properties:
+        status:
+          type: string
+          enum: [disabled, preparing, refreshing, ready, stale, unavailable]
+        refreshing: { type: boolean }
+        backfillComplete: { type: boolean }
+        itemCount: { type: integer }
+        pendingWork: { type: integer }
+        lastRefresh: { type: string, format: date-time }
+        checkpoint: { type: string }
+        error: { type: string }
+    FreshResult:
+      type: object
+      required: [id, mediaType, freshFirstSeenAt]
+      properties:
+        id: { type: integer }
+        mediaType: { type: string, enum: [movie, tv] }
+        freshFirstSeenAt: { type: string, format: date-time }
+        title: { type: string }
+        name: { type: string }
+        overview: { type: string }
+        posterPath: { type: string }
+        backdropPath: { type: string }
+        releaseDate: { type: string }
+        firstAirDate: { type: string }
+        mediaInfo: { $ref: '#/components/schemas/MediaInfo' }
+    FreshResponse:
+      type: object
+      required: [page, totalPages, totalResults, results, status]
+      properties:
+        page: { type: integer }
+        totalPages: { type: integer }
+        totalResults: { type: integer }
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/FreshResult' }
+        status: { $ref: '#/components/schemas/FreshStatus' }
     PersonResult:
       type: object
       properties:
@@ -5265,6 +5305,35 @@ paths:
                       $ref: '#/components/schemas/MediaInfo'
                   playCount:
                     type: integer
+  /fresh:
+    get:
+      operationId: freshGet
+      summary: Get autobrr Fresh media
+      tags: [search]
+      parameters:
+        - in: query
+          name: category
+          description: Persisted cross-media classification, intersected with mediaType.
+          schema: { type: string, enum: [animation, documentary] }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: mediaType
+          schema: { type: string, enum: [all, movie, tv], default: all }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [freshest, oldest, vote_average, vote_count], default: freshest }
+      responses:
+        '200':
+          description: Fresh media projection
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FreshResponse' }
+        '400': { description: Invalid query or configuration }
+        '403': { description: Authentication required }
+        '502': { description: Source unavailable }
+        '503': { description: Fresh temporarily unavailable }
   /search:
     get:
       summary: Search for movies, TV shows, or people
