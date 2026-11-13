@@ -151,6 +151,11 @@ class NavDrawerViewModel
                     navigationManager.navigateToFromDrawer(Destination.Watchlist)
                 }
 
+                NavDrawerItem.Fresh -> {
+                    setIndex(index)
+                    navigationManager.navigateToFromDrawer(Destination.Fresh)
+                }
+
                 is ServerNavDrawerItem -> {
                     setIndex(index)
                     navigationManager.navigateToFromDrawer(item.destination)
@@ -183,6 +188,7 @@ class NavDrawerViewModel
                             is NavDrawerItem.Favorites -> Destination.Favorites
                             is NavDrawerItem.Discover -> Destination.Discover
                             is NavDrawerItem.Watchlist -> Destination.Watchlist
+                            is NavDrawerItem.Fresh -> Destination.Fresh
                             else -> null
                         }
                     }
@@ -264,6 +270,12 @@ sealed interface NavDrawerItem {
         override val id: String = "a_watchlist"
 
         override fun name(context: Context): String = context.getString(R.string.watchlist)
+    }
+
+    object Fresh : NavDrawerItem {
+        override val id: String = "a_fresh"
+
+        override fun name(context: Context): String = context.getString(R.string.fresh)
     }
 }
 
@@ -755,6 +767,10 @@ fun NavigationDrawerScope.NavItem(
 
                 NavDrawerItem.Watchlist -> {
                     R.string.fa_list_ul
+                }
+
+                NavDrawerItem.Fresh -> {
+                    R.string.fa_clock
                 }
 
                 is ServerNavDrawerItem -> {

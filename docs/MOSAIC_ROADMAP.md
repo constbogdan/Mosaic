@@ -82,7 +82,9 @@ Downloads, Discover, Watchlist, Collections, and Suggestions. See
 - Evolve the landing experience across movies, series, animation/anime, and franchises.
 - Add useful genre, decade, studio, network, country, and language browsing.
 - Surface local availability and request/acquisition state without duplicating state logic.
-- Evaluate consumption of the optional Seerr Fresh source through the shared product model.
+- The standalone Fresh page candidate supports All, Movies, Shows, Animation, and Documentary
+  with typed cards, server pagination, sorting, and the existing Quick Request host. Runtime
+  acceptance and protected-main integration remain separate gates.
 
 ### Suggestions and automation
 
