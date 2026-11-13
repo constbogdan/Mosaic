@@ -47,6 +47,7 @@ class SeerrApiClient(
     val blacklistApi by create(::BlacklistApi)
     val collectionApi by create(::CollectionApi)
     val issueApi by create(::IssueApi)
+    val libraryApi by create(::LibraryApi)
     val mediaApi by create(::MediaApi)
     val moviesApi by create(::MoviesApi)
     val otherApi by create(::OtherApi)

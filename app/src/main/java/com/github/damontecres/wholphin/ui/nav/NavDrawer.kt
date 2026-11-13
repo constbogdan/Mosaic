@@ -156,6 +156,11 @@ class NavDrawerViewModel
                     navigationManager.navigateToFromDrawer(Destination.Fresh)
                 }
 
+                NavDrawerItem.Collections -> {
+                    setIndex(index)
+                    navigationManager.navigateToFromDrawer(Destination.Collections)
+                }
+
                 is ServerNavDrawerItem -> {
                     setIndex(index)
                     navigationManager.navigateToFromDrawer(item.destination)
@@ -189,6 +194,7 @@ class NavDrawerViewModel
                             is NavDrawerItem.Discover -> Destination.Discover
                             is NavDrawerItem.Watchlist -> Destination.Watchlist
                             is NavDrawerItem.Fresh -> Destination.Fresh
+                            is NavDrawerItem.Collections -> Destination.Collections
                             else -> null
                         }
                     }
@@ -276,6 +282,12 @@ sealed interface NavDrawerItem {
         override val id: String = "a_fresh"
 
         override fun name(context: Context): String = context.getString(R.string.fresh)
+    }
+
+    object Collections : NavDrawerItem {
+        override val id: String = "a_collections"
+
+        override fun name(context: Context): String = context.getString(R.string.collections)
     }
 }
 
@@ -771,6 +783,10 @@ fun NavigationDrawerScope.NavItem(
 
                 NavDrawerItem.Fresh -> {
                     R.string.fa_clock
+                }
+
+                NavDrawerItem.Collections -> {
+                    R.string.fa_film
                 }
 
                 is ServerNavDrawerItem -> {

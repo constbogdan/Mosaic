@@ -2058,6 +2058,43 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MovieResult'
+    LibraryCollectionItem:
+      type: object
+      required: [id, name, overview, posterPath, backdropPath, availableMovies, totalMovies, completeness]
+      properties:
+        id: { type: integer, minimum: 1 }
+        name: { type: string }
+        overview: { type: string, nullable: true }
+        posterPath: { type: string, nullable: true }
+        backdropPath: { type: string, nullable: true }
+        availableMovies: { type: integer, minimum: 0, nullable: true }
+        totalMovies: { type: integer, minimum: 0, nullable: true }
+        completeness:
+          type: string
+          enum: [complete, incomplete, unknown]
+    LibraryCollectionsResponse:
+      type: object
+      required: [pageInfo, results, status, stale, discoveredCollections, failedCollections, refreshedAt]
+      properties:
+        pageInfo:
+          type: object
+          required: [pages, page, results, pageSize]
+          properties:
+            pages: { type: integer }
+            page: { type: integer }
+            results: { type: integer }
+            pageSize: { type: integer }
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LibraryCollectionItem'
+        status:
+          type: string
+          enum: [pending, complete, partial, unavailable]
+        stale: { type: boolean }
+        discoveredCollections: { type: integer, minimum: 0 }
+        failedCollections: { type: integer, minimum: 0 }
+        refreshedAt: { type: string, format: date-time, nullable: true }
     SonarrSeries:
       type: object
       properties:
@@ -7292,6 +7329,33 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/User'
+  /library/collections:
+    get:
+      summary: Browse library-anchored TMDB movie collections
+      tags: [library]
+      parameters:
+        - in: query
+          name: take
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: skip
+          schema: { type: integer, minimum: 0, default: 0 }
+        - in: query
+          name: completeness
+          schema: { type: string, enum: [all, complete, incomplete], default: all }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [name, completeness, available], default: name }
+        - in: query
+          name: sortDirection
+          schema: { type: string, enum: [asc, desc], default: asc }
+      responses:
+        '200':
+          description: Current library collection index
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LibraryCollectionsResponse' }
+        '403': { description: Administrator permission required }
   /collection/{collectionId}:
     get:
       summary: Get collection details

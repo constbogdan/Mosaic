@@ -152,6 +152,17 @@ sealed class Destination(
     data object Fresh : Destination(false)
 
     @Serializable
+    data object Collections : Destination(false)
+
+    @Serializable
+    data class SeerrCollection(
+        val collectionId: Int,
+        val availableMovies: Int?,
+        val totalMovies: Int?,
+        val owner: String,
+    ) : Destination(false)
+
+    @Serializable
     data object Watchlist : Destination(false)
 
     @Serializable
