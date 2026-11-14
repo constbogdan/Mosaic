@@ -2,6 +2,8 @@ package com.github.damontecres.wholphin.services
 
 import com.github.damontecres.wholphin.api.seerr.SeerrApiClient
 import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionsResponse
+import com.github.damontecres.wholphin.api.seerr.model.MovieDetails
+import com.github.damontecres.wholphin.api.seerr.model.MovieDetailsCollection
 import com.github.damontecres.wholphin.api.seerr.model.PublicSettings
 import com.github.damontecres.wholphin.api.seerr.model.User
 import com.github.damontecres.wholphin.data.model.DiscoverItem
@@ -36,6 +38,55 @@ import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CollectionDetailsTest {
+    @Test fun collectionProviderIdsRequirePositiveTypedTmdbMovieIdentity() {
+        assertEquals(42 to 7, collectionProviderIds(mapOf("Tmdb" to "42", "TmdbCollection" to "7")))
+        assertEquals(42 to null, collectionProviderIds(mapOf("Tmdb" to "42", "TmdbCollection" to "bad")))
+        assertEquals(null, collectionProviderIds(mapOf("TmdbCollection" to "7")))
+        assertEquals(null, collectionProviderIds(mapOf("Tmdb" to "0", "TmdbCollection" to "7")))
+    }
+
+    @Test fun existingMovieDetailsCollectionMapsWithoutIndexRequest() {
+        val link = backend("{}").linkFromMovie(MovieDetails(id = 42, collection = MovieDetailsCollection(7, "Saga", null, null)))
+        assertEquals(7, link?.id)
+        assertEquals("Saga", link?.name)
+        assertEquals(null, backend("{}").linkFromMovie(MovieDetails(id = 42, collection = MovieDetailsCollection(0, "Bad"))))
+        assertEquals(null, backend("{}").linkFromMovie(MovieDetails(id = 42, collection = MovieDetailsCollection(7, " "))))
+    }
+
+    @Test fun jellyfinClaimRequiresMatchingTypedMovieMember() =
+        runTest {
+            val valid =
+                backend("""{"id":7,"name":"Saga","parts":[{"id":42,"mediaType":"movie","title":"Film"}]}""")
+                    .linkFromJellyfinMovie(42, 7)
+            assertEquals(7, valid?.id)
+            val wrong =
+                backend("""{"id":7,"name":"Saga","parts":[{"id":99,"mediaType":"movie","title":"Other"}]}""")
+                    .linkFromJellyfinMovie(42, 7)
+            assertEquals(null, wrong)
+        }
+
+    @Test fun jellyfinFallbackUsesMovieTmdbIdentityWithoutConsultingAdminIndex() =
+        runTest {
+            val paths = mutableListOf<String>()
+            val http =
+                OkHttpClient
+                    .Builder()
+                    .addInterceptor { chain ->
+                        paths += chain.request().url.encodedPath
+                        Response
+                            .Builder()
+                            .request(chain.request())
+                            .protocol(Protocol.HTTP_1_1)
+                            .code(200)
+                            .message("fixture")
+                            .body("""{"id":42,"collection":{"id":7,"name":"Saga"}}""".toResponseBody("application/json".toMediaType()))
+                            .build()
+                    }.build()
+            val backend = SeerrCollectionsBackend(SeerrApiClient("http://seerr.invalid/api/v1", null, http), current)
+            assertEquals(7, backend.linkFromJellyfinMovie(42, null)?.id)
+            assertEquals(listOf("/api/v1/movie/42"), paths)
+        }
+
     private val current =
         CurrentSeerr(
             SeerrServer(1, "http://seerr.invalid"),

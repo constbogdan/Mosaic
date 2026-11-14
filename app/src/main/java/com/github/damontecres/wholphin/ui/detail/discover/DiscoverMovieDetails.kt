@@ -54,6 +54,9 @@ import com.github.damontecres.wholphin.ui.cards.DiscoverItemCard
 import com.github.damontecres.wholphin.ui.cards.DiscoverPersonRow
 import com.github.damontecres.wholphin.ui.cards.ItemRow
 import com.github.damontecres.wholphin.ui.cards.SeasonCard
+import com.github.damontecres.wholphin.ui.collections.CollectionMovieIndicator
+import com.github.damontecres.wholphin.ui.collections.CollectionMovieLinkState
+import com.github.damontecres.wholphin.ui.collections.CollectionMovieLinkViewModel
 import com.github.damontecres.wholphin.ui.components.ErrorMessage
 import com.github.damontecres.wholphin.ui.components.HeaderUtils
 import com.github.damontecres.wholphin.ui.components.LoadingPage
@@ -70,7 +73,7 @@ import kotlinx.coroutines.launch
 import org.jellyfin.sdk.model.api.BaseItemKind
 
 @Composable
-fun DiscoverMovieDetails(
+internal fun DiscoverMovieDetails(
     preferences: UserPreferences,
     destination: Destination.DiscoveredItem,
     modifier: Modifier = Modifier,
@@ -78,6 +81,7 @@ fun DiscoverMovieDetails(
         hiltViewModel<DiscoverMovieViewModel, DiscoverMovieViewModel.Factory>(
             creationCallback = { it.create(destination.item) },
         ),
+    collectionViewModel: CollectionMovieLinkViewModel = hiltViewModel(),
 ) {
     val quickMovieRequest = com.github.damontecres.wholphin.ui.discover.LocalQuickMovieRequest.current
     val resources = LocalResources.current
@@ -89,6 +93,7 @@ fun DiscoverMovieDetails(
     val state by viewModel.state.collectAsState()
     val userConfig by viewModel.userConfig.collectAsState(null)
     val requestEnabled by viewModel.requestEnabled.collectAsState(false)
+    val collectionState by collectionViewModel.state.collectAsState()
 
     var overviewDialog by remember { mutableStateOf<ItemDetailsDialogInfo?>(null) }
     var showRequestDialog by remember { mutableStateOf(false) }
@@ -113,6 +118,7 @@ fun DiscoverMovieDetails(
 
         is DataLoadingState.Success<MovieDetails> -> {
             val movie = st.data
+            LaunchedEffect(movie, destination) { collectionViewModel.showDiscover(movie, destination) }
             DiscoverMovieDetailsContent(
                 preferences = preferences,
                 movie = movie,
@@ -126,6 +132,9 @@ fun DiscoverMovieDetails(
                     ) !=
                         null,
                 canRequest = requestEnabled,
+                collectionState = collectionState,
+                onOpenCollection = { collectionState.link?.let(collectionViewModel::open) },
+                onRetryCollection = collectionViewModel::retry,
                 people = state.people,
                 trailers = state.trailers,
                 similar = state.similar,
@@ -212,14 +221,15 @@ fun DiscoverMovieDetails(
 }
 
 private const val HEADER_ROW = 0
-private const val PEOPLE_ROW = HEADER_ROW + 1
+private const val COLLECTION_ROW = HEADER_ROW + 1
+private const val PEOPLE_ROW = COLLECTION_ROW + 1
 private const val CHAPTER_ROW = PEOPLE_ROW + 1
 private const val EXTRAS_ROW = CHAPTER_ROW + 1
 private const val SIMILAR_ROW = EXTRAS_ROW + 1
 private const val RECOMMENDED_ROW = SIMILAR_ROW + 1
 
 @Composable
-fun DiscoverMovieDetailsContent(
+internal fun DiscoverMovieDetailsContent(
     preferences: UserPreferences,
     userConfig: SeerrUserConfig?,
     movie: MovieDetails,
@@ -240,6 +250,9 @@ fun DiscoverMovieDetailsContent(
     onLongClickPerson: (Int, DiscoverItem) -> Unit,
     onLongClickSimilar: (Int, DiscoverItem) -> Unit,
     canRequest: Boolean = false,
+    collectionState: CollectionMovieLinkState = CollectionMovieLinkState(),
+    onOpenCollection: () -> Unit = {},
+    onRetryCollection: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -315,6 +328,19 @@ fun DiscoverMovieDetailsContent(
                                 .fillMaxWidth()
                                 .padding(bottom = 16.dp)
                                 .focusRequester(focusRequesters[HEADER_ROW]),
+                    )
+                }
+            }
+            if (collectionState.link != null || (collectionState.error && collectionState.retryable)) {
+                item {
+                    CollectionMovieIndicator(
+                        state = collectionState,
+                        onOpen = {
+                            position = COLLECTION_ROW
+                            onOpenCollection()
+                        },
+                        onRetry = onRetryCollection,
+                        modifier = Modifier.focusRequester(focusRequesters[COLLECTION_ROW]),
                     )
                 }
             }
