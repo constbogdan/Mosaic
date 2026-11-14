@@ -12,10 +12,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -42,7 +46,36 @@ internal fun SeerrCollectionDetails(
     val state = viewModel.state.collectAsState().value
     val quickMovieRequest = LocalQuickMovieRequest.current
     val gridFocus = remember { FocusRequester() }
+    val requestFocus = remember { FocusRequester() }
+    var requestWasOpen by remember { mutableStateOf(false) }
+    var returnFocusPending by remember { mutableStateOf(false) }
     LaunchedEffect(destination.collectionId, destination.owner) { viewModel.show(destination.collectionId, destination.owner) }
+    LaunchedEffect(state.request, state.loading, state.requestEligibilityLoading, state.details) {
+        if (state.request != null) {
+            requestWasOpen = true
+            returnFocusPending = false
+        } else if (requestWasOpen) {
+            requestWasOpen = false
+            returnFocusPending = true
+        }
+        if (returnFocusPending && !state.loading && !state.requestEligibilityLoading) {
+            returnFocusPending = false
+            if (state.requestEligibility.values.any { it == CollectionRequestEligibility.ELIGIBLE }) {
+                requestFocus.tryRequestFocus()
+            } else {
+                gridFocus.tryRequestFocus()
+            }
+        }
+    }
+    state.request?.let { request ->
+        CollectionRequestDialog(
+            state = request,
+            onDismiss = viewModel::closeRequest,
+            onToggle = viewModel::toggleRequest,
+            onToggleAll = viewModel::toggleAllRequests,
+            onSubmit = viewModel::submitRequests,
+        )
+    }
     Column(modifier.fillMaxSize()) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(24.dp),
@@ -73,6 +106,14 @@ internal fun SeerrCollectionDetails(
                     Text(stringResource(R.string.collections_count_unknown))
                 }
                 state.details?.overview?.let { Text(it, maxLines = 4, overflow = TextOverflow.Ellipsis) }
+                if (!state.loading && !state.error && !state.denied && !state.requestEligibilityLoading &&
+                    state.owner == destination.owner &&
+                    state.requestEligibility.values.any { it == CollectionRequestEligibility.ELIGIBLE }
+                ) {
+                    Button(onClick = viewModel::openRequest, modifier = Modifier.focusRequester(requestFocus)) {
+                        Text(stringResource(R.string.collections_request))
+                    }
+                }
             }
         }
         when {

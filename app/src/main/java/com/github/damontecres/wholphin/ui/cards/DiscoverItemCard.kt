@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -31,6 +32,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,6 +68,7 @@ fun DiscoverItemCard(
     preferAcquisitionStateOverlay: Boolean = false,
     useFallbackText: Boolean = false,
     savedToWatchlist: Boolean = false,
+    compactLabels: Boolean = false,
 ) {
     val focused by interactionSource.collectIsFocusedAsState()
     var focusedAfterDelay by remember { mutableStateOf(false) }
@@ -202,15 +205,16 @@ fun DiscoverItemCard(
         SlidingCardText(focused) {
             Text(
                 text = item?.title ?: "",
-                maxLines = 1,
+                maxLines = if (compactLabels) 2 else 1,
                 textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodyMedium,
+                overflow = TextOverflow.Ellipsis,
+                style = if (compactLabels) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp)
-                        .enableMarquee(focusedAfterDelay),
+                        .then(if (compactLabels) Modifier.height(32.dp) else Modifier.enableMarquee(focusedAfterDelay)),
             )
             Text(
                 text = item?.releaseDate?.year?.toString() ?: "",
