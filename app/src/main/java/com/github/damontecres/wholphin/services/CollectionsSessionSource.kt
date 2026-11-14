@@ -4,6 +4,7 @@ import com.github.damontecres.wholphin.api.seerr.LibraryApi
 import com.github.damontecres.wholphin.api.seerr.SeerrApiClient
 import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionItem
 import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionsResponse
+import com.github.damontecres.wholphin.api.seerr.model.MovieDetails
 import com.github.damontecres.wholphin.api.seerr.model.MovieResult
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.DiscoverItem
@@ -69,6 +70,20 @@ internal data class CollectionDetailsData(
     val movies: List<DiscoverItem>,
 )
 
+internal data class CollectionMovieLink(
+    val id: Int,
+    val name: String,
+    val posterUrl: String?,
+)
+
+/** A Jellyfin movie's TMDB movie ID is required to verify a claimed collection membership. */
+internal fun collectionProviderIds(providerIds: Map<String, String?>?): Pair<Int, Int?>? {
+    val ids = providerIds ?: return null
+    val movieId = ids["Tmdb"]?.toIntOrNull()?.takeIf { it > 0 } ?: return null
+    val collectionId = ids["TmdbCollection"]?.toIntOrNull()?.takeIf { it > 0 }
+    return movieId to collectionId
+}
+
 internal interface CollectionsBackend {
     suspend fun page(
         skip: Int,
@@ -77,6 +92,13 @@ internal interface CollectionsBackend {
     ): CollectionsPageData
 
     suspend fun detail(id: Int): CollectionDetailsData
+
+    fun linkFromMovie(movie: MovieDetails): CollectionMovieLink? = null
+
+    suspend fun linkFromJellyfinMovie(
+        movieId: Int,
+        claimedCollectionId: Int?,
+    ): CollectionMovieLink? = null
 }
 
 internal data class CollectionsSession(
@@ -122,6 +144,32 @@ internal class SeerrCollectionsBackend(
     private val client: SeerrApiClient,
     private val current: CurrentSeerr,
 ) : CollectionsBackend {
+    override fun linkFromMovie(movie: MovieDetails): CollectionMovieLink? {
+        val collection = movie.collection ?: return null
+        val id = collection.id?.takeIf { it > 0 } ?: return null
+        val name = collection.name?.takeIf { it.isNotBlank() } ?: return null
+        return CollectionMovieLink(
+            id,
+            name,
+            collection.posterPath?.let { current.imageUrlBuilder(ImageType.PRIMARY, it) },
+        )
+    }
+
+    override suspend fun linkFromJellyfinMovie(
+        movieId: Int,
+        claimedCollectionId: Int?,
+    ): CollectionMovieLink? {
+        if (movieId <= 0) return null
+        if (claimedCollectionId != null && claimedCollectionId > 0) {
+            val collection = detail(claimedCollectionId)
+            if (collection.movies.none { it.id == movieId }) return null
+            return CollectionMovieLink(collection.id, collection.name, collection.posterUrl)
+        }
+        val movie = client.moviesApi.movieMovieIdGet(movieId)
+        if (movie.id != movieId) return null
+        return linkFromMovie(movie)
+    }
+
     override suspend fun page(
         skip: Int,
         filter: CollectionsFilter,

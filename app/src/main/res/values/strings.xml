@@ -43,6 +43,7 @@
     <string name="collections_details_empty">This collection has no movie parts.</string>
     <string name="collections_back">Back</string>
     <string name="collections_no_artwork">No artwork</string>
+    <string name="collections_view_collection">View Collection</string>
     <string name="collections_session_changed">Account changed. Reopen Collections for this account.</string>
     <string name="commercial">Commercial</string>
     <string name="community_rating">Community Rating</string>

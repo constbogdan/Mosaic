@@ -42,6 +42,9 @@ import com.github.damontecres.wholphin.ui.cards.ExtrasRow
 import com.github.damontecres.wholphin.ui.cards.ItemRow
 import com.github.damontecres.wholphin.ui.cards.PersonRow
 import com.github.damontecres.wholphin.ui.cards.SeasonCard
+import com.github.damontecres.wholphin.ui.collections.CollectionMovieIndicator
+import com.github.damontecres.wholphin.ui.collections.CollectionMovieLinkState
+import com.github.damontecres.wholphin.ui.collections.CollectionMovieLinkViewModel
 import com.github.damontecres.wholphin.ui.components.ContextMenu
 import com.github.damontecres.wholphin.ui.components.ContextMenuActions
 import com.github.damontecres.wholphin.ui.components.ContextMenuDialog
@@ -74,7 +77,7 @@ import java.util.UUID
 import kotlin.time.Duration
 
 @Composable
-fun MovieDetails(
+internal fun MovieDetails(
     preferences: UserPreferences,
     destination: Destination.MediaItem,
     modifier: Modifier = Modifier,
@@ -82,6 +85,7 @@ fun MovieDetails(
         hiltViewModel<MovieViewModel, MovieViewModel.Factory>(
             creationCallback = { it.create(destination.itemId) },
         ),
+    collectionViewModel: CollectionMovieLinkViewModel = hiltViewModel(),
     playlistViewModel: AddPlaylistViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -90,6 +94,7 @@ fun MovieDetails(
         onPauseOrDispose { }
     }
     val state by viewModel.state.collectAsState()
+    val collectionState by collectionViewModel.state.collectAsState()
 
     var overviewDialog by remember { mutableStateOf<ItemDetailsDialogInfo?>(null) }
     var showContextMenu by remember { mutableStateOf<ContextMenu?>(null) }
@@ -144,6 +149,7 @@ fun MovieDetails(
         is DataLoadingState.Success -> {
             val unknownStr = stringResource(R.string.unknown)
             val movie by rememberUpdatedState(s.data)
+            androidx.compose.runtime.LaunchedEffect(movie, destination) { collectionViewModel.showLocal(movie, destination) }
             val chosenStreams by rememberUpdatedState(state.chosenStreams)
             LifecycleResumeEffect(destination.itemId) {
                 viewModel.maybePlayThemeSong(destination.itemId)
@@ -155,6 +161,9 @@ fun MovieDetails(
                 preferences = preferences,
                 movie = movie,
                 state = state,
+                collectionState = collectionState,
+                onOpenCollection = { collectionState.link?.let(collectionViewModel::open) },
+                onRetryCollection = collectionViewModel::retry,
                 onClickItem = { index, item ->
                     viewModel.navigateTo(item.destination())
                 },
@@ -279,7 +288,8 @@ fun MovieDetails(
 }
 
 private const val HEADER_ROW = 0
-private const val PEOPLE_ROW = HEADER_ROW + 1
+private const val COLLECTION_ROW = HEADER_ROW + 1
+private const val PEOPLE_ROW = COLLECTION_ROW + 1
 private const val TRAILER_ROW = PEOPLE_ROW + 1
 private const val CHAPTER_ROW = TRAILER_ROW + 1
 private const val EXTRAS_ROW = CHAPTER_ROW + 1
@@ -287,10 +297,13 @@ private const val SIMILAR_ROW = EXTRAS_ROW + 1
 private const val DISCOVER_ROW = SIMILAR_ROW + 1
 
 @Composable
-fun MovieDetailsContent(
+internal fun MovieDetailsContent(
     preferences: UserPreferences,
     movie: BaseItem,
     state: MovieState,
+    collectionState: CollectionMovieLinkState = CollectionMovieLinkState(),
+    onOpenCollection: () -> Unit = {},
+    onRetryCollection: () -> Unit = {},
     playOnClick: (Duration) -> Unit,
     trailerOnClick: (Trailer) -> Unit,
     overviewOnClick: () -> Unit,
@@ -397,6 +410,19 @@ fun MovieDetailsContent(
                                 .fillMaxWidth()
                                 .padding(bottom = 16.dp)
                                 .focusRequester(focusRequesters[HEADER_ROW]),
+                    )
+                }
+            }
+            if (collectionState.link != null || (collectionState.error && collectionState.retryable)) {
+                item {
+                    CollectionMovieIndicator(
+                        state = collectionState,
+                        onOpen = {
+                            position = COLLECTION_ROW
+                            onOpenCollection()
+                        },
+                        onRetry = onRetryCollection,
+                        modifier = Modifier.focusRequester(focusRequesters[COLLECTION_ROW]),
                     )
                 }
             }
