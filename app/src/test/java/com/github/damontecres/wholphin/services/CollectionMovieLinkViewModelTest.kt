@@ -119,6 +119,35 @@ class CollectionMovieLinkViewModelTest {
             }
         }
 
+    @Test fun jellyfinMovieCollectionBackRetainsOriginAndLink() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val movie = localMovie()
+                val origin = Destination.MediaItem(movie)
+                val stack = mutableListOf<Destination>(Destination.Home(), origin)
+                val navigation = mockk<NavigationManager>(relaxed = true)
+                every { navigation.backStack } returns stack
+                every { navigation.navigateTo(any()) } answers {
+                    stack.add(firstArg())
+                    Unit
+                }
+                val sessions = MutableStateFlow<CollectionsSession?>(session("one", backend()))
+                val source = mockk<CollectionsSessionSource>()
+                every { source.sessions } returns sessions
+                val vm = CollectionMovieLinkViewModel(source, navigation)
+                vm.showLocal(movie, origin)
+                runCurrent()
+                vm.open(link)
+                assertEquals(Destination.SeerrCollection(7, null, null, "one"), stack.last())
+                stack.removeLast()
+                assertEquals(origin, stack.last())
+                assertEquals(link, vm.state.value.link)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
     @Test fun localLateResultCannotCrossSession() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))

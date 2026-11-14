@@ -87,8 +87,6 @@ internal class SeerrCollectionDetailsViewModel
             navigation.navigateTo(movie.destination)
         }
 
-        fun back() = navigation.goBack()
-
         private fun request(id: Int) {
             val active = session ?: return
             if (active.owner != expectedOwner || !active.isCurrent()) return

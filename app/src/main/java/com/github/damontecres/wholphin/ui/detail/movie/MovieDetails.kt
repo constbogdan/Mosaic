@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -42,7 +43,7 @@ import com.github.damontecres.wholphin.ui.cards.ExtrasRow
 import com.github.damontecres.wholphin.ui.cards.ItemRow
 import com.github.damontecres.wholphin.ui.cards.PersonRow
 import com.github.damontecres.wholphin.ui.cards.SeasonCard
-import com.github.damontecres.wholphin.ui.collections.CollectionMovieIndicator
+import com.github.damontecres.wholphin.ui.collections.CollectionMovieAction
 import com.github.damontecres.wholphin.ui.collections.CollectionMovieLinkState
 import com.github.damontecres.wholphin.ui.collections.CollectionMovieLinkViewModel
 import com.github.damontecres.wholphin.ui.components.ContextMenu
@@ -64,6 +65,7 @@ import com.github.damontecres.wholphin.ui.discover.DiscoverRowData
 import com.github.damontecres.wholphin.ui.letNotEmpty
 import com.github.damontecres.wholphin.ui.nav.Destination
 import com.github.damontecres.wholphin.ui.rememberInt
+import com.github.damontecres.wholphin.ui.tryRequestFocus
 import com.github.damontecres.wholphin.ui.util.ResStringProvider
 import com.github.damontecres.wholphin.util.DataLoadingState
 import com.github.damontecres.wholphin.util.DiscoverRequestType
@@ -288,8 +290,7 @@ internal fun MovieDetails(
 }
 
 private const val HEADER_ROW = 0
-private const val COLLECTION_ROW = HEADER_ROW + 1
-private const val PEOPLE_ROW = COLLECTION_ROW + 1
+private const val PEOPLE_ROW = HEADER_ROW + 1
 private const val TRAILER_ROW = PEOPLE_ROW + 1
 private const val CHAPTER_ROW = TRAILER_ROW + 1
 private const val EXTRAS_ROW = CHAPTER_ROW + 1
@@ -325,6 +326,14 @@ internal fun MovieDetailsContent(
     val scope = rememberCoroutineScope()
     var position by rememberInt(0)
     val focusRequesters = remember { List(DISCOVER_ROW + 1) { FocusRequester() } }
+    val collectionActionFocus = remember { FocusRequester() }
+    var restoreCollectionAction by rememberSaveable { mutableStateOf(false) }
+    LifecycleResumeEffect(collectionState.link?.id) {
+        if (restoreCollectionAction && collectionState.link != null && collectionActionFocus.tryRequestFocus()) {
+            restoreCollectionAction = false
+        }
+        onPauseOrDispose { }
+    }
     val dto = movie.data
     val resumePosition = dto.userData?.playbackPositionTicks?.ticks ?: Duration.ZERO
 
@@ -358,6 +367,23 @@ internal fun MovieDetailsContent(
                                 .padding(top = HeaderUtils.topPadding, bottom = 16.dp),
                     )
                     ExpandablePlayButtons(
+                        collectionAction =
+                            if (collectionState.link != null || (collectionState.error && collectionState.retryable)) {
+                                @Composable { actionModifier ->
+                                    CollectionMovieAction(
+                                        state = collectionState,
+                                        onOpen = {
+                                            position = HEADER_ROW
+                                            restoreCollectionAction = true
+                                            onOpenCollection()
+                                        },
+                                        onRetry = onRetryCollection,
+                                        modifier = actionModifier.focusRequester(collectionActionFocus),
+                                    )
+                                }
+                            } else {
+                                null
+                            },
                         additionalAction =
                             movie.data.providerIds?.get("Tmdb")?.toIntOrNull()?.takeIf { it > 0 }?.let { id ->
                                 @Composable { actionModifier ->
@@ -410,19 +436,6 @@ internal fun MovieDetailsContent(
                                 .fillMaxWidth()
                                 .padding(bottom = 16.dp)
                                 .focusRequester(focusRequesters[HEADER_ROW]),
-                    )
-                }
-            }
-            if (collectionState.link != null || (collectionState.error && collectionState.retryable)) {
-                item {
-                    CollectionMovieIndicator(
-                        state = collectionState,
-                        onOpen = {
-                            position = COLLECTION_ROW
-                            onOpenCollection()
-                        },
-                        onRetry = onRetryCollection,
-                        modifier = Modifier.focusRequester(focusRequesters[COLLECTION_ROW]),
                     )
                 }
             }

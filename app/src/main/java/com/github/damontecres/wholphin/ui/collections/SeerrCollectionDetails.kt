@@ -1,6 +1,5 @@
 package com.github.damontecres.wholphin.ui.collections
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,14 +12,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -46,11 +41,8 @@ internal fun SeerrCollectionDetails(
 ) {
     val state = viewModel.state.collectAsState().value
     val quickMovieRequest = LocalQuickMovieRequest.current
-    val backFocus = remember { FocusRequester() }
     val gridFocus = remember { FocusRequester() }
-    var gridHasFocus by remember(state.owner, destination.collectionId) { mutableStateOf(false) }
     LaunchedEffect(destination.collectionId, destination.owner) { viewModel.show(destination.collectionId, destination.owner) }
-    BackHandler(enabled = gridHasFocus && state.details?.movies?.isNotEmpty() == true) { backFocus.tryRequestFocus() }
     Column(modifier.fillMaxSize()) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(24.dp),
@@ -66,9 +58,6 @@ internal fun SeerrCollectionDetails(
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
-                Button(onClick = viewModel::back, modifier = Modifier.focusRequester(backFocus)) {
-                    Text(stringResource(R.string.collections_back))
-                }
                 Text(
                     state.details?.name ?: stringResource(R.string.collections_details_title),
                     style = MaterialTheme.typography.headlineMedium,
@@ -119,8 +108,6 @@ internal fun SeerrCollectionDetails(
                     pager = movies,
                     totalItems = movies.size,
                     focusAnchorKey = state.focusedKey,
-                    onGridFocusChanged = { gridHasFocus = it },
-                    onFirstRowUp = { backFocus.tryRequestFocus() },
                     backToTopOnBack = false,
                     itemKey = { "tmdb:movie:${movies[it].id}" },
                     onClickItem = { _, item -> viewModel.open(item) },

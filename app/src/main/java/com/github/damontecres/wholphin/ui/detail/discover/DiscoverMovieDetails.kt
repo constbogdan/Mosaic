@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -54,7 +55,7 @@ import com.github.damontecres.wholphin.ui.cards.DiscoverItemCard
 import com.github.damontecres.wholphin.ui.cards.DiscoverPersonRow
 import com.github.damontecres.wholphin.ui.cards.ItemRow
 import com.github.damontecres.wholphin.ui.cards.SeasonCard
-import com.github.damontecres.wholphin.ui.collections.CollectionMovieIndicator
+import com.github.damontecres.wholphin.ui.collections.CollectionMovieAction
 import com.github.damontecres.wholphin.ui.collections.CollectionMovieLinkState
 import com.github.damontecres.wholphin.ui.collections.CollectionMovieLinkViewModel
 import com.github.damontecres.wholphin.ui.components.ErrorMessage
@@ -221,8 +222,7 @@ internal fun DiscoverMovieDetails(
 }
 
 private const val HEADER_ROW = 0
-private const val COLLECTION_ROW = HEADER_ROW + 1
-private const val PEOPLE_ROW = COLLECTION_ROW + 1
+private const val PEOPLE_ROW = HEADER_ROW + 1
 private const val CHAPTER_ROW = PEOPLE_ROW + 1
 private const val EXTRAS_ROW = CHAPTER_ROW + 1
 private const val SIMILAR_ROW = EXTRAS_ROW + 1
@@ -258,6 +258,15 @@ internal fun DiscoverMovieDetailsContent(
     val scope = rememberCoroutineScope()
     var position by rememberInt(0)
     val focusRequesters = remember { List(RECOMMENDED_ROW + 1) { FocusRequester() } }
+    val collectionActionFocus = remember { FocusRequester() }
+    var restoreCollectionAction by rememberSaveable { mutableStateOf(false) }
+
+    LifecycleResumeEffect(collectionState.link?.id) {
+        if (restoreCollectionAction && collectionState.link != null && collectionActionFocus.tryRequestFocus()) {
+            restoreCollectionAction = false
+        }
+        onPauseOrDispose { }
+    }
 
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     LaunchedEffect(Unit) {
@@ -290,6 +299,23 @@ internal fun DiscoverMovieDetailsContent(
                                 .padding(top = HeaderUtils.topPadding, bottom = 16.dp),
                     )
                     ExpandableDiscoverButtons(
+                        collectionAction =
+                            if (collectionState.link != null || (collectionState.error && collectionState.retryable)) {
+                                @Composable { actionModifier ->
+                                    CollectionMovieAction(
+                                        state = collectionState,
+                                        onOpen = {
+                                            position = HEADER_ROW
+                                            restoreCollectionAction = true
+                                            onOpenCollection()
+                                        },
+                                        onRetry = onRetryCollection,
+                                        modifier = actionModifier.focusRequester(collectionActionFocus),
+                                    )
+                                }
+                            } else {
+                                null
+                            },
                         additionalAction =
                             movie.id?.takeIf { it > 0 }?.let { id ->
                                 @Composable { actionModifier ->
@@ -328,19 +354,6 @@ internal fun DiscoverMovieDetailsContent(
                                 .fillMaxWidth()
                                 .padding(bottom = 16.dp)
                                 .focusRequester(focusRequesters[HEADER_ROW]),
-                    )
-                }
-            }
-            if (collectionState.link != null || (collectionState.error && collectionState.retryable)) {
-                item {
-                    CollectionMovieIndicator(
-                        state = collectionState,
-                        onOpen = {
-                            position = COLLECTION_ROW
-                            onOpenCollection()
-                        },
-                        onRetry = onRetryCollection,
-                        modifier = Modifier.focusRequester(focusRequesters[COLLECTION_ROW]),
                     )
                 }
             }
