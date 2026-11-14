@@ -318,7 +318,7 @@ internal suspend fun runMovieSynopsisAutoScroll(
 }
 
 @Composable
-private fun QualityButton(
+internal fun QualityButton(
     image: Int,
     description: String,
     enabled: Boolean,
