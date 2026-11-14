@@ -4,13 +4,18 @@ import com.github.damontecres.wholphin.api.seerr.LibraryApi
 import com.github.damontecres.wholphin.api.seerr.SeerrApiClient
 import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionItem
 import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionsResponse
+import com.github.damontecres.wholphin.api.seerr.model.MediaRequest
 import com.github.damontecres.wholphin.api.seerr.model.MovieDetails
 import com.github.damontecres.wholphin.api.seerr.model.MovieResult
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.DiscoverItem
 import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.data.model.SeerrItemType
+import com.github.damontecres.wholphin.ui.collections.CollectionRequestEligibility
+import com.github.damontecres.wholphin.ui.collections.collectionRequestEligibility
 import com.github.damontecres.wholphin.ui.detail.CardGridItem
+import com.github.damontecres.wholphin.ui.detail.discover.MovieRequest
+import com.github.damontecres.wholphin.ui.detail.discover.SeerrRequestData
 import com.github.damontecres.wholphin.ui.toLocalDate
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -93,6 +98,12 @@ internal interface CollectionsBackend {
 
     suspend fun detail(id: Int): CollectionDetailsData
 
+    suspend fun requestEligibility(item: DiscoverItem): CollectionRequestEligibility = CollectionRequestEligibility.UNKNOWN
+
+    suspend fun profiles(): SeerrRequestData = SeerrRequestData()
+
+    suspend fun submit(request: MovieRequest): MediaRequest = error("Collection requests are unavailable")
+
     fun linkFromMovie(movie: MovieDetails): CollectionMovieLink? = null
 
     suspend fun linkFromJellyfinMovie(
@@ -115,6 +126,7 @@ internal class CollectionsSessionSource
         private val seerr: SeerrServerRepository,
         private val jellyfin: ServerRepository,
         private val api: SeerrApi,
+        private val seerrService: SeerrService,
     ) {
         val sessions =
             combine(seerr.connection, jellyfin.current) { connection, local ->
@@ -127,7 +139,7 @@ internal class CollectionsSessionSource
                     CollectionsSession(
                         owner = owner,
                         epoch = client,
-                        backend = SeerrCollectionsBackend(client, current),
+                        backend = SeerrCollectionsBackend(client, current, seerrService),
                         isCurrent = {
                             val live = (seerr.connection.value.connection as? SeerrConnectionStatus.Success)?.current
                             val localNow = jellyfin.current.value
@@ -143,7 +155,20 @@ internal class CollectionsSessionSource
 internal class SeerrCollectionsBackend(
     private val client: SeerrApiClient,
     private val current: CurrentSeerr,
+    private val seerrService: SeerrService? = null,
 ) : CollectionsBackend {
+    override suspend fun requestEligibility(item: DiscoverItem): CollectionRequestEligibility {
+        if (item.id <= 0 || item.type != SeerrItemType.MOVIE) return CollectionRequestEligibility.EXCLUDED
+        val details = client.moviesApi.movieMovieIdGet(item.id)
+        return collectionRequestEligibility(item, details, current)
+    }
+
+    override suspend fun profiles(): SeerrRequestData =
+        requireNotNull(seerrService) { "Collection request profiles unavailable" }
+            .getProfilesAndFolders(SeerrItemType.MOVIE, include4k = false)
+
+    override suspend fun submit(request: MovieRequest): MediaRequest = client.submitMovieRequest(request)
+
     override fun linkFromMovie(movie: MovieDetails): CollectionMovieLink? {
         val collection = movie.collection ?: return null
         val id = collection.id?.takeIf { it > 0 } ?: return null
