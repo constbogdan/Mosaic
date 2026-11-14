@@ -5,6 +5,7 @@ import com.github.damontecres.wholphin.api.seerr.infrastructure.ClientException
 import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionItem
 import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionsResponse
 import com.github.damontecres.wholphin.ui.collections.CollectionsViewModel
+import com.github.damontecres.wholphin.ui.nav.Destination
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
@@ -63,6 +64,42 @@ class CollectionsViewModelTest {
         backend,
         { true },
     )
+
+    @Test fun browserCollectionBackKeepsOriginAndFocusedCard() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val backend =
+                    object : CollectionsBackend {
+                        override suspend fun page(
+                            skip: Int,
+                            filter: CollectionsFilter,
+                            sort: CollectionsSort,
+                        ) = page(skip, 2)
+
+                        override suspend fun detail(id: Int) = CollectionDetailsData(id, "Collection $id", null, null, null, emptyList())
+                    }
+                val stack = mutableListOf<Destination>(Destination.Home(), Destination.Collections)
+                val navigation = mockk<NavigationManager>(relaxed = true)
+                every { navigation.navigateTo(any()) } answers {
+                    stack.add(firstArg())
+                    Unit
+                }
+                val source = mockk<CollectionsSessionSource>()
+                every { source.sessions } returns MutableStateFlow(session(backend))
+                val vm = CollectionsViewModel(source, navigation)
+                runCurrent()
+                vm.position(1, 6)
+                vm.open(entry(2))
+                assertEquals(Destination.SeerrCollection(2, 1, 4, "one"), stack.last())
+                stack.removeLast()
+                assertEquals(Destination.Collections, stack.last())
+                assertEquals("tmdb:collection:2", vm.state.value.focusedKey)
+                assertEquals(1, vm.state.value.focusedIndex)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
 
     @Test fun prefetchIsBoundedAndKeepsStableOrderAcrossThreePages() =
         runTest {

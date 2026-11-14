@@ -31,6 +31,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -58,6 +59,9 @@ import com.github.damontecres.wholphin.data.model.WatchlistCategory
 import com.github.damontecres.wholphin.data.model.WatchlistEntry
 import com.github.damontecres.wholphin.data.model.WatchlistFilter
 import com.github.damontecres.wholphin.data.model.WatchlistMembership
+import com.github.damontecres.wholphin.services.CollectionDetailsData
+import com.github.damontecres.wholphin.services.CollectionMovieLink
+import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.services.ScreensaverService
 import com.github.damontecres.wholphin.services.ScreensaverState
 import com.github.damontecres.wholphin.services.SetupDestination
@@ -68,6 +72,11 @@ import com.github.damontecres.wholphin.test.TestActivity
 import com.github.damontecres.wholphin.ui.cards.CardAcquisitionState
 import com.github.damontecres.wholphin.ui.cards.CardMediaPresentation
 import com.github.damontecres.wholphin.ui.cards.DiscoverItemCard
+import com.github.damontecres.wholphin.ui.collections.CollectionDetailsState
+import com.github.damontecres.wholphin.ui.collections.CollectionMovieAction
+import com.github.damontecres.wholphin.ui.collections.CollectionMovieLinkState
+import com.github.damontecres.wholphin.ui.collections.SeerrCollectionDetails
+import com.github.damontecres.wholphin.ui.collections.SeerrCollectionDetailsViewModel
 import com.github.damontecres.wholphin.ui.components.BasicDialog
 import com.github.damontecres.wholphin.ui.components.ExpandablePlayButtons
 import com.github.damontecres.wholphin.ui.components.MinButtonSize
@@ -79,6 +88,7 @@ import com.github.damontecres.wholphin.ui.detail.discover.SeerrProfile
 import com.github.damontecres.wholphin.ui.detail.discover.SeerrRequestData
 import com.github.damontecres.wholphin.ui.detail.discover.originalLanguageName
 import com.github.damontecres.wholphin.ui.discover.QuickMovieConfirmGate
+import com.github.damontecres.wholphin.ui.nav.Destination
 import com.github.damontecres.wholphin.ui.setup.SwitchServerContent
 import com.github.damontecres.wholphin.ui.setup.SwitchServerViewModel
 import com.github.damontecres.wholphin.ui.theme.WholphinTheme
@@ -1432,6 +1442,127 @@ class BasicUiTests {
         Assert.assertEquals(listOf("play", "watched", "favorite", "more"), actions)
         Assert.assertTrue(focusEvents >= 5)
         coVerify(exactly = 0) { repository.setMembership(any(), any(), any()) }
+    }
+
+    @Test
+    fun collection_action_is_compact_until_focused_and_keeps_movie_actions() {
+        val actions = mutableListOf<String>()
+        composeTestRule.setContent {
+            WholphinTheme {
+                ExpandablePlayButtons(
+                    title = "Movie",
+                    resumePosition = Duration.ZERO,
+                    watched = false,
+                    favorite = false,
+                    canDelete = false,
+                    trailers = null,
+                    playOnClick = { actions += "play" },
+                    watchOnClick = { actions += "watched" },
+                    favoriteOnClick = { actions += "favorite" },
+                    moreOnClick = { actions += "more" },
+                    trailerOnClick = {},
+                    onConfirmDelete = {},
+                    chooseVersionParams = null,
+                    buttonOnFocusChanged = {},
+                    collectionAction = { modifier ->
+                        CollectionMovieAction(
+                            CollectionMovieLinkState(link = CollectionMovieLink(7, "Alien Collection", null)),
+                            onOpen = { actions += "collection" },
+                            onRetry = { actions += "retry" },
+                            modifier = modifier,
+                        )
+                    },
+                )
+            }
+        }
+        val action = composeTestRule.onNodeWithTag("collectionMovieAction")
+        action.assertWidthIsEqualTo(MinButtonSize)
+        composeTestRule.onAllNodes(hasClickAction())[0].requestFocus().performKeyInput {
+            repeat(3) { pressKey(Key.DirectionRight) }
+        }
+        action.assertIsFocused()
+        composeTestRule.onNodeWithText("Alien Collection").assertIsDisplayed()
+        action.performClickEnter()
+        action.performKeyInput { pressKey(Key.DirectionRight) }
+        composeTestRule.onNodeWithText("More").assertIsFocused().performClickEnter()
+        Assert.assertEquals(listOf("collection", "more"), actions)
+    }
+
+    @Test
+    fun missing_collection_hides_action_but_failed_lookup_retains_retry() {
+        val state = mutableStateOf(CollectionMovieLinkState())
+        var retries = 0
+        composeTestRule.setContent {
+            WholphinTheme {
+                CollectionMovieAction(state.value, onOpen = {}, onRetry = { retries++ })
+            }
+        }
+        composeTestRule.onAllNodesWithTag("collectionMovieAction").assertCountEquals(0)
+        composeTestRule.runOnIdle { state.value = CollectionMovieLinkState(error = true, retryable = true) }
+        composeTestRule.onNodeWithTag("collectionMovieAction").requestFocus().performClickEnter()
+        Assert.assertEquals(1, retries)
+    }
+
+    @Test
+    fun discover_movie_collection_action_navigates_without_changing_request_action() {
+        var requests = 0
+        var collections = 0
+        composeTestRule.setContent {
+            WholphinTheme {
+                ExpandableDiscoverButtons(
+                    canRequest = true,
+                    canCancel = false,
+                    availability = SeerrAvailability.UNKNOWN,
+                    trailers = null,
+                    requestOnClick = { requests++ },
+                    cancelOnClick = {},
+                    goToOnClick = {},
+                    moreOnClick = {},
+                    trailerOnClick = {},
+                    buttonOnFocusChanged = {},
+                    collectionAction = { modifier ->
+                        CollectionMovieAction(
+                            CollectionMovieLinkState(link = CollectionMovieLink(7, "Alien Collection", null)),
+                            onOpen = { collections++ },
+                            onRetry = {},
+                            modifier = modifier,
+                        )
+                    },
+                )
+            }
+        }
+        composeTestRule.onAllNodes(hasClickAction())[0].requestFocus().performKeyInput { pressKey(Key.DirectionRight) }
+        composeTestRule.onNodeWithTag("collectionMovieAction").assertIsFocused().performClickEnter()
+        composeTestRule.onNodeWithTag("collectionMovieAction").performKeyInput { pressKey(Key.DirectionLeft) }
+        composeTestRule.onNodeWithText("Request").assertIsFocused().performClickEnter()
+        Assert.assertEquals(1, collections)
+        Assert.assertEquals(1, requests)
+    }
+
+    @Test
+    fun collection_details_back_reaches_navigation_in_one_press_from_grid() {
+        val movie = DiscoverItem(42, SeerrItemType.MOVIE, "Alien", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
+        val destination = Destination.SeerrCollection(7, 1, 1, "viewer")
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        every { vm.state } returns
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Alien Collection", null, null, null, listOf(movie)),
+                ),
+            )
+        var backs = 0
+        composeTestRule.setContent {
+            WholphinTheme {
+                BackHandler { backs++ }
+                SeerrCollectionDetails(destination, viewModel = vm)
+            }
+        }
+        composeTestRule.onAllNodes(hasClickAction())[0].requestFocus()
+        composeTestRule.runOnIdle { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
+        Assert.assertEquals(1, backs)
+        composeTestRule.onAllNodesWithText("Back").assertCountEquals(0)
     }
 
     @Test

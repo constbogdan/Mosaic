@@ -761,7 +761,7 @@ fun NavigationDrawerScope.NavItem(
     containerColor: Color = Color.Unspecified,
 ) {
     val context = LocalContext.current
-    val useFont = library !is ServerNavDrawerItem || library.type != CollectionType.LIVETV
+    val useFont = library != NavDrawerItem.Collections && (library !is ServerNavDrawerItem || library.type != CollectionType.LIVETV)
     val icon =
         remember(library) {
             when (library) {
@@ -786,7 +786,7 @@ fun NavigationDrawerScope.NavItem(
                 }
 
                 NavDrawerItem.Collections -> {
-                    R.string.fa_film
+                    R.drawable.ic_animated_images
                 }
 
                 is ServerNavDrawerItem -> {

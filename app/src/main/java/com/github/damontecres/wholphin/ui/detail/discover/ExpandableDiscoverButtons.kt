@@ -39,6 +39,7 @@ fun ExpandableDiscoverButtons(
     modifier: Modifier = Modifier,
     pendingOnClick: () -> Unit = {},
     additionalAction: (@Composable (Modifier) -> Unit)? = null,
+    collectionAction: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val firstFocus = remember { FocusRequester() }
     LazyRow(
@@ -174,6 +175,11 @@ fun ExpandableDiscoverButtons(
         if (additionalAction != null) {
             item("additional_action") {
                 additionalAction(Modifier.onFocusChanged(buttonOnFocusChanged))
+            }
+        }
+        if (collectionAction != null) {
+            item("collection_action") {
+                collectionAction(Modifier.onFocusChanged(buttonOnFocusChanged))
             }
         }
         if (trailers != null) {

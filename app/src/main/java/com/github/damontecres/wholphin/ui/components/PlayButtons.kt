@@ -90,6 +90,7 @@ fun ExpandablePlayButtons(
     buttonOnFocusChanged: (FocusState) -> Unit,
     modifier: Modifier = Modifier,
     additionalAction: (@Composable (Modifier) -> Unit)? = null,
+    collectionAction: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val resources = LocalResources.current
     val firstFocus = remember { FocusRequester() }
@@ -186,6 +187,11 @@ fun ExpandablePlayButtons(
         if (additionalAction != null) {
             item("additional_action") {
                 additionalAction(Modifier.onFocusChanged(buttonOnFocusChanged))
+            }
+        }
+        if (collectionAction != null) {
+            item("collection_action") {
+                collectionAction(Modifier.onFocusChanged(buttonOnFocusChanged))
             }
         }
         if (trailers != null) {
@@ -307,6 +313,52 @@ fun ExpandablePlayButton(
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     enabled: Boolean = true,
 ) {
+    ExpandablePlayButtonContent(
+        title = stringResource(title),
+        resume = resume,
+        icon = icon,
+        onClick = onClick,
+        modifier = modifier,
+        interactionSource = interactionSource,
+        enabled = enabled,
+    )
+}
+
+@Composable
+fun ExpandablePlayButton(
+    title: String,
+    icon: Painter,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+) {
+    ExpandablePlayButtonContent(
+        title = title,
+        resume = Duration.ZERO,
+        icon = {
+            Icon(
+                painter = icon,
+                contentDescription = null,
+                modifier = Modifier.size(28.dp),
+            )
+        },
+        onClick = { onClick() },
+        modifier = modifier,
+        interactionSource = interactionSource,
+        enabled = true,
+    )
+}
+
+@Composable
+private fun ExpandablePlayButtonContent(
+    title: String,
+    resume: Duration,
+    icon: @Composable BoxScope.() -> Unit,
+    onClick: (position: Duration) -> Unit,
+    modifier: Modifier,
+    interactionSource: MutableInteractionSource,
+    enabled: Boolean,
+) {
     val isFocused = interactionSource.collectIsFocusedAsState().value
     Button(
         onClick = { onClick.invoke(resume) },
@@ -332,7 +384,7 @@ fun ExpandablePlayButton(
         AnimatedVisibility(isFocused) {
             Spacer(Modifier.size(8.dp))
             Text(
-                text = stringResource(title),
+                text = title,
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.padding(end = 4.dp),
             )
