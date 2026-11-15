@@ -212,23 +212,7 @@ internal fun CollectionCard(
                     contentScale = ContentScale.FillBounds,
                     modifier = Modifier.fillMaxWidth().aspectRatio(AspectRatios.TALL),
                 )
-                val count =
-                    if (available != null && total != null && available in 0..total) {
-                        stringResource(R.string.collections_count, available, total)
-                    } else {
-                        stringResource(R.string.collections_count_unknown)
-                    }
-                Text(
-                    text = count,
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .background(Color.Black.copy(alpha = .75f), RoundedCornerShape(6.dp))
-                            .padding(5.dp),
-                )
+                CollectionCompletionBadge(available, total, Modifier.align(Alignment.TopEnd))
             }
         }
         Text(
@@ -238,4 +222,28 @@ internal fun CollectionCard(
             modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
         )
     }
+}
+
+@Composable
+internal fun CollectionCompletionBadge(
+    available: Int?,
+    total: Int?,
+    modifier: Modifier = Modifier,
+) {
+    val count =
+        if (available != null && total != null && available in 0..total) {
+            stringResource(R.string.collections_count, available, total)
+        } else {
+            stringResource(R.string.collections_count_unknown)
+        }
+    Text(
+        text = count,
+        color = Color.White,
+        style = MaterialTheme.typography.labelMedium,
+        modifier =
+            modifier
+                .padding(6.dp)
+                .background(Color.Black.copy(alpha = .75f), RoundedCornerShape(6.dp))
+                .padding(5.dp),
+    )
 }

@@ -77,6 +77,9 @@ import com.github.damontecres.wholphin.ui.cards.DiscoverItemCard
 import com.github.damontecres.wholphin.ui.collections.CollectionDetailsState
 import com.github.damontecres.wholphin.ui.collections.CollectionMovieAction
 import com.github.damontecres.wholphin.ui.collections.CollectionMovieLinkState
+import com.github.damontecres.wholphin.ui.collections.CollectionRequestEligibility
+import com.github.damontecres.wholphin.ui.collections.CollectionRequestMovie
+import com.github.damontecres.wholphin.ui.collections.CollectionRequestState
 import com.github.damontecres.wholphin.ui.collections.SeerrCollectionDetails
 import com.github.damontecres.wholphin.ui.collections.SeerrCollectionDetailsViewModel
 import com.github.damontecres.wholphin.ui.components.BasicDialog
@@ -112,6 +115,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -1565,6 +1569,169 @@ class BasicUiTests {
         composeTestRule.runOnIdle { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
         Assert.assertEquals(1, backs)
         composeTestRule.onAllNodesWithText("Back").assertCountEquals(0)
+    }
+
+    @Test
+    fun collection_details_uses_poster_badge_without_textual_completion_rows() {
+        val movie = DiscoverItem(42, SeerrItemType.MOVIE, "Alien", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        every { vm.state } returns
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Alien Collection", null, null, null, listOf(movie)),
+                ),
+            )
+        composeTestRule.setContent {
+            WholphinTheme { SeerrCollectionDetails(Destination.SeerrCollection(7, 2, 4, "viewer"), viewModel = vm) }
+        }
+        composeTestRule.onNodeWithTag("collectionPoster").assertExists()
+        composeTestRule.onAllNodesWithText("2/4").assertCountEquals(1)
+        composeTestRule.onAllNodesWithText("2 available · 2 missing").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("Movie").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("Count unavailable").assertCountEquals(0)
+    }
+
+    @Test
+    fun collection_details_unknown_count_remains_a_badge() {
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        every { vm.state } returns
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Alien Collection", null, null, null, emptyList()),
+                ),
+            )
+        composeTestRule.setContent {
+            WholphinTheme { SeerrCollectionDetails(Destination.SeerrCollection(7, null, null, "viewer"), viewModel = vm) }
+        }
+        composeTestRule.onAllNodesWithText("Count unavailable").assertCountEquals(1)
+        composeTestRule.onAllNodesWithText("Request Collection").assertCountEquals(0)
+    }
+
+    @Test
+    fun eligible_collection_poster_opens_existing_modal_and_restores_focus_on_dismissal() {
+        val movie = DiscoverItem(42, SeerrItemType.MOVIE, "Alien", null, null, SeerrAvailability.UNKNOWN, null, null, null, null, null)
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        val state =
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Alien Collection", null, null, null, listOf(movie)),
+                    requestEligibility = mapOf(42 to CollectionRequestEligibility.ELIGIBLE),
+                ),
+            )
+        every { vm.state } returns state
+        every { vm.openRequest() } answers {
+            state.value =
+                state.value.copy(
+                    request =
+                        CollectionRequestState(
+                            "viewer",
+                            7,
+                            listOf(CollectionRequestMovie(movie, CollectionRequestEligibility.ELIGIBLE)),
+                        ),
+                )
+        }
+        every { vm.closeRequest() } answers { state.value = state.value.copy(request = null) }
+        composeTestRule.setContent {
+            WholphinTheme { SeerrCollectionDetails(Destination.SeerrCollection(7, 0, 1, "viewer"), viewModel = vm) }
+        }
+        val poster = composeTestRule.onNodeWithTag("collectionRequestPoster").requestFocus().assertIsFocused()
+        verify(exactly = 0) { vm.openRequest() }
+        poster.performClickEnter()
+        verify(exactly = 1) { vm.openRequest() }
+        composeTestRule.onNodeWithTag("collectionRequestDialog").assertExists()
+        composeTestRule.runOnIdle { state.value = state.value.copy(request = null) }
+        composeTestRule.onNodeWithTag("collectionRequestPoster").assertIsFocused()
+        verify(exactly = 0) { vm.submitRequests(any()) }
+    }
+
+    @Test
+    fun collection_poster_becomes_non_actionable_when_eligibility_changes() {
+        val movie = DiscoverItem(42, SeerrItemType.MOVIE, "Alien", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        val state =
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Alien Collection", null, null, null, listOf(movie)),
+                    requestEligibility = mapOf(42 to CollectionRequestEligibility.ELIGIBLE),
+                ),
+            )
+        every { vm.state } returns state
+        composeTestRule.setContent {
+            WholphinTheme { SeerrCollectionDetails(Destination.SeerrCollection(7, 1, 1, "viewer"), viewModel = vm) }
+        }
+        composeTestRule.onNodeWithTag("collectionRequestPoster").assertExists()
+        composeTestRule.runOnIdle {
+            state.value =
+                state.value.copy(
+                    requestEligibility = mapOf(42 to CollectionRequestEligibility.AVAILABLE),
+                )
+        }
+        composeTestRule.onAllNodesWithTag("collectionRequestPoster").assertCountEquals(0)
+        composeTestRule.onNodeWithTag("collectionPoster").assertExists()
+        verify(exactly = 0) { vm.openRequest() }
+    }
+
+    @Test
+    fun collection_first_row_up_reaches_eligible_poster() {
+        val movie = DiscoverItem(42, SeerrItemType.MOVIE, "Alien", null, null, SeerrAvailability.UNKNOWN, null, null, null, null, null)
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        every { vm.state } returns
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Alien Collection", null, null, null, listOf(movie)),
+                    requestEligibility = mapOf(42 to CollectionRequestEligibility.ELIGIBLE),
+                ),
+            )
+        composeTestRule.setContent {
+            WholphinTheme { SeerrCollectionDetails(Destination.SeerrCollection(7, 0, 1, "viewer"), viewModel = vm) }
+        }
+        composeTestRule
+            .onAllNodes(hasText("Alien") and hasClickAction())[0]
+            .requestFocus()
+            .performKeyInput { pressKey(Key.DirectionUp) }
+        composeTestRule.onNodeWithTag("collectionRequestPoster").assertIsFocused()
+        verify(exactly = 0) { vm.openRequest() }
+    }
+
+    @Test
+    fun collection_card_overrides_keep_default_badges_and_pending_indicator() {
+        val available =
+            DiscoverItem(42, SeerrItemType.MOVIE, "Available", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
+        val pending = DiscoverItem(43, SeerrItemType.MOVIE, "Pending", null, null, SeerrAvailability.PENDING, null, null, null, null, null)
+        composeTestRule.setContent {
+            WholphinTheme {
+                Row {
+                    DiscoverItemCard(available, onClick = {}, onLongClick = {})
+                    DiscoverItemCard(
+                        available,
+                        onClick = {},
+                        onLongClick = {},
+                        showOverlay = false,
+                        showAvailableIndicator = false,
+                    )
+                    DiscoverItemCard(
+                        pending,
+                        onClick = {},
+                        onLongClick = {},
+                        showOverlay = false,
+                        showAvailableIndicator = false,
+                    )
+                }
+            }
+        }
+        composeTestRule.onAllNodesWithText("Movie").assertCountEquals(1)
+        composeTestRule.onAllNodesWithText(composeTestRule.activity.getString(R.string.fa_check)).assertCountEquals(1)
+        composeTestRule.onAllNodesWithText(composeTestRule.activity.getString(R.string.fa_bell)).assertCountEquals(1)
     }
 
     @Test

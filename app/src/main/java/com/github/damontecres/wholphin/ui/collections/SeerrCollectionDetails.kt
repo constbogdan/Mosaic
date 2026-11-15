@@ -26,16 +26,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.tv.material3.Button
+import androidx.tv.material3.Card
+import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.github.damontecres.wholphin.R
+import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.services.CollectionDetailsData
 import com.github.damontecres.wholphin.ui.cards.DiscoverItemCard
 import com.github.damontecres.wholphin.ui.components.LoadingPage
@@ -53,15 +60,19 @@ internal fun SeerrCollectionDetails(
     val state = viewModel.state.collectAsState().value
     val quickMovieRequest = LocalQuickMovieRequest.current
     val gridFocus = remember { FocusRequester() }
-    val requestFocus = remember { FocusRequester() }
+    val posterFocus = remember { FocusRequester() }
     val similarFocus = remember { FocusRequester() }
     val similarListState = rememberLazyListState()
     var requestWasOpen by remember { mutableStateOf(false) }
     var returnFocusPending by remember { mutableStateOf(false) }
+    val posterActionable =
+        state.owner == destination.owner && state.details != null && !state.loading && !state.error && !state.denied &&
+            !state.requestEligibilityLoading &&
+            state.requestEligibility.values.any { it == CollectionRequestEligibility.ELIGIBLE }
     LaunchedEffect(destination.collectionId, destination.owner, destination.entryToken) {
         viewModel.show(destination.collectionId, destination.owner)
     }
-    LaunchedEffect(state.request, state.loading, state.requestEligibilityLoading, state.details) {
+    LaunchedEffect(state.request, state.loading, state.requestEligibilityLoading, state.details, posterActionable) {
         if (state.request != null) {
             requestWasOpen = true
             returnFocusPending = false
@@ -71,9 +82,9 @@ internal fun SeerrCollectionDetails(
         }
         if (returnFocusPending && !state.loading && !state.requestEligibilityLoading) {
             returnFocusPending = false
-            if (state.requestEligibility.values.any { it == CollectionRequestEligibility.ELIGIBLE }) {
-                requestFocus.tryRequestFocus()
-            } else {
+            if (posterActionable) {
+                posterFocus.tryRequestFocus()
+            } else if (state.details?.movies?.isNotEmpty() == true) {
                 gridFocus.tryRequestFocus()
             }
         }
@@ -93,38 +104,38 @@ internal fun SeerrCollectionDetails(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().padding(start = 24.dp, top = 20.dp, end = 40.dp, bottom = 12.dp),
         ) {
-            Box(Modifier.width(140.dp).height(190.dp), contentAlignment = Alignment.Center) {
-                val image = state.details?.posterUrl ?: state.details?.backdropUrl
-                if (image != null) {
-                    AsyncImage(model = image, contentDescription = state.details?.name, modifier = Modifier.fillMaxSize())
-                } else {
-                    Text(stringResource(R.string.collections_no_artwork))
+            val posterModifier = Modifier.width(140.dp).height(190.dp)
+            val posterContent: @Composable () -> Unit = {
+                CollectionDetailsPosterContent(
+                    name = state.details?.name,
+                    image = state.details?.posterUrl ?: state.details?.backdropUrl,
+                    available = destination.availableMovies,
+                    total = destination.totalMovies,
+                    showCount = state.owner == destination.owner && state.details != null,
+                )
+            }
+            if (posterActionable) {
+                val requestLabel = stringResource(R.string.collections_request)
+                Card(
+                    onClick = viewModel::openRequest,
+                    modifier =
+                        posterModifier
+                            .focusRequester(posterFocus)
+                            .semantics { contentDescription = requestLabel }
+                            .testTag("collectionRequestPoster"),
+                    colors = CardDefaults.colors(containerColor = Color.Transparent),
+                ) {
+                    posterContent()
                 }
+            } else {
+                Box(posterModifier.testTag("collectionPoster"), contentAlignment = Alignment.Center) { posterContent() }
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
                 Text(
                     state.details?.name ?: stringResource(R.string.collections_details_title),
                     style = MaterialTheme.typography.headlineMedium,
                 )
-                val available = destination.availableMovies
-                val total = destination.totalMovies
-                if (state.owner == destination.owner && state.details != null && available != null && total != null &&
-                    available in 0..total
-                ) {
-                    Text(stringResource(R.string.collections_count, available, total))
-                    Text(stringResource(R.string.collections_available_missing, available, total - available))
-                } else if (state.owner == destination.owner && state.details != null) {
-                    Text(stringResource(R.string.collections_count_unknown))
-                }
                 state.details?.overview?.let { Text(it, maxLines = 4, overflow = TextOverflow.Ellipsis) }
-                if (!state.loading && !state.error && !state.denied && !state.requestEligibilityLoading &&
-                    state.owner == destination.owner &&
-                    state.requestEligibility.values.any { it == CollectionRequestEligibility.ELIGIBLE }
-                ) {
-                    Button(onClick = viewModel::openRequest, modifier = Modifier.focusRequester(requestFocus)) {
-                        Text(stringResource(R.string.collections_request))
-                    }
-                }
             }
         }
         when {
@@ -171,6 +182,7 @@ internal fun SeerrCollectionDetails(
                     gridFocusRequester = gridFocus,
                     initialPosition = state.focusedIndex,
                     positionCallback = { _, index -> viewModel.position(index) },
+                    onFirstRowUp = { posterActionable && posterFocus.tryRequestFocus() },
                     showJumpButtons = false,
                     showLetterButtons = false,
                     footerFocusRequester = similarFocus.takeIf { state.similarFocusedId != null },
@@ -181,7 +193,9 @@ internal fun SeerrCollectionDetails(
                             onClick = onClick,
                             onLongClick = onLongClick,
                             modifier = cardModifier,
-                            showOverlay = true,
+                            showOverlay = false,
+                            showAvailableIndicator = false,
+                            artworkAlpha = collectionMovieArtworkAlpha(item?.availability),
                             useFallbackText = true,
                             width = Dp.Unspecified,
                         )
@@ -210,6 +224,35 @@ internal fun SeerrCollectionDetails(
         }
     }
 }
+
+@Composable
+private fun CollectionDetailsPosterContent(
+    name: String?,
+    image: String?,
+    available: Int?,
+    total: Int?,
+    showCount: Boolean,
+) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        if (image != null) {
+            AsyncImage(model = image, contentDescription = name, modifier = Modifier.fillMaxSize())
+        } else {
+            Text(stringResource(R.string.collections_no_artwork))
+        }
+        if (showCount) CollectionCompletionBadge(available, total, Modifier.align(Alignment.TopEnd))
+    }
+}
+
+internal fun collectionMovieArtworkAlpha(availability: SeerrAvailability?): Float =
+    when (availability) {
+        SeerrAvailability.PENDING,
+        SeerrAvailability.PROCESSING,
+        SeerrAvailability.BLOCKLISTED,
+        SeerrAvailability.DELETED,
+        -> .45f
+
+        else -> 1f
+    }
 
 @Composable
 private fun SimilarCollectionsRow(

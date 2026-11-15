@@ -69,6 +69,8 @@ fun DiscoverItemCard(
     useFallbackText: Boolean = false,
     savedToWatchlist: Boolean = false,
     compactLabels: Boolean = false,
+    showAvailableIndicator: Boolean = true,
+    artworkAlpha: Float = 1f,
 ) {
     val focused by interactionSource.collectIsFocusedAsState()
     var focusedAfterDelay by remember { mutableStateOf(false) }
@@ -121,6 +123,7 @@ fun DiscoverItemCard(
                     mediaPresentation = mediaPresentation,
                     useFallbackText = useFallbackText,
                     contentScale = ContentScale.FillBounds,
+                    artworkAlpha = artworkAlpha,
                     modifier =
                         Modifier
                             .fillMaxSize(),
@@ -138,7 +141,7 @@ fun DiscoverItemCard(
 
                     SeerrAvailability.AVAILABLE,
                     -> {
-                        AvailableIndicator(Modifier.align(Alignment.TopEnd))
+                        if (showAvailableIndicator) AvailableIndicator(Modifier.align(Alignment.TopEnd))
                     }
 
                     SeerrAvailability.BLOCKLISTED -> {
