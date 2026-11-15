@@ -170,17 +170,39 @@ private fun CollectionsCard(
     onLongClick: () -> Unit,
     modifier: Modifier,
 ) {
+    CollectionCard(
+        name = item?.summary?.name.orEmpty(),
+        posterUrl = item?.posterUrl,
+        available = item?.summary?.availableMovies,
+        total = item?.summary?.totalMovies,
+        onClick = onClick,
+        onLongClick = onLongClick,
+        modifier = modifier,
+    )
+}
+
+@Composable
+internal fun CollectionCard(
+    name: String,
+    posterUrl: String?,
+    available: Int?,
+    total: Int?,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    cardModifier: Modifier = Modifier,
+) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Card(
             onClick = onClick,
             onLongClick = onLongClick,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().then(cardModifier),
             colors = CardDefaults.colors(containerColor = Color.Transparent),
         ) {
             Box(Modifier.fillMaxWidth()) {
                 ItemCardImage(
-                    imageUrl = item?.posterUrl,
-                    name = item?.summary?.name,
+                    imageUrl = posterUrl,
+                    name = name,
                     showOverlay = false,
                     favorite = false,
                     watched = false,
@@ -190,10 +212,8 @@ private fun CollectionsCard(
                     contentScale = ContentScale.FillBounds,
                     modifier = Modifier.fillMaxWidth().aspectRatio(AspectRatios.TALL),
                 )
-                val available = item?.summary?.availableMovies
-                val total = item?.summary?.totalMovies
                 val count =
-                    if (available != null && total != null && available <= total) {
+                    if (available != null && total != null && available in 0..total) {
                         stringResource(R.string.collections_count, available, total)
                     } else {
                         stringResource(R.string.collections_count_unknown)
@@ -212,7 +232,7 @@ private fun CollectionsCard(
             }
         }
         Text(
-            item?.summary?.name.orEmpty(),
+            name,
             maxLines = 1,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().padding(top = 16.dp),

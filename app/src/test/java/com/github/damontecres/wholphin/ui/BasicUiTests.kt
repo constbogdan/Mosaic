@@ -28,6 +28,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -39,6 +40,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
@@ -1563,6 +1565,86 @@ class BasicUiTests {
         composeTestRule.runOnIdle { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
         Assert.assertEquals(1, backs)
         composeTestRule.onAllNodesWithText("Back").assertCountEquals(0)
+    }
+
+    @Test
+    fun collection_details_shows_optional_similar_row_without_inventing_completion() {
+        val movie = DiscoverItem(42, SeerrItemType.MOVIE, "Alien", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
+        val destination = Destination.SeerrCollection(7, 1, 1, "viewer")
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        every { vm.state } returns
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Alien Collection", null, null, null, listOf(movie)),
+                    similar = listOf(CollectionDetailsData(8, "Another Collection", null, null, null, emptyList())),
+                    similarFocusedId = 8,
+                ),
+            )
+        composeTestRule.setContent {
+            WholphinTheme { SeerrCollectionDetails(destination, viewModel = vm) }
+        }
+        composeTestRule.onAllNodes(hasScrollToIndexAction())[0].performScrollToIndex(1)
+        composeTestRule.onNodeWithText("Similar Collections").assertExists()
+        composeTestRule.onAllNodesWithText("Another Collection").assertCountEquals(2)
+        composeTestRule.onNodeWithText("Count unavailable").assertExists()
+        composeTestRule.onAllNodesWithText("Another Collection")[0].assertIsFocused()
+    }
+
+    @Test
+    fun collection_details_restores_focus_to_offscreen_similar_card() {
+        val movie = DiscoverItem(42, SeerrItemType.MOVIE, "Alien", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
+        val destination = Destination.SeerrCollection(7, 1, 1, "viewer")
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        val state =
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Alien Collection", null, null, null, listOf(movie)),
+                    similar = (8..17).map { CollectionDetailsData(it, "Collection $it", null, null, null, emptyList()) },
+                    similarFocusedId = 17,
+                ),
+            )
+        every { vm.state } returns state
+        every { vm.position(any()) } answers {
+            state.value = state.value.copy(similarFocusedId = null)
+        }
+        composeTestRule.setContent {
+            WholphinTheme { SeerrCollectionDetails(destination, viewModel = vm) }
+        }
+        composeTestRule.onNodeWithText("Similar Collections").assertExists()
+        composeTestRule.onAllNodesWithText("Collection 17")[0].assertIsFocused()
+    }
+
+    @Test
+    fun collection_details_similar_dpad_right_does_not_snap_each_card_to_row_start() {
+        val movie = DiscoverItem(42, SeerrItemType.MOVIE, "Alien", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
+        val destination = Destination.SeerrCollection(7, 1, 1, "viewer")
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        val state =
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Alien Collection", null, null, null, listOf(movie)),
+                    similar = (8..17).map { CollectionDetailsData(it, "Collection $it", null, null, null, emptyList()) },
+                    similarFocusedId = 8,
+                ),
+            )
+        every { vm.state } returns state
+        every { vm.focusSimilar(any()) } answers {
+            state.value = state.value.copy(similarFocusedId = firstArg())
+        }
+        composeTestRule.setContent {
+            WholphinTheme { SeerrCollectionDetails(destination, viewModel = vm) }
+        }
+        val first = composeTestRule.onAllNodesWithText("Collection 8")[0].assertIsFocused()
+        val firstLeft = first.getUnclippedBoundsInRoot().left
+        first.performKeyInput { pressKey(Key.DirectionRight) }
+        val second = composeTestRule.onAllNodes(hasText("Collection 9") and hasClickAction())[0].assertIsFocused()
+        Assert.assertTrue(second.getUnclippedBoundsInRoot().left > firstLeft)
     }
 
     @Test

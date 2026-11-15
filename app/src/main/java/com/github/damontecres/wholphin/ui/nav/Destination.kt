@@ -160,6 +160,7 @@ sealed class Destination(
         val availableMovies: Int?,
         val totalMovies: Int?,
         val owner: String,
+        val entryToken: String = "",
     ) : Destination(false)
 
     @Serializable

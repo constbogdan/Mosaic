@@ -10,6 +10,7 @@ import com.github.damontecres.wholphin.services.CollectionsSession
 import com.github.damontecres.wholphin.services.CollectionsSessionSource
 import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.ui.detail.discover.movieRequestForQuality
+import com.github.damontecres.wholphin.ui.nav.Destination
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -21,7 +22,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import java.io.IOException
+import java.util.UUID
 import javax.inject.Inject
+import kotlin.random.Random
 
 internal data class CollectionDetailsState(
     val owner: String? = null,
@@ -35,6 +38,11 @@ internal data class CollectionDetailsState(
     val requestEligibility: Map<Int, CollectionRequestEligibility> = emptyMap(),
     val requestEligibilityLoading: Boolean = false,
     val request: CollectionRequestState? = null,
+    val similarSeedId: Int? = null,
+    val similar: List<CollectionDetailsData> = emptyList(),
+    val similarLoading: Boolean = false,
+    val similarLoaded: Boolean = false,
+    val similarFocusedId: Int? = null,
 )
 
 @HiltViewModel
@@ -49,10 +57,12 @@ internal class SeerrCollectionDetailsViewModel
         private var expectedOwner: String? = null
         private var load: Job? = null
         private var eligibilityLoad: Job? = null
+        private var similarLoad: Job? = null
         private var profileLoad: Job? = null
         private var submitJob: Job? = null
         private var activeSubmissionId: Int? = null
         private var generation = 0L
+        private var entryGeneration = 0L
 
         init {
             viewModelScope.launch {
@@ -60,6 +70,8 @@ internal class SeerrCollectionDetailsViewModel
                     if (session?.owner == next?.owner && session?.epoch === next?.epoch) return@collect
                     load?.cancel()
                     eligibilityLoad?.cancel()
+                    similarLoad?.cancel()
+                    entryGeneration++
                     profileLoad?.cancel()
                     generation++
                     submitJob?.cancel()
@@ -101,6 +113,8 @@ internal class SeerrCollectionDetailsViewModel
             if (id <= 0 || (state.value.collectionId == id && expectedOwner == owner)) return
             load?.cancel()
             eligibilityLoad?.cancel()
+            similarLoad?.cancel()
+            entryGeneration++
             profileLoad?.cancel()
             submitJob?.cancel()
             generation++
@@ -346,7 +360,27 @@ internal class SeerrCollectionDetailsViewModel
         fun position(index: Int) {
             val current = state.value
             val movie = current.details?.movies?.getOrNull(index) ?: return
-            state.value = current.copy(focusedKey = "tmdb:movie:${movie.id}", focusedIndex = index)
+            state.value = current.copy(focusedKey = "tmdb:movie:${movie.id}", focusedIndex = index, similarFocusedId = null)
+        }
+
+        fun focusSimilar(id: Int) {
+            if (state.value.similar.any { it.id == id } && state.value.similarFocusedId != id) {
+                state.value = state.value.copy(similarFocusedId = id)
+            }
+        }
+
+        fun openSimilar(id: Int) {
+            val active = session ?: return
+            val current = state.value
+            val top = navigation.backStack.lastOrNull() as? Destination.SeerrCollection ?: return
+            if (top.collectionId != current.collectionId || top.owner != active.owner ||
+                !active.isCurrent() || current.owner != active.owner ||
+                active.owner != expectedOwner || current.similar.none { it.id == id }
+            ) {
+                return
+            }
+            state.value = current.copy(similarFocusedId = id)
+            navigation.navigateTo(Destination.SeerrCollection(id, null, null, active.owner, UUID.randomUUID().toString()))
         }
 
         fun open(movie: DiscoverItem) {
@@ -355,7 +389,7 @@ internal class SeerrCollectionDetailsViewModel
             val details = current.details ?: return
             val index = details.movies.indexOfFirst { it.id == movie.id }
             if (index < 0) return
-            state.value = current.copy(focusedKey = "tmdb:movie:${movie.id}", focusedIndex = index)
+            state.value = current.copy(focusedKey = "tmdb:movie:${movie.id}", focusedIndex = index, similarFocusedId = null)
             // No Jellyfin ID is inferred from Seerr availability; Discover resolves ordinary details.
             navigation.navigateTo(movie.destination)
         }
@@ -386,6 +420,7 @@ internal class SeerrCollectionDetailsViewModel
                                 requestEligibilityLoading = true,
                             )
                         scanEligibility(active, details, token)
+                        if (!state.value.similarLoaded) loadSimilar(active, details)
                     } catch (cancel: CancellationException) {
                         throw cancel
                     } catch (error: ClientException) {
@@ -395,6 +430,41 @@ internal class SeerrCollectionDetailsViewModel
                         }
                     } catch (error: Exception) {
                         if (token == generation && active.isCurrent()) state.value = state.value.copy(loading = false, error = true)
+                    }
+                }
+        }
+
+        private fun loadSimilar(
+            active: CollectionsSession,
+            details: CollectionDetailsData,
+        ) {
+            val entryToken = entryGeneration
+            val seed = chooseReleasedSeed(details.movies, chooseIndex = { Random.nextInt(it) })
+            state.value = state.value.copy(similarSeedId = seed, similarLoaded = true, similarLoading = seed != null)
+            if (seed == null) return
+            similarLoad?.cancel()
+            similarLoad =
+                viewModelScope.launch {
+                    val ids = discoverSimilarCollectionIds(details.id) { page -> active.backend.similarRecommendations(seed, page) }
+                    val semaphore = Semaphore(3)
+                    val resolved =
+                        coroutineScope {
+                            ids
+                                .map { id ->
+                                    async {
+                                        try {
+                                            semaphore.withPermit { active.backend.similarDetail(id) }.takeIf { it.nameVerified }
+                                        } catch (cancel: CancellationException) {
+                                            throw cancel
+                                        } catch (_: Exception) {
+                                            null
+                                        }
+                                    }
+                                }.awaitAll()
+                                .filterNotNull()
+                        }
+                    if (entryToken == entryGeneration && active.isCurrent() && state.value.collectionId == details.id) {
+                        state.value = state.value.copy(similar = resolved, similarLoading = false)
                     }
                 }
         }

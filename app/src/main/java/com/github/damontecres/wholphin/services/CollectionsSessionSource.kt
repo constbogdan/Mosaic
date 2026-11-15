@@ -73,6 +73,12 @@ internal data class CollectionDetailsData(
     val posterUrl: String?,
     val backdropUrl: String?,
     val movies: List<DiscoverItem>,
+    val nameVerified: Boolean = true,
+)
+
+internal data class SimilarRecommendationsPage(
+    val totalPages: Int,
+    val collectionIds: List<Int?>,
 )
 
 internal data class CollectionMovieLink(
@@ -97,6 +103,14 @@ internal interface CollectionsBackend {
     ): CollectionsPageData
 
     suspend fun detail(id: Int): CollectionDetailsData
+
+    /** Presentation-only reuse; opening a Collection Details entry still refreshes its normal data. */
+    suspend fun similarDetail(id: Int): CollectionDetailsData = detail(id)
+
+    suspend fun similarRecommendations(
+        seedMovieId: Int,
+        page: Int,
+    ): SimilarRecommendationsPage = SimilarRecommendationsPage(0, emptyList())
 
     suspend fun requestEligibility(item: DiscoverItem): CollectionRequestEligibility = CollectionRequestEligibility.UNKNOWN
 
@@ -157,6 +171,35 @@ internal class SeerrCollectionsBackend(
     private val current: CurrentSeerr,
     private val seerrService: SeerrService? = null,
 ) : CollectionsBackend {
+    private val detailsCache =
+        object : LinkedHashMap<Int, CollectionDetailsData>(32, .75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, CollectionDetailsData>): Boolean = size > 32
+        }
+
+    override suspend fun similarDetail(id: Int): CollectionDetailsData = synchronized(detailsCache) { detailsCache[id] } ?: detail(id)
+
+    override suspend fun similarRecommendations(
+        seedMovieId: Int,
+        page: Int,
+    ): SimilarRecommendationsPage {
+        val response =
+            client.moviesApi.movieMovieIdRecommendationsGet(
+                movieId = seedMovieId,
+                page = page,
+                includeCollectionIds = true,
+            )
+        return SimilarRecommendationsPage(
+            totalPages = response.totalPages?.coerceAtLeast(0) ?: 0,
+            collectionIds =
+                response.results.orEmpty().map { movie ->
+                    movie.collectionMembership
+                        ?.takeIf { movie.mediaType == "movie" && it.kind == "collection" }
+                        ?.collectionId
+                        ?.takeIf { it > 0 }
+                },
+        )
+    }
+
     override suspend fun requestEligibility(item: DiscoverItem): CollectionRequestEligibility {
         if (item.id <= 0 || item.type != SeerrItemType.MOVIE) return CollectionRequestEligibility.EXCLUDED
         val details = client.moviesApi.movieMovieIdGet(item.id)
@@ -237,14 +280,19 @@ internal class SeerrCollectionsBackend(
                 .sortedWith(
                     compareBy<MovieResult> { toLocalDate(it.releaseDate) == null }.thenBy { toLocalDate(it.releaseDate) }.thenBy { it.id },
                 ).map(::movie)
-        return CollectionDetailsData(
-            id = id,
-            name = response.name?.takeIf { it.isNotBlank() } ?: "Collection $id",
-            overview = response.overview?.takeIf { it.isNotBlank() },
-            posterUrl = response.posterPath?.let { current.imageUrlBuilder(ImageType.PRIMARY, it) },
-            backdropUrl = response.backdropPath?.let { current.imageUrlBuilder(ImageType.BACKDROP, it) },
-            movies = movies,
-        )
+        val name = response.name?.takeIf { it.isNotBlank() }
+        val details =
+            CollectionDetailsData(
+                id = id,
+                name = name ?: "Collection $id",
+                overview = response.overview?.takeIf { it.isNotBlank() },
+                posterUrl = response.posterPath?.let { current.imageUrlBuilder(ImageType.PRIMARY, it) },
+                backdropUrl = response.backdropPath?.let { current.imageUrlBuilder(ImageType.BACKDROP, it) },
+                movies = movies,
+                nameVerified = name != null,
+            )
+        synchronized(detailsCache) { detailsCache[id] = details }
+        return details
     }
 
     fun movie(part: MovieResult): DiscoverItem =
