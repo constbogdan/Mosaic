@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
@@ -138,6 +139,8 @@ fun <T : CardGridItem> CardGrid(
     onGridFocusChanged: ((Boolean) -> Unit)? = null,
     onFirstRowUp: (() -> Boolean)? = null,
     backToTopOnBack: Boolean = true,
+    footerContent: (@Composable () -> Unit)? = null,
+    footerFocusRequester: FocusRequester? = null,
 ) {
     val leadingEmptySlots = if (alignWindowToAbsoluteRows) gridLeadingSlots(positionOffset, columns) else 0
     val startPosition =
@@ -152,6 +155,11 @@ fun <T : CardGridItem> CardGrid(
             cacheWindow = LazyLayoutCacheWindow(aheadFraction = 2f, behindFraction = 0.5f),
             initialFirstVisibleItemIndex = focusedIndex + leadingEmptySlots,
         )
+    LaunchedEffect(footerFocusRequester, pager.size, footerContent != null) {
+        if (footerFocusRequester != null && footerContent != null) {
+            gridState.scrollToItem(pager.size + leadingEmptySlots)
+        }
+    }
     val scope = rememberCoroutineScope()
     val firstFocus = remember { FocusRequester() }
     val zeroFocus = remember { FocusRequester() }
@@ -372,7 +380,7 @@ fun <T : CardGridItem> CardGrid(
                                 .fillMaxSize()
                                 .onFocusChanged { onGridFocusChanged?.invoke(it.hasFocus) }
                                 .focusGroup()
-                                .focusRestorer(firstFocus)
+                                .focusRestorer(footerFocusRequester ?: firstFocus)
                                 .focusProperties {
                                     onEnter = {
                                         if (focusedIndex < 0 && gridState.firstVisibleItemIndex <= startPosition) {
@@ -445,6 +453,11 @@ fun <T : CardGridItem> CardGrid(
                                     )
                                 }
                             cardContent.invoke(details)
+                        }
+                        if (footerContent != null) {
+                            item(key = "card-grid-footer", span = { GridItemSpan(maxLineSpan) }) {
+                                footerContent()
+                            }
                         }
                     }
                     if (pager.isEmpty()) {

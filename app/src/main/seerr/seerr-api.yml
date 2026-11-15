@@ -828,6 +828,15 @@ components:
           example: false
         mediaInfo:
           $ref: '#/components/schemas/MediaInfo'
+        collectionMembership:
+          $ref: '#/components/schemas/CollectionMembership'
+    CollectionMembership:
+      type: object
+      properties:
+        kind:
+          type: string
+        collectionId:
+          type: integer
     TvResult:
       type: object
       properties:
@@ -6728,6 +6737,10 @@ paths:
             type: integer
             example: 1
             default: 1
+        - in: query
+          name: includeCollectionIds
+          schema:
+            type: boolean
         - in: query
           name: language
           schema:
