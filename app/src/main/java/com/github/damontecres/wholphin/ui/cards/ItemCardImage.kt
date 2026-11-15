@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.ColorFilter
@@ -111,11 +112,12 @@ fun ItemCardImage(
     useFallbackText: Boolean = true,
     contentScale: ContentScale = ContentScale.Fit,
     mediaPresentation: CardMediaPresentation? = null,
+    artworkAlpha: Float = 1f,
     fallback: @Composable BoxScope.() -> Unit = {
         ItemCardImageFallback(
             name = name,
             useFallbackText = useFallbackText,
-            modifier = Modifier,
+            modifier = Modifier.alpha(artworkAlpha),
         )
     },
 ) {
@@ -136,6 +138,7 @@ fun ItemCardImage(
                 modifier =
                     Modifier
                         .fillMaxSize()
+                        .alpha(artworkAlpha)
                         .align(Alignment.TopCenter),
             )
         } else {

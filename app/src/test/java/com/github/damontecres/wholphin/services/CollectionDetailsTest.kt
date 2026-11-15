@@ -13,6 +13,7 @@ import com.github.damontecres.wholphin.data.model.SeerrItemType
 import com.github.damontecres.wholphin.data.model.SeerrServer
 import com.github.damontecres.wholphin.data.model.SeerrUser
 import com.github.damontecres.wholphin.ui.collections.SeerrCollectionDetailsViewModel
+import com.github.damontecres.wholphin.ui.collections.collectionMovieArtworkAlpha
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -38,6 +39,17 @@ import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CollectionDetailsTest {
+    @Test fun collectionArtworkDimsOnlyConfirmedMissingStatuses() {
+        assertEquals(.45f, collectionMovieArtworkAlpha(SeerrAvailability.PENDING))
+        assertEquals(.45f, collectionMovieArtworkAlpha(SeerrAvailability.PROCESSING))
+        assertEquals(.45f, collectionMovieArtworkAlpha(SeerrAvailability.BLOCKLISTED))
+        assertEquals(.45f, collectionMovieArtworkAlpha(SeerrAvailability.DELETED))
+        assertEquals(1f, collectionMovieArtworkAlpha(SeerrAvailability.AVAILABLE))
+        assertEquals(1f, collectionMovieArtworkAlpha(SeerrAvailability.PARTIALLY_AVAILABLE))
+        assertEquals(1f, collectionMovieArtworkAlpha(SeerrAvailability.UNKNOWN))
+        assertEquals(1f, collectionMovieArtworkAlpha(null))
+    }
+
     @Test fun collectionProviderIdsRequirePositiveTypedTmdbMovieIdentity() {
         assertEquals(42 to 7, collectionProviderIds(mapOf("Tmdb" to "42", "TmdbCollection" to "7")))
         assertEquals(42 to null, collectionProviderIds(mapOf("Tmdb" to "42", "TmdbCollection" to "bad")))
