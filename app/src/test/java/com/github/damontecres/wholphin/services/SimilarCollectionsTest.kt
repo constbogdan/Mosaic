@@ -54,8 +54,10 @@ class SimilarCollectionsTest {
         var triggerStarted = true
         var triggerFailure: Exception? = null
         var triggerToken: UUID? = null
+        var triggerOverride: (suspend () -> Boolean)? = null
         var readFailure: Exception? = null
         var readOverride: (suspend (Int) -> SimilarCollectionsRead)? = null
+        var detailOverride: (suspend () -> CollectionDetailsData)? = null
         var metadata: suspend (
             Int,
         ) -> CollectionDetailsData = { id -> CollectionDetailsData(id, "Related $id", null, null, null, emptyList()) }
@@ -67,7 +69,8 @@ class SimilarCollectionsTest {
             sort: CollectionsSort,
         ): CollectionsPageData = error("unused")
 
-        override suspend fun detail(id: Int) = CollectionDetailsData(id, "Origin", null, null, null, emptyList())
+        override suspend fun detail(id: Int) =
+            detailOverride?.invoke() ?: CollectionDetailsData(id, "Origin", null, null, null, emptyList())
 
         override suspend fun similarDetail(id: Int): CollectionDetailsData {
             requestedMetadata += id
@@ -88,6 +91,7 @@ class SimilarCollectionsTest {
             triggerCalls++
             triggerToken = visitToken
             triggerFailure?.let { throw it }
+            triggerOverride?.let { return it() }
             return triggerStarted
         }
     }
@@ -183,6 +187,179 @@ class SimilarCollectionsTest {
             assertEquals(500, (failure as ServerException).statusCode)
         }
 
+    @Test fun collectionDetailsReadSimilarReadAndTriggerStartIndependently() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val detailGate = CompletableDeferred<CollectionDetailsData>()
+                val readGate = CompletableDeferred<SimilarCollectionsRead>()
+                val triggerGate = CompletableDeferred<Boolean>()
+                var detailCalls = 0
+                val backend =
+                    Backend().apply {
+                        detailOverride = {
+                            detailCalls++
+                            detailGate.await()
+                        }
+                        readOverride = { call -> if (call == 1) readGate.await() else read() }
+                        triggerOverride = { triggerGate.await() }
+                    }
+                val vm = viewModel(MutableStateFlow(session("one", backend)))
+                vm.show(7, "one", UUID.randomUUID().toString())
+                runCurrent()
+                assertEquals(1, detailCalls)
+                assertEquals(1, backend.readCalls)
+                assertEquals(1, backend.triggerCalls)
+                assertTrue(vm.state.value.loading)
+                assertTrue(vm.state.value.similarLoading)
+
+                readGate.complete(read(listOf(3)))
+                runCurrent()
+                assertEquals(
+                    listOf(3),
+                    vm.state.value.similar
+                        .map { it.id },
+                )
+                assertTrue(vm.state.value.loading)
+                detailGate.complete(CollectionDetailsData(7, "Origin", null, null, null, emptyList()))
+                runCurrent()
+                assertEquals(
+                    "Origin",
+                    vm.state.value.details
+                        ?.name,
+                )
+                assertTrue(vm.state.value.similarLoading)
+                triggerGate.complete(false)
+                vm.onScreenHidden()
+                runCurrent()
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun inactiveReadBeforeTriggerClaimDoesNotStopFastObservation() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val triggerGate = CompletableDeferred<Boolean>()
+                val backend =
+                    Backend().apply {
+                        reads = listOf(read())
+                        triggerOverride = { triggerGate.await() }
+                    }
+                val vm = viewModel(MutableStateFlow(session("one", backend)))
+                vm.show(7, "one", UUID.randomUUID().toString())
+                runCurrent()
+                assertEquals(1, backend.readCalls)
+                advanceTimeBy(499)
+                runCurrent()
+                assertEquals(1, backend.readCalls)
+                advanceTimeBy(1)
+                runCurrent()
+                assertEquals(2, backend.readCalls)
+                advanceTimeBy(1_500)
+                runCurrent()
+                assertTrue(vm.state.value.similarLoading)
+                triggerGate.complete(true)
+                runCurrent()
+                advanceTimeBy(1_000)
+                runCurrent()
+                assertFalse(vm.state.value.similarLoading)
+                assertEquals(1, backend.triggerCalls)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun fastTriggerCanFinishBeforePersistedReadWithoutHidingCards() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val readGate = CompletableDeferred<SimilarCollectionsRead>()
+                val backend =
+                    Backend().apply {
+                        readOverride = { call -> if (call == 1) readGate.await() else read(listOf(3)) }
+                    }
+                val vm = viewModel(MutableStateFlow(session("one", backend)))
+                vm.show(7, "one", UUID.randomUUID().toString())
+                runCurrent()
+                assertEquals(1, backend.triggerCalls)
+                assertEquals(1, backend.readCalls)
+                assertTrue(vm.state.value.similarLoading)
+
+                readGate.complete(read(listOf(3)))
+                runCurrent()
+                assertEquals(
+                    listOf(3),
+                    vm.state.value.similar
+                        .map { it.id },
+                )
+                advanceTimeBy(1_000)
+                runCurrent()
+                assertFalse(vm.state.value.similarLoading)
+                assertEquals(
+                    listOf(3),
+                    vm.state.value.similar
+                        .map { it.id },
+                )
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun slowSimilarGetNeverOverlapsAnotherGet() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val slowRead = CompletableDeferred<SimilarCollectionsRead>()
+                var activeReads = 0
+                var maximumReads = 0
+                val backend =
+                    Backend().apply {
+                        readOverride = { call ->
+                            activeReads++
+                            maximumReads = maxOf(maximumReads, activeReads)
+                            try {
+                                if (call == 2) slowRead.await() else read(active = call == 1)
+                            } finally {
+                                activeReads--
+                            }
+                        }
+                    }
+                val vm = viewModel(MutableStateFlow(session("one", backend)))
+                vm.show(7, "one", UUID.randomUUID().toString())
+                runCurrent()
+                advanceTimeBy(2_000)
+                runCurrent()
+                assertEquals(2, backend.readCalls)
+                assertEquals(1, maximumReads)
+                slowRead.complete(read())
+                runCurrent()
+                assertFalse(vm.state.value.similarLoading)
+                assertEquals(1, maximumReads)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun activeDiscoveryObservationEndsWithinFiniteWindow() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val backend = Backend().apply { reads = listOf(read(active = true)) }
+                val vm = viewModel(MutableStateFlow(session("one", backend)))
+                vm.show(7, "one", UUID.randomUUID().toString())
+                runCurrent()
+                advanceTimeBy(24_000)
+                runCurrent()
+                assertFalse(vm.state.value.similarLoading)
+                assertTrue(backend.readCalls <= 50)
+                assertEquals(1, backend.triggerCalls)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
     @Test fun persistedAndNewIdsRenderProgressivelyInServerOrder() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
@@ -208,7 +385,7 @@ class SimilarCollectionsTest {
                 assertTrue(vm.state.value.similarLoading)
                 assertEquals(1, backend.triggerCalls)
                 assertEquals(UUID.fromString(token), backend.triggerToken)
-                advanceTimeBy(2_000)
+                advanceTimeBy(500)
                 runCurrent()
                 assertEquals(
                     listOf(4),
@@ -223,7 +400,7 @@ class SimilarCollectionsTest {
                     vm.state.value.similar
                         .map { it.id },
                 )
-                advanceTimeBy(2_000)
+                advanceTimeBy(500)
                 runCurrent()
                 assertFalse(vm.state.value.similarLoading)
                 assertEquals(4, backend.readCalls) // Initial, two polls, final boundary read.
@@ -254,9 +431,9 @@ class SimilarCollectionsTest {
                 val vm = viewModel(MutableStateFlow(session("one", backend)))
                 vm.show(7, "one", UUID.randomUUID().toString())
                 runCurrent()
-                advanceTimeBy(4_000)
+                advanceTimeBy(500)
                 runCurrent()
-                assertEquals(4, backend.readCalls)
+                assertEquals(3, backend.readCalls)
                 assertEquals(1, backend.triggerCalls)
                 assertFalse(vm.state.value.similarLoading)
                 assertTrue(
@@ -423,13 +600,15 @@ class SimilarCollectionsTest {
             }
         }
 
-    @Test fun unavailableReadDoesNotTriggerOrEraseCollectionDetails() =
+    @Test fun unavailableReadDoesNotBlockTriggerOrEraseCollectionDetails() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             try {
                 val backend = Backend().apply { readFailure = IOException("GET unavailable") }
                 val vm = viewModel(MutableStateFlow(session("one", backend)))
                 vm.show(7, "one", UUID.randomUUID().toString())
+                runCurrent()
+                advanceTimeBy(1_000)
                 runCurrent()
                 assertEquals(
                     "Origin",
@@ -438,7 +617,7 @@ class SimilarCollectionsTest {
                 )
                 assertTrue(vm.state.value.similarReadError)
                 assertFalse(vm.state.value.similarLoading)
-                assertEquals(0, backend.triggerCalls)
+                assertEquals(1, backend.triggerCalls)
             } finally {
                 Dispatchers.resetMain()
             }
@@ -573,7 +752,7 @@ class SimilarCollectionsTest {
                 assertEquals(0, second.readCalls)
                 vm.show(7, "one", entry)
                 runCurrent()
-                assertEquals(2, second.readCalls) // Resume read plus bounded final refresh.
+                assertEquals(1, second.readCalls) // Resume read without a new trigger or active claim.
                 assertEquals(0, second.triggerCalls)
                 vm.onScreenHidden()
                 advanceUntilIdle()
