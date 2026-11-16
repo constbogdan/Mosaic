@@ -1,131 +1,142 @@
 package com.github.damontecres.wholphin.services
 
 import com.github.damontecres.wholphin.api.seerr.SeerrApiClient
+import com.github.damontecres.wholphin.api.seerr.infrastructure.ServerException
 import com.github.damontecres.wholphin.api.seerr.model.PublicSettings
+import com.github.damontecres.wholphin.api.seerr.model.SimilarCollectionsRead
 import com.github.damontecres.wholphin.api.seerr.model.User
-import com.github.damontecres.wholphin.data.model.DiscoverItem
 import com.github.damontecres.wholphin.data.model.SeerrAuthMethod
-import com.github.damontecres.wholphin.data.model.SeerrAvailability
-import com.github.damontecres.wholphin.data.model.SeerrItemType
 import com.github.damontecres.wholphin.data.model.SeerrServer
 import com.github.damontecres.wholphin.data.model.SeerrUser
 import com.github.damontecres.wholphin.ui.collections.SeerrCollectionDetailsViewModel
-import com.github.damontecres.wholphin.ui.collections.chooseReleasedSeed
-import com.github.damontecres.wholphin.ui.collections.discoverSimilarCollectionIds
+import com.github.damontecres.wholphin.ui.collections.verifiedSimilarIds
 import com.github.damontecres.wholphin.ui.nav.Destination
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
-import java.time.LocalDate
+import java.util.UUID
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SimilarCollectionsTest {
-    private fun movie(
-        id: Int,
-        date: LocalDate?,
-    ) = DiscoverItem(id, SeerrItemType.MOVIE, "Movie $id", null, null, SeerrAvailability.UNKNOWN, date, null, null, null, null)
+    private fun read(
+        ids: List<Int> = emptyList(),
+        active: Boolean = false,
+        completed: Int = 0,
+        incomplete: Int = 0,
+    ) = SimilarCollectionsRead(ids, completed, incomplete, active)
 
-    @Test fun seedUsesOnlyReleasedMembersAndDeterministicChoice() {
-        val today = LocalDate.of(2026, 11, 15)
-        val movies = listOf(movie(1, null), movie(2, today.plusDays(1)), movie(3, today), movie(4, today.minusYears(1)))
-        assertEquals(
-            4,
-            chooseReleasedSeed(movies, today) { count ->
-                assertEquals(2, count)
-                1
-            },
-        )
-        assertNull(chooseReleasedSeed(movies.take(2), today) { 0 })
+    private class Backend : CollectionsBackend {
+        var reads: List<SimilarCollectionsRead> = emptyList()
+        var readCalls = 0
+        var triggerCalls = 0
+        var triggerStarted = true
+        var triggerFailure: Exception? = null
+        var triggerToken: UUID? = null
+        var readFailure: Exception? = null
+        var readOverride: (suspend (Int) -> SimilarCollectionsRead)? = null
+        var metadata: suspend (
+            Int,
+        ) -> CollectionDetailsData = { id -> CollectionDetailsData(id, "Related $id", null, null, null, emptyList()) }
+        val requestedMetadata = mutableListOf<Int>()
+
+        override suspend fun page(
+            skip: Int,
+            filter: CollectionsFilter,
+            sort: CollectionsSort,
+        ): CollectionsPageData = error("unused")
+
+        override suspend fun detail(id: Int) = CollectionDetailsData(id, "Origin", null, null, null, emptyList())
+
+        override suspend fun similarDetail(id: Int): CollectionDetailsData {
+            requestedMetadata += id
+            return metadata(id)
+        }
+
+        override suspend fun readSimilar(id: Int): SimilarCollectionsRead {
+            readCalls++
+            readFailure?.let { throw it }
+            readOverride?.let { return it(readCalls) }
+            return reads.getOrElse(readCalls - 1) { reads.last() }
+        }
+
+        override suspend fun triggerSimilar(
+            id: Int,
+            visitToken: UUID,
+        ): Boolean {
+            triggerCalls++
+            triggerToken = visitToken
+            triggerFailure?.let { throw it }
+            return triggerStarted
+        }
     }
 
-    @Test fun discoveryPreservesOrderDeduplicatesAndStopsAtLastPage() =
-        runTest {
-            val pages = mutableListOf<Int>()
-            val ids =
-                discoverSimilarCollectionIds(7) { page ->
-                    pages += page
-                    when (page) {
-                        1 -> SimilarRecommendationsPage(2, listOf(null, 7, 3, 3, -1, 4))
-                        else -> SimilarRecommendationsPage(2, listOf(4, 5, null))
-                    }
-                }
-            assertEquals(listOf(3, 4, 5), ids)
-            assertEquals(listOf(1, 2), pages)
-        }
+    private fun session(
+        owner: String,
+        backend: CollectionsBackend,
+    ) = CollectionsSession(owner, SeerrApiClient("http://seerr.invalid/api/v1", null, OkHttpClient()), backend, { true })
 
-    @Test fun discoveryNeverExceedsTenCollectionsOrThreePages() =
-        runTest {
-            var calls = 0
-            val ids =
-                discoverSimilarCollectionIds(100) { page ->
-                    calls++
-                    SimilarRecommendationsPage(99, (page * 10 until page * 10 + 10).toList())
-                }
-            assertEquals(10, ids.size)
-            assertEquals(1, calls)
-            calls = 0
-            val sparse =
-                discoverSimilarCollectionIds(100) {
-                    calls++
-                    SimilarRecommendationsPage(99, listOf(it))
-                }
-            assertEquals(listOf(1, 2, 3), sparse)
-            assertEquals(3, calls)
-        }
+    private fun viewModel(
+        sessions: MutableStateFlow<CollectionsSession?>,
+        navigation: NavigationManager = mockk(relaxed = true),
+    ): SeerrCollectionDetailsViewModel {
+        val source = mockk<CollectionsSessionSource>()
+        every { source.sessions } returns sessions
+        return SeerrCollectionDetailsViewModel(source, navigation)
+    }
 
-    @Test fun laterRecommendationFailureRetainsEarlierCandidates() =
-        runTest {
-            val ids =
-                discoverSimilarCollectionIds(7) { page ->
-                    if (page == 2) throw IOException("optional page failed")
-                    SimilarRecommendationsPage(3, listOf(3, 4))
-                }
-            assertEquals(listOf(3, 4), ids)
-        }
+    @Test fun verifiedIdsPreserveServerOrderWithoutDuplicatesOrOrigin() {
+        assertEquals(listOf(4, 3, 12), verifiedSimilarIds(7, listOf(4, 7, 0, 3, 4, -1, 12)))
+        assertEquals((1..24).toList(), verifiedSimilarIds(100, (1..24).toList()))
+    }
 
-    @Test fun enrichmentUsesOneAuthenticatedRecommendationsCallAndIgnoresUnresolved() =
+    @Test fun generatedContractUsesOneAuthenticatedReadAndOneUuidTrigger() =
         runTest {
-            val requests = mutableListOf<String>()
+            val requests = mutableListOf<Pair<String, String>>()
             val http =
                 OkHttpClient
                     .Builder()
                     .addInterceptor { chain ->
                         val request = chain.request()
-                        requests += request.url.toString()
+                        requests += request.method to request.url.encodedPath
+                        val body =
+                            if (request.method == "GET") {
+                                """{"relatedCollectionIds":[528,5547],"completedSeedCount":3,"incompleteSeedCount":0,"discoveryActive":false}"""
+                            } else {
+                                val postBody = okio.Buffer().also { request.body?.writeTo(it) }.readUtf8()
+                                assertTrue(postBody.contains("\"visitToken\""))
+                                """{"started":false}"""
+                            }
                         Response
                             .Builder()
                             .request(request)
                             .protocol(Protocol.HTTP_1_1)
-                            .code(200)
+                            .code(if (request.method == "GET") 200 else 202)
                             .message("fixture")
-                            .body(
-                                """{"page":1,"totalPages":1,"results":[
-                              {"id":1,"mediaType":"movie","collectionMembership":{"kind":"collection","collectionId":12}},
-                              {"id":2,"mediaType":"movie","collectionMembership":{"kind":"standalone"}},
-                              {"id":3,"mediaType":"movie","collectionMembership":{"kind":"unresolved"}},
-                              {"id":4,"mediaType":"movie","collectionMembership":{"kind":"collection","collectionId":0}}
-                            ]}""".toResponseBody("application/json".toMediaType()),
-                            ).build()
+                            .body(body.toResponseBody("application/json".toMediaType()))
+                            .build()
                     }.build()
-            val client = SeerrApiClient("http://seerr.invalid/api/v1", "fixture-key", http)
             val current =
                 CurrentSeerr(
                     SeerrServer(1, "http://seerr.invalid"),
@@ -133,180 +144,477 @@ class SimilarCollectionsTest {
                     User(id = 7),
                     PublicSettings(),
                 )
-            val page = SeerrCollectionsBackend(client, current).similarRecommendations(42, 1)
-            assertEquals(listOf(12, null, null, null), page.collectionIds)
-            assertEquals(1, requests.size)
-            assertTrue(requests.single().contains("/api/v1/movie/42/recommendations"))
-            assertTrue(requests.single().contains("includeCollectionIds=true"))
-            assertTrue(requests.single().contains("page=1"))
+            val client = SeerrApiClient("http://seerr.invalid/api/v1", "fixture-key", http)
+            assertTrue(client.hasValidCredentials)
+            val backend = SeerrCollectionsBackend(client, current)
+            assertEquals(listOf(528, 5547), backend.readSimilar(7).relatedCollectionIds)
+            assertFalse(backend.triggerSimilar(7, UUID.randomUUID()))
+            assertEquals(
+                listOf("GET" to "/api/v1/collection/7/similar", "POST" to "/api/v1/collection/7/similar"),
+                requests,
+            )
         }
 
-    @Test fun newDetailEntryKeepsSeedAndMetadataOrderDespiteOutOfOrderCompletion() =
+    @Test fun persistenceRead500IsAnErrorNotAnEmptyState() =
         runTest {
-            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-            try {
-                val first = CompletableDeferred<CollectionDetailsData>()
-                val second = CompletableDeferred<CollectionDetailsData>()
-                var recommendationCalls = 0
-                val backend =
-                    object : CollectionsBackend {
-                        override suspend fun page(
-                            skip: Int,
-                            filter: CollectionsFilter,
-                            sort: CollectionsSort,
-                        ) = error("Not used")
-
-                        override suspend fun detail(id: Int): CollectionDetailsData =
-                            when (id) {
-                                7 -> CollectionDetailsData(id, "Origin", null, null, null, listOf(movie(42, LocalDate.of(2020, 1, 1))))
-                                3 -> first.await()
-                                4 -> second.await()
-                                else -> error("Unexpected collection")
-                            }
-
-                        override suspend fun similarRecommendations(
-                            seedMovieId: Int,
-                            page: Int,
-                        ): SimilarRecommendationsPage {
-                            assertEquals(42, seedMovieId)
-                            recommendationCalls++
-                            return SimilarRecommendationsPage(1, listOf(3, 4))
-                        }
-                    }
-                val sessions = MutableStateFlow<CollectionsSession?>(testSession("one", backend))
-                val source = mockk<CollectionsSessionSource>()
-                every { source.sessions } returns sessions
-                val stack = mutableListOf<Destination>(Destination.SeerrCollection(7, null, null, "one"))
-                val navigation = mockk<NavigationManager>(relaxed = true)
-                every { navigation.backStack } returns stack
-                every { navigation.navigateTo(any()) } answers {
-                    stack.add(firstArg())
-                    Unit
-                }
-                val vm = SeerrCollectionDetailsViewModel(source, navigation)
-                vm.show(7, "one")
-                runCurrent()
-                assertEquals(42, vm.state.value.similarSeedId)
-                vm.retry() // A normal detail refresh must not invalidate the optional row load.
-                runCurrent()
-                second.complete(CollectionDetailsData(4, "Fourth", null, null, null, emptyList()))
-                runCurrent()
-                assertTrue(vm.state.value.similarLoading)
-                first.complete(CollectionDetailsData(3, "Third", null, null, null, emptyList()))
-                runCurrent()
-                assertEquals(
-                    listOf(3, 4),
-                    vm.state.value.similar
-                        .map { it.id },
+            val http =
+                OkHttpClient
+                    .Builder()
+                    .addInterceptor { chain ->
+                        Response
+                            .Builder()
+                            .request(chain.request())
+                            .protocol(Protocol.HTTP_1_1)
+                            .code(500)
+                            .message("fixture")
+                            .body("""{"message":"Unable to read Similar Collections"}""".toResponseBody("application/json".toMediaType()))
+                            .build()
+                    }.build()
+            val current =
+                CurrentSeerr(
+                    SeerrServer(1, "http://seerr.invalid"),
+                    SeerrUser(1, 1, SeerrAuthMethod.JELLYFIN, "admin", null, null),
+                    User(id = 7),
+                    PublicSettings(),
                 )
-                vm.retry()
-                runCurrent()
-                assertEquals(42, vm.state.value.similarSeedId)
-                assertEquals(1, recommendationCalls)
-                vm.focusSimilar(4)
-                vm.openSimilar(4)
-                assertEquals(4, (stack.last() as Destination.SeerrCollection).collectionId)
-                assertNull((stack.last() as Destination.SeerrCollection).availableMovies)
-                val firstToken = (stack.last() as Destination.SeerrCollection).entryToken
-                vm.openSimilar(4)
-                assertEquals(2, stack.size)
-                stack.removeLast()
-                vm.openSimilar(4)
-                assertEquals(2, stack.size)
-                assertTrue((stack.last() as Destination.SeerrCollection).entryToken != firstToken)
-                assertEquals(4, vm.state.value.similarFocusedId)
-            } finally {
-                Dispatchers.resetMain()
-            }
+            val backend = SeerrCollectionsBackend(SeerrApiClient("http://seerr.invalid/api/v1", "fixture-key", http), current)
+            val failure = runCatching { backend.readSimilar(7) }.exceptionOrNull()
+            assertTrue(failure is ServerException)
+            assertEquals(500, (failure as ServerException).statusCode)
         }
 
-    @Test fun sessionChangeDiscardsPendingSimilarResults() =
+    @Test fun persistedAndNewIdsRenderProgressivelyInServerOrder() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             try {
-                val pending = CompletableDeferred<SimilarRecommendationsPage>()
+                val slow = CompletableDeferred<CollectionDetailsData>()
                 val backend =
-                    object : CollectionsBackend {
-                        override suspend fun page(
-                            skip: Int,
-                            filter: CollectionsFilter,
-                            sort: CollectionsSort,
-                        ) = error("Not used")
-
-                        override suspend fun detail(id: Int) =
-                            CollectionDetailsData(id, "Origin", null, null, null, listOf(movie(42, LocalDate.of(2020, 1, 1))))
-
-                        override suspend fun similarRecommendations(
-                            seedMovieId: Int,
-                            page: Int,
-                        ) = pending.await()
+                    Backend().apply {
+                        reads =
+                            listOf(
+                                read(listOf(3), true),
+                                read(listOf(3, 4), true),
+                                read(listOf(3, 4), false),
+                                read(listOf(3, 4, 5), false),
+                            )
+                        metadata =
+                            { id -> if (id == 3) slow.await() else CollectionDetailsData(id, "Fourth", null, null, null, emptyList()) }
                     }
-                val sessions = MutableStateFlow<CollectionsSession?>(testSession("one", backend))
-                val source = mockk<CollectionsSessionSource>()
-                every { source.sessions } returns sessions
-                val vm = SeerrCollectionDetailsViewModel(source, mockk(relaxed = true))
-                vm.show(7, "one")
+                val vm = viewModel(MutableStateFlow(session("one", backend)))
+                val token = UUID.randomUUID().toString()
+                vm.show(7, "one", token)
                 runCurrent()
+                assertEquals(listOf(3), vm.state.value.similarIds)
                 assertTrue(vm.state.value.similarLoading)
-                sessions.value = testSession("two", backend)
-                runCurrent()
-                pending.complete(SimilarRecommendationsPage(1, listOf(3)))
-                runCurrent()
-                assertEquals("two", vm.state.value.owner)
-                assertTrue(
-                    vm.state.value.similar
-                        .isEmpty(),
-                )
-                assertNull(vm.state.value.similarSeedId)
-            } finally {
-                Dispatchers.resetMain()
-            }
-        }
-
-    @Test fun failedCandidateDetailDoesNotFailTheWholeRow() =
-        runTest {
-            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-            try {
-                val backend =
-                    object : CollectionsBackend {
-                        override suspend fun page(
-                            skip: Int,
-                            filter: CollectionsFilter,
-                            sort: CollectionsSort,
-                        ) = error("Not used")
-
-                        override suspend fun detail(id: Int) =
-                            when (id) {
-                                7 -> CollectionDetailsData(id, "Origin", null, null, null, listOf(movie(42, LocalDate.of(2020, 1, 1))))
-                                3 -> throw IOException("metadata unavailable")
-                                4 -> CollectionDetailsData(id, "Fourth", null, null, null, emptyList())
-                                else -> error("Unexpected collection")
-                            }
-
-                        override suspend fun similarRecommendations(
-                            seedMovieId: Int,
-                            page: Int,
-                        ) = SimilarRecommendationsPage(1, listOf(3, 4))
-                    }
-                val sessions = MutableStateFlow<CollectionsSession?>(testSession("one", backend))
-                val source = mockk<CollectionsSessionSource>()
-                every { source.sessions } returns sessions
-                val vm = SeerrCollectionDetailsViewModel(source, mockk(relaxed = true))
-                vm.show(7, "one")
+                assertEquals(1, backend.triggerCalls)
+                assertEquals(UUID.fromString(token), backend.triggerToken)
+                advanceTimeBy(2_000)
                 runCurrent()
                 assertEquals(
                     listOf(4),
                     vm.state.value.similar
                         .map { it.id },
                 )
-                assertTrue(!vm.state.value.similarLoading)
+                assertEquals(listOf(3, 4), vm.state.value.similarIds)
+                slow.complete(CollectionDetailsData(3, "Third", null, null, null, emptyList()))
+                runCurrent()
+                assertEquals(
+                    listOf(3, 4),
+                    vm.state.value.similar
+                        .map { it.id },
+                )
+                advanceTimeBy(2_000)
+                runCurrent()
+                assertFalse(vm.state.value.similarLoading)
+                assertEquals(4, backend.readCalls) // Initial, two polls, final boundary read.
+                assertEquals(
+                    listOf(3, 4, 5),
+                    vm.state.value.similar
+                        .map { it.id },
+                )
+                assertEquals(listOf(3, 4, 5), backend.requestedMetadata)
+                vm.retry() // Ordinary full-detail refresh does not retrigger discovery or metadata.
+                runCurrent()
+                assertEquals(1, backend.triggerCalls)
+                assertEquals(listOf(3, 4, 5), backend.requestedMetadata)
             } finally {
                 Dispatchers.resetMain()
             }
         }
 
-    private fun testSession(
-        owner: String,
-        backend: CollectionsBackend,
-    ) = CollectionsSession(owner, SeerrApiClient("http://seerr.invalid/api/v1", null, OkHttpClient()), backend, { true })
+    @Test fun inactiveAndEmptyAreValidButStillGetFinalRefresh() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val backend =
+                    Backend().apply {
+                        reads = listOf(read(), read(), read(), read())
+                        triggerStarted = false
+                    }
+                val vm = viewModel(MutableStateFlow(session("one", backend)))
+                vm.show(7, "one", UUID.randomUUID().toString())
+                runCurrent()
+                advanceTimeBy(4_000)
+                runCurrent()
+                assertEquals(4, backend.readCalls)
+                assertEquals(1, backend.triggerCalls)
+                assertFalse(vm.state.value.similarLoading)
+                assertTrue(
+                    vm.state.value.similar
+                        .isEmpty(),
+                )
+                assertFalse(vm.state.value.similarReadError)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun dozensOfRelatedCollectionsUseOnlyThreeConcurrentMetadataRequests() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val gate = CompletableDeferred<Unit>()
+                var active = 0
+                var maximum = 0
+                val backend =
+                    Backend().apply {
+                        reads = listOf(read((1..24).toList()))
+                        metadata = { id ->
+                            active++
+                            maximum = maxOf(maximum, active)
+                            gate.await()
+                            active--
+                            CollectionDetailsData(id, "Related $id", null, null, null, emptyList())
+                        }
+                    }
+                val vm = viewModel(MutableStateFlow(session("one", backend)))
+                vm.show(100, "one", UUID.randomUUID().toString())
+                runCurrent()
+                assertEquals(3, active)
+                assertEquals(3, backend.requestedMetadata.size)
+                gate.complete(Unit)
+                runCurrent()
+                advanceTimeBy(4_000)
+                runCurrent()
+                assertEquals(3, maximum)
+                assertEquals(
+                    (1..24).toList(),
+                    vm.state.value.similar
+                        .map { it.id },
+                )
+                assertEquals(24, backend.requestedMetadata.distinct().size)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun removedRelationshipDropsCardAndFocusedIdentity() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val backend =
+                    Backend().apply {
+                        reads = listOf(read(listOf(3, 4), true), read(listOf(3), false))
+                    }
+                val vm = viewModel(MutableStateFlow(session("one", backend)))
+                vm.show(7, "one", UUID.randomUUID().toString())
+                runCurrent()
+                vm.focusSimilar(4)
+                assertEquals(4, vm.state.value.similarFocusedId)
+                advanceTimeBy(2_000)
+                runCurrent()
+                assertEquals(
+                    listOf(3),
+                    vm.state.value.similar
+                        .map { it.id },
+                )
+                assertEquals(null, vm.state.value.similarFocusedId)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun failedMetadataDoesNotBlockOtherCardsOrRetryOnEveryPoll() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val backend =
+                    Backend().apply {
+                        reads = listOf(read(listOf(3, 4)))
+                        metadata = { id ->
+                            if (id == 3) throw IOException("metadata unavailable")
+                            CollectionDetailsData(id, "Fourth", null, null, null, emptyList())
+                        }
+                    }
+                val vm = viewModel(MutableStateFlow(session("one", backend)))
+                vm.show(7, "one", UUID.randomUUID().toString())
+                runCurrent()
+                advanceTimeBy(4_000)
+                runCurrent()
+                assertEquals(
+                    listOf(4),
+                    vm.state.value.similar
+                        .map { it.id },
+                )
+                assertEquals(listOf(3, 4), backend.requestedMetadata)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun metadataStillFinishesAfterFiniteObservationSpinnerStops() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val gate = CompletableDeferred<Unit>()
+                val backend =
+                    Backend().apply {
+                        reads = listOf(read(listOf(3)))
+                        metadata = { id ->
+                            gate.await()
+                            CollectionDetailsData(id, "Related $id", null, null, null, emptyList())
+                        }
+                    }
+                val vm = viewModel(MutableStateFlow(session("one", backend)))
+                vm.show(7, "one", UUID.randomUUID().toString())
+                runCurrent()
+                advanceTimeBy(4_000)
+                runCurrent()
+                assertFalse(vm.state.value.similarLoading)
+                assertTrue(
+                    vm.state.value.similar
+                        .isEmpty(),
+                )
+                gate.complete(Unit)
+                runCurrent()
+                assertEquals(
+                    listOf(3),
+                    vm.state.value.similar
+                        .map { it.id },
+                )
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun leavingScreenCancelsPollingAndReturningRefreshesWithoutNewTrigger() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val backend = Backend().apply { reads = listOf(read(listOf(3), true)) }
+                val vm = viewModel(MutableStateFlow(session("one", backend)))
+                val entry = UUID.randomUUID().toString()
+                vm.show(7, "one", entry)
+                runCurrent()
+                vm.onScreenHidden()
+                advanceTimeBy(30_000)
+                runCurrent()
+                assertEquals(1, backend.readCalls)
+                assertEquals(1, backend.triggerCalls)
+                vm.show(7, "one", entry)
+                runCurrent()
+                assertEquals(2, backend.readCalls)
+                assertEquals(1, backend.triggerCalls)
+                assertEquals(listOf(3), backend.requestedMetadata)
+                vm.onScreenHidden()
+                advanceUntilIdle()
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun unavailableReadDoesNotTriggerOrEraseCollectionDetails() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val backend = Backend().apply { readFailure = IOException("GET unavailable") }
+                val vm = viewModel(MutableStateFlow(session("one", backend)))
+                vm.show(7, "one", UUID.randomUUID().toString())
+                runCurrent()
+                assertEquals(
+                    "Origin",
+                    vm.state.value.details
+                        ?.name,
+                )
+                assertTrue(vm.state.value.similarReadError)
+                assertFalse(vm.state.value.similarLoading)
+                assertEquals(0, backend.triggerCalls)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun triggerFailureKeepsPersistedCardsAndDoesNotRetryThePost() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val backend =
+                    Backend().apply {
+                        reads = listOf(read(listOf(3)))
+                        triggerFailure = IOException("POST failed")
+                    }
+                val vm = viewModel(MutableStateFlow(session("one", backend)))
+                vm.show(7, "one", UUID.randomUUID().toString())
+                runCurrent()
+                assertTrue(vm.state.value.similarTriggerError)
+                assertEquals(
+                    listOf(3),
+                    vm.state.value.similar
+                        .map { it.id },
+                )
+                advanceTimeBy(4_000)
+                runCurrent()
+                assertEquals(1, backend.triggerCalls)
+                assertFalse(vm.state.value.similarLoading)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun sameEntryAndChildBackDoNotRetriggerButNewSameIdEntryDoes() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val backend = Backend().apply { reads = listOf(read()) }
+                val vm = viewModel(MutableStateFlow(session("one", backend)))
+                val first = UUID.randomUUID().toString()
+                vm.show(7, "one", first)
+                runCurrent()
+                vm.show(7, "one", first) // Recomposition or return from a child.
+                runCurrent()
+                assertEquals(1, backend.triggerCalls)
+                vm.show(7, "one", UUID.randomUUID().toString())
+                runCurrent()
+                assertEquals(2, backend.triggerCalls)
+                vm.onScreenHidden()
+                runCurrent()
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun nestedCollectionBackRestoresFocusedRelationshipWithoutRetrigger() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val backend = Backend().apply { reads = listOf(read(listOf(3))) }
+                val entry = UUID.randomUUID().toString()
+                val stack = mutableListOf<Destination>(Destination.SeerrCollection(7, null, null, "one", entry))
+                val navigation = mockk<NavigationManager>(relaxed = true)
+                every { navigation.backStack } returns stack
+                every { navigation.navigateTo(any()) } answers {
+                    stack.add(firstArg())
+                    Unit
+                }
+                val vm = viewModel(MutableStateFlow(session("one", backend)), navigation)
+                vm.show(7, "one", entry)
+                runCurrent()
+                vm.focusSimilar(3)
+                vm.openSimilar(3)
+                assertEquals(3, (stack.last() as Destination.SeerrCollection).collectionId)
+                assertTrue((stack.last() as Destination.SeerrCollection).entryToken.isNotBlank())
+                vm.onScreenHidden()
+                stack.removeLast()
+                vm.show(7, "one", entry)
+                runCurrent()
+                assertEquals(3, vm.state.value.similarFocusedId)
+                assertEquals(1, backend.triggerCalls)
+                vm.onScreenHidden()
+                advanceUntilIdle()
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun sessionSwitchCancelsOldMetadataAndObservation() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val slow = CompletableDeferred<CollectionDetailsData>()
+                val old =
+                    Backend().apply {
+                        reads = listOf(read(listOf(3), true))
+                        metadata = { slow.await() }
+                    }
+                val sessions = MutableStateFlow<CollectionsSession?>(session("one", old))
+                val vm = viewModel(sessions)
+                vm.show(7, "one", UUID.randomUUID().toString())
+                runCurrent()
+                sessions.value = session("two", Backend())
+                runCurrent()
+                slow.complete(CollectionDetailsData(3, "Stale", null, null, null, emptyList()))
+                advanceTimeBy(30_000)
+                runCurrent()
+                assertEquals("two", vm.state.value.owner)
+                assertTrue(
+                    vm.state.value.similar
+                        .isEmpty(),
+                )
+                assertEquals(1, old.readCalls)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun sessionRefreshWhileParentIsHiddenDoesNotStartPolling() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val first = Backend().apply { reads = listOf(read()) }
+                val second = Backend().apply { reads = listOf(read()) }
+                val sessions = MutableStateFlow<CollectionsSession?>(session("one", first))
+                val vm = viewModel(sessions)
+                val entry = UUID.randomUUID().toString()
+                vm.show(7, "one", entry)
+                runCurrent()
+                vm.onScreenHidden()
+                sessions.value = session("one", second)
+                runCurrent()
+                assertEquals(0, second.readCalls)
+                vm.show(7, "one", entry)
+                runCurrent()
+                assertEquals(2, second.readCalls) // Resume read plus bounded final refresh.
+                assertEquals(0, second.triggerCalls)
+                vm.onScreenHidden()
+                advanceUntilIdle()
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun lateCancelledReadCannotStopNewObservation() {
+        val dispatcher = StandardTestDispatcher()
+        Dispatchers.setMain(dispatcher)
+        try {
+            runTest(dispatcher) {
+                val old = CompletableDeferred<SimilarCollectionsRead>()
+                val backend =
+                    Backend().apply {
+                        readOverride = { call ->
+                            if (call == 1) withContext(NonCancellable) { old.await() } else read(active = true)
+                        }
+                    }
+                val vm = viewModel(MutableStateFlow(session("one", backend)))
+                val entry = UUID.randomUUID().toString()
+                vm.show(7, "one", entry)
+                runCurrent()
+                vm.onScreenHidden()
+                vm.show(7, "one", entry)
+                runCurrent()
+                assertTrue(vm.state.value.similarLoading)
+                assertEquals(1, backend.triggerCalls)
+                old.complete(read(listOf(9)))
+                runCurrent()
+                assertTrue(vm.state.value.similarLoading)
+                assertTrue(
+                    vm.state.value.similarIds
+                        .isEmpty(),
+                )
+                vm.onScreenHidden()
+                advanceUntilIdle()
+            }
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
 }

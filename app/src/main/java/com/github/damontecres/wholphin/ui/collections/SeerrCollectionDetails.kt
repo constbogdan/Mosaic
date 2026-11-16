@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -70,7 +71,10 @@ internal fun SeerrCollectionDetails(
             !state.requestEligibilityLoading &&
             state.requestEligibility.values.any { it == CollectionRequestEligibility.ELIGIBLE }
     LaunchedEffect(destination.collectionId, destination.owner, destination.entryToken) {
-        viewModel.show(destination.collectionId, destination.owner)
+        viewModel.show(destination.collectionId, destination.owner, destination.entryToken)
+    }
+    DisposableEffect(viewModel, destination.collectionId, destination.owner, destination.entryToken) {
+        onDispose { viewModel.onScreenHidden(destination.entryToken) }
     }
     LaunchedEffect(state.request, state.loading, state.requestEligibilityLoading, state.details, posterActionable) {
         if (state.request != null) {
@@ -201,19 +205,27 @@ internal fun SeerrCollectionDetails(
                         )
                     },
                     footerContent =
-                        if (state.owner == destination.owner && (state.similarLoading || state.similar.isNotEmpty())) {
+                        if (state.owner == destination.owner &&
+                            (state.similarLoading || state.similar.isNotEmpty() || state.similarReadError || state.similarTriggerError)
+                        ) {
                             {
-                                if (state.similarLoading) {
-                                    LoadingPage(Modifier.fillMaxWidth().height(120.dp), focusEnabled = false)
-                                } else {
-                                    SimilarCollectionsRow(
-                                        collections = state.similar,
-                                        selectedId = state.similarFocusedId,
-                                        focusRequester = similarFocus,
-                                        listState = similarListState,
-                                        onFocus = viewModel::focusSimilar,
-                                        onOpen = viewModel::openSimilar,
-                                    )
+                                Column {
+                                    if (state.similar.isNotEmpty()) {
+                                        SimilarCollectionsRow(
+                                            collections = state.similar,
+                                            selectedId = state.similarFocusedId,
+                                            focusRequester = similarFocus,
+                                            listState = similarListState,
+                                            onFocus = viewModel::focusSimilar,
+                                            onOpen = viewModel::openSimilar,
+                                        )
+                                    }
+                                    if (state.similarLoading && state.similar.isEmpty()) {
+                                        LoadingPage(Modifier.fillMaxWidth().height(120.dp), focusEnabled = false)
+                                    }
+                                    if (state.similarReadError || state.similarTriggerError) {
+                                        Text(stringResource(R.string.collections_similar_unavailable), Modifier.padding(24.dp))
+                                    }
                                 }
                             }
                         } else {

@@ -16,15 +16,17 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import java.io.IOException
 import java.util.UUID
 import javax.inject.Inject
-import kotlin.random.Random
 
 internal data class CollectionDetailsState(
     val owner: String? = null,
@@ -38,10 +40,11 @@ internal data class CollectionDetailsState(
     val requestEligibility: Map<Int, CollectionRequestEligibility> = emptyMap(),
     val requestEligibilityLoading: Boolean = false,
     val request: CollectionRequestState? = null,
-    val similarSeedId: Int? = null,
+    val similarIds: List<Int> = emptyList(),
     val similar: List<CollectionDetailsData> = emptyList(),
     val similarLoading: Boolean = false,
-    val similarLoaded: Boolean = false,
+    val similarReadError: Boolean = false,
+    val similarTriggerError: Boolean = false,
     val similarFocusedId: Int? = null,
 )
 
@@ -63,6 +66,12 @@ internal class SeerrCollectionDetailsViewModel
         private var activeSubmissionId: Int? = null
         private var generation = 0L
         private var entryGeneration = 0L
+        private var similarGeneration = 0L
+        private var entryToken = ""
+        private var visitToken: UUID? = null
+        private var triggerAttempted = false
+        private var screenVisible = false
+        private val failedSimilarMetadataIds = mutableSetOf<Int>()
 
         init {
             viewModelScope.launch {
@@ -71,7 +80,9 @@ internal class SeerrCollectionDetailsViewModel
                     load?.cancel()
                     eligibilityLoad?.cancel()
                     similarLoad?.cancel()
+                    similarGeneration++
                     entryGeneration++
+                    failedSimilarMetadataIds.clear()
                     profileLoad?.cancel()
                     generation++
                     submitJob?.cancel()
@@ -101,7 +112,10 @@ internal class SeerrCollectionDetailsViewModel
                                 ),
                         )
                     activeSubmissionId = null
-                    if (next != null && next.owner == expectedOwner && id > 0) request(id)
+                    if (next != null && next.owner == expectedOwner && id > 0) {
+                        request(id)
+                        if (screenVisible) startSimilar(next, id, triggerOnEntry = !triggerAttempted)
+                    }
                 }
             }
         }
@@ -109,18 +123,44 @@ internal class SeerrCollectionDetailsViewModel
         fun show(
             id: Int,
             owner: String,
+            navigationToken: String = "",
         ) {
-            if (id <= 0 || (state.value.collectionId == id && expectedOwner == owner)) return
+            if (id <= 0) return
+            screenVisible = true
+            if (state.value.collectionId == id && expectedOwner == owner && entryToken == navigationToken) {
+                if (similarLoad?.isActive != true) {
+                    session?.takeIf { it.owner == owner && it.isCurrent() }?.let {
+                        startSimilar(it, id, triggerOnEntry = !triggerAttempted)
+                    }
+                }
+                return
+            }
             load?.cancel()
             eligibilityLoad?.cancel()
             similarLoad?.cancel()
+            similarGeneration++
             entryGeneration++
+            failedSimilarMetadataIds.clear()
             profileLoad?.cancel()
             submitJob?.cancel()
             generation++
             expectedOwner = owner
+            entryToken = navigationToken
+            visitToken = navigationToken.takeIf { it.isNotBlank() }?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                ?: UUID.randomUUID()
+            triggerAttempted = false
             state.value = CollectionDetailsState(owner = session?.owner, collectionId = id)
             request(id)
+            session?.takeIf { it.owner == owner && it.isCurrent() }?.let { startSimilar(it, id, triggerOnEntry = !triggerAttempted) }
+        }
+
+        fun onScreenHidden(navigationToken: String = entryToken) {
+            if (navigationToken != entryToken) return
+            screenVisible = false
+            similarLoad?.cancel()
+            similarGeneration++
+            similarLoad = null
+            if (state.value.similarLoading) state.value = state.value.copy(similarLoading = false)
         }
 
         fun retry() {
@@ -420,7 +460,6 @@ internal class SeerrCollectionDetailsViewModel
                                 requestEligibilityLoading = true,
                             )
                         scanEligibility(active, details, token)
-                        if (!state.value.similarLoaded) loadSimilar(active, details)
                     } catch (cancel: CancellationException) {
                         throw cancel
                     } catch (error: ClientException) {
@@ -434,37 +473,140 @@ internal class SeerrCollectionDetailsViewModel
                 }
         }
 
-        private fun loadSimilar(
+        private fun startSimilar(
             active: CollectionsSession,
-            details: CollectionDetailsData,
+            id: Int,
+            triggerOnEntry: Boolean = true,
         ) {
-            val entryToken = entryGeneration
-            val seed = chooseReleasedSeed(details.movies, chooseIndex = { Random.nextInt(it) })
-            state.value = state.value.copy(similarSeedId = seed, similarLoaded = true, similarLoading = seed != null)
-            if (seed == null) return
+            val entry = entryGeneration
+            val token = visitToken ?: return
             similarLoad?.cancel()
+            val observation = ++similarGeneration
+            state.value = state.value.copy(similarLoading = true)
             similarLoad =
                 viewModelScope.launch {
-                    val ids = discoverSimilarCollectionIds(details.id) { page -> active.backend.similarRecommendations(seed, page) }
-                    val semaphore = Semaphore(3)
                     val resolved =
+                        state.value.similar
+                            .associateBy { it.id }
+                            .toMutableMap()
+                    val pending = mutableSetOf<Int>()
+                    val queue = Channel<Int>(Channel.UNLIMITED)
+
+                    fun isEntryCurrent() =
+                        entry == entryGeneration && observation == similarGeneration && session === active && active.isCurrent() &&
+                            state.value.collectionId == id && state.value.owner == active.owner
+
+                    suspend fun publishRead() = active.backend.readSimilar(id)
+
+                    try {
                         coroutineScope {
-                            ids
-                                .map { id ->
-                                    async {
+                            val workers =
+                                List(3) {
+                                    launch {
+                                        for (relatedId in queue) {
+                                            val detail =
+                                                try {
+                                                    active.backend.similarDetail(relatedId).takeIf { it.id == relatedId && it.nameVerified }
+                                                } catch (cancel: CancellationException) {
+                                                    throw cancel
+                                                } catch (_: Exception) {
+                                                    null
+                                                }
+                                            if (!isEntryCurrent()) continue
+                                            pending -= relatedId
+                                            if (detail == null) {
+                                                failedSimilarMetadataIds += relatedId
+                                            } else {
+                                                resolved[relatedId] = detail
+                                                val current = state.value
+                                                val ordered = current.similarIds.mapNotNull(resolved::get)
+                                                if (ordered != current.similar) state.value = current.copy(similar = ordered)
+                                            }
+                                        }
+                                    }
+                                }
+
+                            fun applyRead(read: com.github.damontecres.wholphin.api.seerr.model.SimilarCollectionsRead) {
+                                if (!isEntryCurrent()) return
+                                val ids = verifiedSimilarIds(id, read.relatedCollectionIds)
+                                val current = state.value
+                                if (ids != current.similarIds || current.similarReadError) {
+                                    state.value =
+                                        current.copy(
+                                            similarIds = ids,
+                                            similar = ids.mapNotNull(resolved::get),
+                                            similarFocusedId = current.similarFocusedId?.takeIf(ids::contains),
+                                            similarReadError = false,
+                                        )
+                                }
+                                ids.filterNot { it in resolved || it in pending || it in failedSimilarMetadataIds }.forEach { relatedId ->
+                                    pending += relatedId
+                                    queue.trySend(relatedId)
+                                }
+                            }
+
+                            val initial =
+                                try {
+                                    publishRead().also(::applyRead)
+                                } catch (cancel: CancellationException) {
+                                    throw cancel
+                                } catch (_: Exception) {
+                                    // A missing or broken lightweight read endpoint is not an empty result.
+                                    if (isEntryCurrent()) state.value = state.value.copy(similarReadError = true)
+                                    null
+                                }
+                            if (initial != null && isEntryCurrent()) {
+                                if (triggerOnEntry && !triggerAttempted) {
+                                    triggerAttempted = true
+                                    try {
+                                        active.backend.triggerSimilar(id, token)
+                                    } catch (cancel: CancellationException) {
+                                        throw cancel
+                                    } catch (_: Exception) {
+                                        if (isEntryCurrent()) state.value = state.value.copy(similarTriggerError = true)
+                                    }
+                                }
+                                var sawActive = initial.discoveryActive
+                                var inactivePolls = 0
+                                for (poll in 1..(if (triggerOnEntry || initial.discoveryActive) SIMILAR_MAX_POLLS else 0)) {
+                                    delay(SIMILAR_POLL_INTERVAL_MS)
+                                    if (!isEntryCurrent()) break
+                                    val read =
                                         try {
-                                            semaphore.withPermit { active.backend.similarDetail(id) }.takeIf { it.nameVerified }
+                                            publishRead().also(::applyRead)
                                         } catch (cancel: CancellationException) {
                                             throw cancel
                                         } catch (_: Exception) {
-                                            null
+                                            if (isEntryCurrent()) state.value = state.value.copy(similarReadError = true)
+                                            continue
                                         }
+                                    if (read.discoveryActive) {
+                                        sawActive = true
+                                        inactivePolls = 0
+                                    } else {
+                                        inactivePolls++
+                                        if (sawActive || inactivePolls >= SIMILAR_INACTIVE_GRACE_POLLS) break
                                     }
-                                }.awaitAll()
-                                .filterNotNull()
+                                }
+                                // A final lightweight read catches relationships committed at the stop boundary.
+                                if (isEntryCurrent()) {
+                                    try {
+                                        applyRead(publishRead())
+                                    } catch (cancel: CancellationException) {
+                                        throw cancel
+                                    } catch (_: Exception) {
+                                        if (isEntryCurrent()) state.value = state.value.copy(similarReadError = true)
+                                    }
+                                }
+                            }
+                            queue.close()
+                            // Observation is finite even when related-card metadata is slow.
+                            if (isEntryCurrent()) state.value = state.value.copy(similarLoading = false)
+                            workers.joinAll()
                         }
-                    if (entryToken == entryGeneration && active.isCurrent() && state.value.collectionId == details.id) {
-                        state.value = state.value.copy(similar = resolved, similarLoading = false)
+                    } finally {
+                        queue.close()
+                        if (isEntryCurrent()) state.value = state.value.copy(similarLoading = false)
                     }
                 }
         }

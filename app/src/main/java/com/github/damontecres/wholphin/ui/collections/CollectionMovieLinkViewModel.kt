@@ -16,6 +16,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.jellyfin.sdk.model.api.BaseItemKind
+import java.util.UUID
 import javax.inject.Inject
 
 internal data class CollectionMovieLinkState(
@@ -91,7 +92,7 @@ internal class CollectionMovieLinkViewModel
             val active = session ?: return
             if (state.value.link != link || state.value.owner != active.owner || !active.isCurrent()) return
             if (navigation.backStack.lastOrNull() != input?.origin) return
-            navigation.navigateTo(Destination.SeerrCollection(link.id, null, null, active.owner))
+            navigation.navigateTo(Destination.SeerrCollection(link.id, null, null, active.owner, UUID.randomUUID().toString()))
         }
 
         private fun refresh() {

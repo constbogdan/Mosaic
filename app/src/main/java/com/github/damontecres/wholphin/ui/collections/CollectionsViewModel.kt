@@ -19,6 +19,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 
 internal data class CollectionsScreenState(
@@ -141,6 +142,7 @@ internal class CollectionsViewModel
                     entry.summary.availableMovies,
                     entry.summary.totalMovies,
                     current.owner,
+                    UUID.randomUUID().toString(),
                 ),
             )
         }
