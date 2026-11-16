@@ -95,7 +95,9 @@ class CollectionMovieLinkViewModelTest {
                 vm.open(link)
                 vm.open(link)
                 assertEquals(3, stack.size)
-                assertEquals(Destination.SeerrCollection(7, null, null, "one"), stack.last())
+                val destination = stack.last() as Destination.SeerrCollection
+                assertEquals(Destination.SeerrCollection(7, null, null, "one"), destination.copy(entryToken = ""))
+                assertTrue(runCatching { UUID.fromString(destination.entryToken) }.isSuccess)
                 stack.removeLast()
                 assertEquals(origin, stack.last())
             } finally {
@@ -139,7 +141,9 @@ class CollectionMovieLinkViewModelTest {
                 vm.showLocal(movie, origin)
                 runCurrent()
                 vm.open(link)
-                assertEquals(Destination.SeerrCollection(7, null, null, "one"), stack.last())
+                val destination = stack.last() as Destination.SeerrCollection
+                assertEquals(Destination.SeerrCollection(7, null, null, "one"), destination.copy(entryToken = ""))
+                assertTrue(runCatching { UUID.fromString(destination.entryToken) }.isSuccess)
                 stack.removeLast()
                 assertEquals(origin, stack.last())
                 assertEquals(link, vm.state.value.link)

@@ -23,6 +23,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
+import java.util.UUID
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CollectionsViewModelTest {
@@ -91,7 +92,9 @@ class CollectionsViewModelTest {
                 runCurrent()
                 vm.position(1, 6)
                 vm.open(entry(2))
-                assertEquals(Destination.SeerrCollection(2, 1, 4, "one"), stack.last())
+                val destination = stack.last() as Destination.SeerrCollection
+                assertEquals(Destination.SeerrCollection(2, 1, 4, "one"), destination.copy(entryToken = ""))
+                assertTrue(runCatching { UUID.fromString(destination.entryToken) }.isSuccess)
                 stack.removeLast()
                 assertEquals(Destination.Collections, stack.last())
                 assertEquals("tmdb:collection:2", vm.state.value.focusedKey)

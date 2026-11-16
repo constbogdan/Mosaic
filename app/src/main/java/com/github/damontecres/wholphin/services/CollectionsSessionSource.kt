@@ -2,11 +2,13 @@ package com.github.damontecres.wholphin.services
 
 import com.github.damontecres.wholphin.api.seerr.LibraryApi
 import com.github.damontecres.wholphin.api.seerr.SeerrApiClient
+import com.github.damontecres.wholphin.api.seerr.model.CollectionCollectionIdSimilarPostRequest
 import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionItem
 import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionsResponse
 import com.github.damontecres.wholphin.api.seerr.model.MediaRequest
 import com.github.damontecres.wholphin.api.seerr.model.MovieDetails
 import com.github.damontecres.wholphin.api.seerr.model.MovieResult
+import com.github.damontecres.wholphin.api.seerr.model.SimilarCollectionsRead
 import com.github.damontecres.wholphin.data.ServerRepository
 import com.github.damontecres.wholphin.data.model.DiscoverItem
 import com.github.damontecres.wholphin.data.model.SeerrAvailability
@@ -20,6 +22,7 @@ import com.github.damontecres.wholphin.ui.toLocalDate
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.jellyfin.sdk.model.api.ImageType
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -76,11 +79,6 @@ internal data class CollectionDetailsData(
     val nameVerified: Boolean = true,
 )
 
-internal data class SimilarRecommendationsPage(
-    val totalPages: Int,
-    val collectionIds: List<Int?>,
-)
-
 internal data class CollectionMovieLink(
     val id: Int,
     val name: String,
@@ -107,10 +105,12 @@ internal interface CollectionsBackend {
     /** Presentation-only reuse; opening a Collection Details entry still refreshes its normal data. */
     suspend fun similarDetail(id: Int): CollectionDetailsData = detail(id)
 
-    suspend fun similarRecommendations(
-        seedMovieId: Int,
-        page: Int,
-    ): SimilarRecommendationsPage = SimilarRecommendationsPage(0, emptyList())
+    suspend fun readSimilar(id: Int): SimilarCollectionsRead = error("Similar Collections read unavailable")
+
+    suspend fun triggerSimilar(
+        id: Int,
+        visitToken: UUID,
+    ): Boolean = error("Similar Collections trigger unavailable")
 
     suspend fun requestEligibility(item: DiscoverItem): CollectionRequestEligibility = CollectionRequestEligibility.UNKNOWN
 
@@ -178,27 +178,12 @@ internal class SeerrCollectionsBackend(
 
     override suspend fun similarDetail(id: Int): CollectionDetailsData = synchronized(detailsCache) { detailsCache[id] } ?: detail(id)
 
-    override suspend fun similarRecommendations(
-        seedMovieId: Int,
-        page: Int,
-    ): SimilarRecommendationsPage {
-        val response =
-            client.moviesApi.movieMovieIdRecommendationsGet(
-                movieId = seedMovieId,
-                page = page,
-                includeCollectionIds = true,
-            )
-        return SimilarRecommendationsPage(
-            totalPages = response.totalPages?.coerceAtLeast(0) ?: 0,
-            collectionIds =
-                response.results.orEmpty().map { movie ->
-                    movie.collectionMembership
-                        ?.takeIf { movie.mediaType == "movie" && it.kind == "collection" }
-                        ?.collectionId
-                        ?.takeIf { it > 0 }
-                },
-        )
-    }
+    override suspend fun readSimilar(id: Int): SimilarCollectionsRead = client.collectionApi.collectionCollectionIdSimilarGet(id)
+
+    override suspend fun triggerSimilar(
+        id: Int,
+        visitToken: UUID,
+    ): Boolean = client.collectionApi.collectionCollectionIdSimilarPost(id, CollectionCollectionIdSimilarPostRequest(visitToken)).started
 
     override suspend fun requestEligibility(item: DiscoverItem): CollectionRequestEligibility {
         if (item.id <= 0 || item.type != SeerrItemType.MOVIE) return CollectionRequestEligibility.EXCLUDED

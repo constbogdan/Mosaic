@@ -1760,6 +1760,59 @@ class BasicUiTests {
     }
 
     @Test
+    fun collection_details_keeps_focused_similar_card_while_more_results_arrive() {
+        val movie = DiscoverItem(42, SeerrItemType.MOVIE, "Alien", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        val state =
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Alien Collection", null, null, null, listOf(movie)),
+                    similar = listOf(CollectionDetailsData(8, "First Related", null, null, null, emptyList())),
+                    similarLoading = true,
+                    similarFocusedId = 8,
+                ),
+            )
+        every { vm.state } returns state
+        composeTestRule.setContent {
+            WholphinTheme { SeerrCollectionDetails(Destination.SeerrCollection(7, 1, 1, "viewer"), viewModel = vm) }
+        }
+        composeTestRule.onAllNodes(hasScrollToIndexAction())[0].performScrollToIndex(1)
+        composeTestRule.onAllNodesWithText("First Related")[0].assertIsFocused()
+        composeTestRule.runOnIdle {
+            state.value =
+                state.value.copy(
+                    similar =
+                        state.value.similar + CollectionDetailsData(9, "Second Related", null, null, null, emptyList()),
+                )
+        }
+        composeTestRule.onAllNodesWithText("First Related")[0].assertIsFocused()
+        composeTestRule.onAllNodesWithText("Second Related").assertCountEquals(2)
+    }
+
+    @Test
+    fun collection_details_preserves_movie_grid_when_similar_read_is_unavailable() {
+        val movie = DiscoverItem(42, SeerrItemType.MOVIE, "Alien", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        every { vm.state } returns
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Alien Collection", null, null, null, listOf(movie)),
+                    similarReadError = true,
+                ),
+            )
+        composeTestRule.setContent {
+            WholphinTheme { SeerrCollectionDetails(Destination.SeerrCollection(7, 1, 1, "viewer"), viewModel = vm) }
+        }
+        composeTestRule.onAllNodesWithText("Alien").assertCountEquals(2)
+        composeTestRule.onAllNodes(hasScrollToIndexAction())[0].performScrollToIndex(1)
+        composeTestRule.onNodeWithText("Similar Collections could not be refreshed.").assertExists()
+    }
+
+    @Test
     fun collection_details_restores_focus_to_offscreen_similar_card() {
         val movie = DiscoverItem(42, SeerrItemType.MOVIE, "Alien", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
         val destination = Destination.SeerrCollection(7, 1, 1, "viewer")

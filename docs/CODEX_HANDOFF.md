@@ -119,6 +119,22 @@ not current instruction.
 
 ## Non-obvious invariants and negative knowledge
 
+- Similar Collections C4.2 consumes Seerr PR #63's lightweight authenticated
+  `GET /collection/{id}/similar` separately from the full collection-details response.
+  Polling the full details endpoint would repeatedly map constituent media and requests;
+  its optional `similarCollections` field is not a substitute for the new read path.
+  `discoveryActive=false` only means no unexpired origin claim exists, not that all
+  eligible seeds succeeded or are exhausted. An empty successful read is valid, while
+  a failed read must remain an error rather than an empty list. POST's `started`
+  reports claim acquisition, not completion. Existing Android clients must not fall
+  back to local recommendation-page discovery when this endpoint is unavailable.
+  The screen's entry UUID is stable across child Back restoration; only a new
+  navigation entry may submit a new discovery trigger. Related-card hydration
+  remains capped at three concurrent requests and is independent of discovery polling.
+  A separate observation generation is needed even within one entry: a cancelled
+  child-navigation read may finish after the parent resumes, and its cleanup must
+  not clear the newer observation's loading state.
+
 - Request actions check current capabilities again at submission. Standard has no separate
   public backend enabled flag; 4K requires its public enabled flag and matching permission.
   Acquisition conversion now reads selected-quality media/season availability from `media`, never
