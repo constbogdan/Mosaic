@@ -131,6 +131,10 @@ not current instruction.
   The screen's entry UUID is stable across child Back restoration; only a new
   navigation entry may submit a new discovery trigger. Related-card hydration
   remains capped at three concurrent requests and is independent of discovery polling.
+  Main details, the first lightweight read, and the visit trigger start independently:
+  an inactive read before POST settles cannot end observation. The single-read-at-a-time
+  observer polls at 500 ms inside a 24-second total window (including initial and final
+  reads), while each resolved card publishes without waiting for the other metadata.
   A separate observation generation is needed even within one entry: a cancelled
   child-navigation read may finish after the parent resumes, and its cleanup must
   not clear the newer observation's loading state.

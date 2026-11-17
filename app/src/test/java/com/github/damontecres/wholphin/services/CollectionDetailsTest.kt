@@ -22,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -198,6 +199,7 @@ class CollectionDetailsTest {
     @Test fun failedLoadExposesRetryAndSuccessClearsError() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            var hideScreen: () -> Unit = {}
             try {
                 var fail = true
                 val backend =
@@ -209,6 +211,7 @@ class CollectionDetailsTest {
                 val source = mockk<CollectionsSessionSource>()
                 every { source.sessions } returns sessions
                 val vm = SeerrCollectionDetailsViewModel(source, mockk(relaxed = true))
+                hideScreen = { vm.onScreenHidden() }
                 vm.show(7, "one")
                 runCurrent()
                 assertTrue(vm.state.value.error)
@@ -222,6 +225,8 @@ class CollectionDetailsTest {
                 )
                 assertFalse(vm.state.value.error)
             } finally {
+                hideScreen()
+                advanceUntilIdle()
                 Dispatchers.resetMain()
             }
         }
@@ -229,6 +234,7 @@ class CollectionDetailsTest {
     @Test fun movieNavigationRetainsTypedFocusAndDoesNotInferJellyfinPlayback() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            var hideScreen: () -> Unit = {}
             try {
                 val movies =
                     (1..2).map { id ->
@@ -252,6 +258,7 @@ class CollectionDetailsTest {
                 every { source.sessions } returns sessions
                 val navigation = mockk<NavigationManager>(relaxed = true)
                 val vm = SeerrCollectionDetailsViewModel(source, navigation)
+                hideScreen = { vm.onScreenHidden() }
                 vm.show(7, "one")
                 runCurrent()
                 vm.position(1)
@@ -261,6 +268,44 @@ class CollectionDetailsTest {
                 assertEquals(null, movies[1].jellyfinItemId)
                 verify(exactly = 1) { navigation.navigateTo(movies[1].destination) }
             } finally {
+                hideScreen()
+                advanceUntilIdle()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun unavailableSimilarEndpointSettlesWithoutInterruptingDetails() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            var hideScreen: () -> Unit = {}
+            try {
+                val backend = fake { CollectionDetailsData(it, "Saga", null, null, null, emptyList()) }
+                val sessions = MutableStateFlow<CollectionsSession?>(session("one", backend))
+                val source = mockk<CollectionsSessionSource>()
+                every { source.sessions } returns sessions
+                val vm = SeerrCollectionDetailsViewModel(source, mockk(relaxed = true))
+                hideScreen = { vm.onScreenHidden() }
+                vm.show(7, "one")
+                runCurrent()
+                assertEquals(
+                    "Saga",
+                    vm.state.value.details
+                        ?.name,
+                )
+                assertTrue(vm.state.value.similarLoading)
+
+                advanceUntilIdle()
+                assertFalse(vm.state.value.similarLoading)
+                assertTrue(vm.state.value.similarReadError)
+                assertTrue(vm.state.value.similarTriggerError)
+                assertEquals(
+                    "Saga",
+                    vm.state.value.details
+                        ?.name,
+                )
+            } finally {
+                hideScreen()
+                advanceUntilIdle()
                 Dispatchers.resetMain()
             }
         }

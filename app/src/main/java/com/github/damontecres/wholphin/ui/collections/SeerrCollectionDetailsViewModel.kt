@@ -24,6 +24,7 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
 import java.util.UUID
 import javax.inject.Inject
@@ -545,60 +546,75 @@ internal class SeerrCollectionDetailsViewModel
                                 }
                             }
 
-                            val initial =
+                            // The trigger does not depend on the first read. A slow or broken GET must not
+                            // delay the POST, and neither operation is allowed to hold up collection details.
+                            val shouldTrigger = triggerOnEntry && !triggerAttempted
+                            var triggerFinished = !shouldTrigger
+                            var triggerStarted: Boolean? = null
+                            val triggerJob =
+                                if (shouldTrigger) {
+                                    triggerAttempted = true
+                                    launch {
+                                        try {
+                                            triggerStarted = active.backend.triggerSimilar(id, token)
+                                        } catch (cancel: CancellationException) {
+                                            throw cancel
+                                        } catch (_: Exception) {
+                                            if (isEntryCurrent()) state.value = state.value.copy(similarTriggerError = true)
+                                        } finally {
+                                            triggerFinished = true
+                                        }
+                                    }
+                                } else {
+                                    null
+                                }
+
+                            suspend fun readAndApply(): com.github.damontecres.wholphin.api.seerr.model.SimilarCollectionsRead? =
                                 try {
                                     publishRead().also(::applyRead)
                                 } catch (cancel: CancellationException) {
                                     throw cancel
                                 } catch (_: Exception) {
-                                    // A missing or broken lightweight read endpoint is not an empty result.
+                                    // A failed lightweight read is not evidence of an empty result.
                                     if (isEntryCurrent()) state.value = state.value.copy(similarReadError = true)
                                     null
                                 }
-                            if (initial != null && isEntryCurrent()) {
-                                if (triggerOnEntry && !triggerAttempted) {
-                                    triggerAttempted = true
-                                    try {
-                                        active.backend.triggerSimilar(id, token)
-                                    } catch (cancel: CancellationException) {
-                                        throw cancel
-                                    } catch (_: Exception) {
-                                        if (isEntryCurrent()) state.value = state.value.copy(similarTriggerError = true)
-                                    }
-                                }
-                                var sawActive = initial.discoveryActive
-                                var inactivePolls = 0
-                                for (poll in 1..(if (triggerOnEntry || initial.discoveryActive) SIMILAR_MAX_POLLS else 0)) {
-                                    delay(SIMILAR_POLL_INTERVAL_MS)
-                                    if (!isEntryCurrent()) break
-                                    val read =
-                                        try {
-                                            publishRead().also(::applyRead)
-                                        } catch (cancel: CancellationException) {
-                                            throw cancel
-                                        } catch (_: Exception) {
-                                            if (isEntryCurrent()) state.value = state.value.copy(similarReadError = true)
+
+                            withTimeoutOrNull(SIMILAR_OBSERVATION_WINDOW_MS) {
+                                val initial = readAndApply()
+                                var sawActive = initial?.discoveryActive == true
+                                if (isEntryCurrent() && (shouldTrigger || sawActive)) {
+                                    var inactiveAfterTrigger = 0
+                                    var failedReads = 0
+                                    while (isEntryCurrent()) {
+                                        delay(SIMILAR_POLL_INTERVAL_MS)
+                                        val read = readAndApply()
+                                        if (!isEntryCurrent()) break
+                                        if (read == null) {
+                                            if (triggerFinished && ++failedReads >= SIMILAR_INACTIVE_GRACE_POLLS) break
                                             continue
                                         }
-                                    if (read.discoveryActive) {
-                                        sawActive = true
-                                        inactivePolls = 0
-                                    } else {
-                                        inactivePolls++
-                                        if (sawActive || inactivePolls >= SIMILAR_INACTIVE_GRACE_POLLS) break
+                                        failedReads = 0
+                                        if (read.discoveryActive) {
+                                            sawActive = true
+                                            inactiveAfterTrigger = 0
+                                        } else if (triggerFinished) {
+                                            // An inactive read before the POST establishes its claim says nothing
+                                            // about this visit. Once the POST settles, confirm the inactive state.
+                                            inactiveAfterTrigger++
+                                            if (sawActive ||
+                                                (triggerStarted != true && inactiveAfterTrigger >= 1) ||
+                                                inactiveAfterTrigger >= SIMILAR_INACTIVE_GRACE_POLLS
+                                            ) {
+                                                break
+                                            }
+                                        }
                                     }
-                                }
-                                // A final lightweight read catches relationships committed at the stop boundary.
-                                if (isEntryCurrent()) {
-                                    try {
-                                        applyRead(publishRead())
-                                    } catch (cancel: CancellationException) {
-                                        throw cancel
-                                    } catch (_: Exception) {
-                                        if (isEntryCurrent()) state.value = state.value.copy(similarReadError = true)
-                                    }
+                                    // Catch relationships committed at the stop boundary without another full detail GET.
+                                    if (isEntryCurrent()) readAndApply()
                                 }
                             }
+                            triggerJob?.cancel()
                             queue.close()
                             // Observation is finite even when related-card metadata is slow.
                             if (isEntryCurrent()) state.value = state.value.copy(similarLoading = false)
