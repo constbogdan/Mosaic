@@ -398,6 +398,12 @@ fun DestinationContent(
                 .FreshPage(modifier)
         }
 
+        Destination.LeavingSoon -> {
+            LaunchedEffect(Unit) { onClearBackdrop.invoke() }
+            com.github.damontecres.wholphin.ui.leavingsoon
+                .LeavingSoonPage(modifier)
+        }
+
         Destination.Collections -> {
             LaunchedEffect(Unit) { onClearBackdrop.invoke() }
             com.github.damontecres.wholphin.ui.collections

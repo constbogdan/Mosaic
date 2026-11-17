@@ -184,6 +184,15 @@
     <string name="fresh_preparing">Fresh is preparing. Check again shortly.</string>
     <string name="fresh_unavailable">Fresh is temporarily unavailable.</string>
     <string name="fresh_connection_required">Connect to Seerr to browse Fresh.</string>
+    <string name="leaving_soon">Leaving Soon</string>
+    <string name="leaving_soon_all">All</string>
+    <string name="leaving_soon_movies">Movies</string>
+    <string name="leaving_soon_series">Series</string>
+    <string name="leaving_soon_refresh">Refresh</string>
+    <string name="leaving_soon_empty">Nothing is scheduled to leave in this category.</string>
+    <string name="leaving_soon_connection_required">Connect to Seerr to browse Leaving Soon.</string>
+    <string name="leaving_soon_date">Leaving %1$s</string>
+    <string name="leaving_soon_date_unknown">Leaving date unavailable</string>
     <string name="watchlist_all">All</string>
     <string name="watchlist_movies">Movies</string>
     <string name="watchlist_shows">Shows</string>

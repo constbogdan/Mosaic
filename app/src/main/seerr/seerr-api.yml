@@ -920,6 +920,61 @@ components:
           type: array
           items: { $ref: '#/components/schemas/FreshResult' }
         status: { $ref: '#/components/schemas/FreshStatus' }
+    LeavingSoonSchedule:
+      type: object
+      additionalProperties: false
+      required: [id, canonicalMediaId, targetType, seasonNumber, origin, status, scheduledAt, removeAt, revision]
+      properties:
+        id: { type: integer }
+        canonicalMediaId: { type: integer }
+        targetType: { type: string, enum: [movie, series, season] }
+        seasonNumber: { type: integer, nullable: true, minimum: 0 }
+        origin: { type: string, enum: [manual, automatic] }
+        status: { type: string, enum: [active, deferred] }
+        scheduledAt: { type: string, format: date-time }
+        removeAt: { type: string, format: date-time }
+        revision: { type: integer, minimum: 1 }
+    LeavingSoonItem:
+      type: object
+      additionalProperties: false
+      required: [canonicalMediaId, tmdbId, mediaType, title, year, posterPath, schedules]
+      properties:
+        canonicalMediaId: { type: integer, minimum: 1 }
+        tmdbId: { type: integer, minimum: 1, nullable: true }
+        mediaType: { type: string, enum: [movie, series] }
+        title: { type: string }
+        year: { type: integer, nullable: true }
+        posterPath: { type: string, nullable: true }
+        schedules:
+          type: array
+          items: { $ref: '#/components/schemas/LeavingSoonSchedule' }
+    LeavingSoonResultsResponse:
+      type: object
+      additionalProperties: false
+      required: [pageInfo, results]
+      properties:
+        pageInfo:
+          type: object
+          required: [pages, page, results, pageSize]
+          properties:
+            pages: { type: integer }
+            page: { type: integer }
+            results: { type: integer }
+            pageSize: { type: integer }
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/LeavingSoonItem' }
+        presentation:
+          $ref: '#/components/schemas/LeavingSoonPresentationBatchStatus'
+    LeavingSoonPresentationBatchStatus:
+      type: object
+      additionalProperties: false
+      required: [state, revision, pendingCount]
+      properties:
+        state: { type: string, enum: [complete, pending, partial] }
+        revision: { type: integer, minimum: 0 }
+        pendingCount: { type: integer, minimum: 0 }
+        batchId: { type: string, format: uuid }
     PersonResult:
       type: object
       properties:
@@ -5374,6 +5429,30 @@ paths:
                       $ref: '#/components/schemas/MediaInfo'
                   playCount:
                     type: integer
+  /leaving-soon:
+    get:
+      operationId: leavingSoonGet
+      summary: Get current scheduled removals ordered by earliest removal due date
+      description: >-
+        Returns 20-item pages after filtering by media type. Items are ordered by
+        earliest active or deferred schedule's current stored removeAt ascending,
+        then canonical media ID ascending. A deferred removeAt may be a retry time.
+      tags: [library]
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: mediaType
+          schema: { type: string, enum: [all, movie, series], default: all }
+      responses:
+        '200':
+          description: User-safe paginated Leaving Soon projection
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeavingSoonResultsResponse' }
+        '400': { description: Invalid page or media type }
+        '403': { description: Authentication required }
   /fresh:
     get:
       operationId: freshGet

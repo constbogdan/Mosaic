@@ -152,6 +152,9 @@ sealed class Destination(
     data object Fresh : Destination(false)
 
     @Serializable
+    data object LeavingSoon : Destination(false)
+
+    @Serializable
     data object Collections : Destination(false)
 
     @Serializable

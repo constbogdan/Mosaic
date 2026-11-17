@@ -71,6 +71,7 @@ fun DiscoverItemCard(
     compactLabels: Boolean = false,
     showAvailableIndicator: Boolean = true,
     artworkAlpha: Float = 1f,
+    bottomBadge: String? = null,
 ) {
     val focused by interactionSource.collectIsFocusedAsState()
     var focusedAfterDelay by remember { mutableStateOf(false) }
@@ -157,6 +158,20 @@ fun DiscoverItemCard(
                 }
                 if (savedToWatchlist) {
                     WatchlistIndicator(Modifier.align(Alignment.BottomEnd))
+                }
+                if (bottomBadge != null) {
+                    Text(
+                        text = bottomBadge,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        modifier =
+                            Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(4.dp)
+                                .background(AppColors.TransparentBlack50, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 6.dp, vertical = 3.dp),
+                    )
                 }
                 val acquisitionOverlayState =
                     mediaPresentation?.acquisitionState?.takeIf { preferAcquisitionStateOverlay }
