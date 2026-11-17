@@ -27,6 +27,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -136,6 +137,7 @@ class CollectionRequestTest {
     @Test fun selectionAndDirectQualitySubmissionAreSingleFlightAndStandardOnly() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            var hideScreen: () -> Unit = {}
             try {
                 val backend = FakeBackend(listOf(movie(1), movie(2), movie(3)))
                 backend.statuses[3] = CollectionRequestEligibility.REQUESTED
@@ -145,6 +147,7 @@ class CollectionRequestTest {
                     MediaRequest(request.movieId!!, 1)
                 }
                 val vm = viewModel(MutableStateFlow(session(backend)))
+                hideScreen = { vm.onScreenHidden() }
                 vm.show(7, "one")
                 runCurrent()
                 vm.openRequest()
@@ -199,6 +202,8 @@ class CollectionRequestTest {
                 )
                 assertEquals(1, backend.posts.size)
             } finally {
+                hideScreen()
+                advanceUntilIdle()
                 Dispatchers.resetMain()
             }
         }
@@ -206,6 +211,7 @@ class CollectionRequestTest {
     @Test fun failedItemCanBeExplicitlyRetriedWithoutResubmittingSuccess() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            var hideScreen: () -> Unit = {}
             try {
                 val backend = FakeBackend(listOf(movie(1), movie(2)))
                 var fail = true
@@ -214,6 +220,7 @@ class CollectionRequestTest {
                     MediaRequest(request.movieId!!, 1)
                 }
                 val vm = viewModel(MutableStateFlow(session(backend)))
+                hideScreen = { vm.onScreenHidden() }
                 vm.show(7, "one")
                 runCurrent()
                 vm.openRequest()
@@ -243,6 +250,8 @@ class CollectionRequestTest {
                 assertEquals(listOf(1, 2, 2), backend.posts.map { it.movieId })
                 assertEquals(8, backend.posts.last().profileId)
             } finally {
+                hideScreen()
+                advanceUntilIdle()
                 Dispatchers.resetMain()
             }
         }
@@ -250,10 +259,12 @@ class CollectionRequestTest {
     @Test fun timeoutLeavesAmbiguousMovieUnselectableUntilStatusRefresh() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            var hideScreen: () -> Unit = {}
             try {
                 val backend = FakeBackend(listOf(movie(1)))
                 backend.submitBehavior = { throw IOException("simulated timeout") }
                 val vm = viewModel(MutableStateFlow(session(backend)))
+                hideScreen = { vm.onScreenHidden() }
                 vm.show(7, "one")
                 runCurrent()
                 vm.openRequest()
@@ -277,6 +288,8 @@ class CollectionRequestTest {
                 runCurrent()
                 assertEquals(1, backend.posts.size)
             } finally {
+                hideScreen()
+                advanceUntilIdle()
                 Dispatchers.resetMain()
             }
         }
