@@ -33,6 +33,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.tv.material3.Button
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
@@ -59,6 +61,10 @@ internal fun CollectionsPage(
     val filterFocus = remember { FocusRequester() }
     var toolbarHasFocus by remember(state.owner) { mutableStateOf(false) }
     var gridHasFocus by remember(state.owner, state.filter, state.sort) { mutableStateOf(false) }
+    var restoreFocusEpoch by remember(state.owner, state.filter, state.sort) { mutableStateOf(0L) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (!toolbarHasFocus && state.focusedKey != null) restoreFocusEpoch++
+    }
     BackHandler(enabled = gridHasFocus && state.entries.isNotEmpty()) { filterFocus.tryRequestFocus() }
     Column(modifier.fillMaxSize()) {
         Row(
@@ -123,6 +129,7 @@ internal fun CollectionsPage(
                     pager = state.entries,
                     totalItems = state.total,
                     focusAnchorKey = state.focusedKey,
+                    focusRequestEpoch = restoreFocusEpoch,
                     onGridFocusChanged = { gridHasFocus = it },
                     onFirstRowUp = { filterFocus.tryRequestFocus() },
                     backToTopOnBack = false,

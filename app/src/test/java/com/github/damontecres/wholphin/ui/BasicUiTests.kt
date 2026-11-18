@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -25,6 +27,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
@@ -47,10 +50,15 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.core.app.ApplicationProvider
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
 import com.github.damontecres.wholphin.R
+import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionItem
 import com.github.damontecres.wholphin.data.model.CatalogMediaType
 import com.github.damontecres.wholphin.data.model.DiscoverItem
 import com.github.damontecres.wholphin.data.model.DiscoverRating
@@ -63,6 +71,7 @@ import com.github.damontecres.wholphin.data.model.WatchlistFilter
 import com.github.damontecres.wholphin.data.model.WatchlistMembership
 import com.github.damontecres.wholphin.services.CollectionDetailsData
 import com.github.damontecres.wholphin.services.CollectionMovieLink
+import com.github.damontecres.wholphin.services.CollectionsEntry
 import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.services.ScreensaverService
 import com.github.damontecres.wholphin.services.ScreensaverState
@@ -80,6 +89,9 @@ import com.github.damontecres.wholphin.ui.collections.CollectionMovieLinkState
 import com.github.damontecres.wholphin.ui.collections.CollectionRequestEligibility
 import com.github.damontecres.wholphin.ui.collections.CollectionRequestMovie
 import com.github.damontecres.wholphin.ui.collections.CollectionRequestState
+import com.github.damontecres.wholphin.ui.collections.CollectionsPage
+import com.github.damontecres.wholphin.ui.collections.CollectionsScreenState
+import com.github.damontecres.wholphin.ui.collections.CollectionsViewModel
 import com.github.damontecres.wholphin.ui.collections.SeerrCollectionDetails
 import com.github.damontecres.wholphin.ui.collections.SeerrCollectionDetailsViewModel
 import com.github.damontecres.wholphin.ui.components.BasicDialog
@@ -1546,7 +1558,90 @@ class BasicUiTests {
     }
 
     @Test
-    fun collection_details_back_reaches_navigation_in_one_press_from_grid() {
+    fun collections_browser_resume_restores_originating_card_after_poster_exit() {
+        class Owner : LifecycleOwner {
+            val registry = LifecycleRegistry(this)
+            override val lifecycle: Lifecycle = registry
+        }
+
+        val owner = Owner()
+        owner.registry.currentState = Lifecycle.State.RESUMED
+        val entry =
+            CollectionsEntry(
+                LibraryCollectionItem(7, "Alien Collection", null, null, null, 1, 4, LibraryCollectionItem.Completeness.INCOMPLETE),
+                null,
+                null,
+            )
+        val vm = mockk<CollectionsViewModel>(relaxed = true)
+        every { vm.state } returns
+            MutableStateFlow(
+                CollectionsScreenState(
+                    owner = "viewer",
+                    entries = listOf(entry),
+                    total = 1,
+                    focusedKey = entry.gridId,
+                ),
+            )
+        val avatarFocus = FocusRequester()
+        composeTestRule.setContent {
+            WholphinTheme {
+                CompositionLocalProvider(LocalLifecycleOwner provides owner) {
+                    Box {
+                        CollectionsPage(viewModel = vm)
+                        Button(onClick = {}, modifier = Modifier.focusRequester(avatarFocus)) { Text("Avatar") }
+                    }
+                }
+            }
+        }
+        composeTestRule.runOnIdle { avatarFocus.requestFocus() }
+        composeTestRule.onNodeWithText("Avatar").assertIsFocused()
+        composeTestRule.runOnIdle { owner.registry.currentState = Lifecycle.State.STARTED }
+        composeTestRule.runOnIdle { owner.registry.currentState = Lifecycle.State.RESUMED }
+        composeTestRule.onAllNodes(hasText("Alien Collection") and hasClickAction())[0].assertIsFocused()
+    }
+
+    @Test
+    fun collection_details_back_follows_grid_poster_navigation_contract() {
+        val movie = DiscoverItem(42, SeerrItemType.MOVIE, "Alien", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
+        val second = DiscoverItem(43, SeerrItemType.MOVIE, "Aliens", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
+        val destination = Destination.SeerrCollection(7, 1, 1, "viewer")
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        every { vm.state } returns
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Alien Collection", null, null, null, listOf(movie, second)),
+                ),
+            )
+        var backs = 0
+        composeTestRule.setContent {
+            WholphinTheme {
+                BackHandler { backs++ }
+                SeerrCollectionDetails(destination, viewModel = vm)
+            }
+        }
+        composeTestRule.onAllNodes(hasText("Alien") and hasClickAction())[0].requestFocus().performKeyInput {
+            pressKey(Key.DirectionRight)
+        }
+        composeTestRule.onAllNodes(hasText("Aliens") and hasClickAction())[0].assertIsFocused()
+        composeTestRule.runOnIdle { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
+        val poster = composeTestRule.onNodeWithTag("collectionPoster").assertIsFocused().assertIsDisplayed()
+        val posterBounds = poster.getUnclippedBoundsInRoot()
+        val screenBounds = composeTestRule.onRoot().getUnclippedBoundsInRoot()
+        Assert.assertTrue(
+            posterBounds.left >= screenBounds.left && posterBounds.top >= screenBounds.top &&
+                posterBounds.right <= screenBounds.right && posterBounds.bottom <= screenBounds.bottom,
+        )
+        Assert.assertEquals(0, backs)
+        composeTestRule.runOnIdle { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
+        Assert.assertEquals(1, backs)
+        verify(exactly = 0) { vm.openRequest() }
+        composeTestRule.onAllNodesWithText("Back").assertCountEquals(0)
+    }
+
+    @Test
+    fun collection_details_initial_back_exits_without_focusing_poster_or_avatar() {
         val movie = DiscoverItem(42, SeerrItemType.MOVIE, "Alien", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
         val destination = Destination.SeerrCollection(7, 1, 1, "viewer")
         val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
@@ -1565,10 +1660,76 @@ class BasicUiTests {
                 SeerrCollectionDetails(destination, viewModel = vm)
             }
         }
-        composeTestRule.onAllNodes(hasClickAction())[0].requestFocus()
+        composeTestRule.onAllNodes(hasText("Alien") and hasClickAction())[0].assertIsFocused()
         composeTestRule.runOnIdle { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
         Assert.assertEquals(1, backs)
-        composeTestRule.onAllNodesWithText("Back").assertCountEquals(0)
+        composeTestRule.onNodeWithTag("collectionPoster").assertIsNotFocused()
+        verify(exactly = 0) { vm.openRequest() }
+    }
+
+    @Test
+    fun collection_details_back_from_similar_focuses_disabled_poster_then_exits() {
+        val movie = DiscoverItem(42, SeerrItemType.MOVIE, "Alien", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
+        val destination = Destination.SeerrCollection(7, 1, 1, "viewer")
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        every { vm.state } returns
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Alien Collection", null, null, null, listOf(movie)),
+                    similar = listOf(CollectionDetailsData(8, "Another Collection", null, null, null, emptyList())),
+                    similarFocusedId = 8,
+                ),
+            )
+        var backs = 0
+        composeTestRule.setContent {
+            WholphinTheme {
+                BackHandler { backs++ }
+                SeerrCollectionDetails(destination, viewModel = vm)
+            }
+        }
+        composeTestRule.onAllNodesWithText("Another Collection")[0].assertIsFocused()
+        composeTestRule.runOnIdle { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
+        composeTestRule.onNodeWithTag("collectionPoster").assertIsFocused().assertIsDisplayed()
+        Assert.assertEquals(0, backs)
+        composeTestRule.runOnIdle { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
+        Assert.assertEquals(1, backs)
+        verify(exactly = 0) { vm.openRequest() }
+    }
+
+    @Test
+    fun collection_details_back_from_member_focuses_request_poster_without_opening_modal() {
+        val movie = DiscoverItem(42, SeerrItemType.MOVIE, "Alien", null, null, SeerrAvailability.UNKNOWN, null, null, null, null, null)
+        val second = DiscoverItem(43, SeerrItemType.MOVIE, "Aliens", null, null, SeerrAvailability.UNKNOWN, null, null, null, null, null)
+        val destination = Destination.SeerrCollection(7, 0, 1, "viewer")
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        every { vm.state } returns
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Alien Collection", null, null, null, listOf(movie, second)),
+                    requestEligibility = mapOf(42 to CollectionRequestEligibility.ELIGIBLE),
+                ),
+            )
+        var backs = 0
+        composeTestRule.setContent {
+            WholphinTheme {
+                BackHandler { backs++ }
+                SeerrCollectionDetails(destination, viewModel = vm)
+            }
+        }
+        composeTestRule.onAllNodes(hasText("Alien") and hasClickAction())[0].requestFocus().performKeyInput {
+            pressKey(Key.DirectionRight)
+        }
+        composeTestRule.onAllNodes(hasText("Aliens") and hasClickAction())[0].assertIsFocused()
+        composeTestRule.runOnIdle { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
+        composeTestRule.onNodeWithTag("collectionRequestPoster").assertIsFocused().assertIsDisplayed()
+        Assert.assertEquals(0, backs)
+        verify(exactly = 0) { vm.openRequest() }
+        composeTestRule.runOnIdle { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
+        Assert.assertEquals(1, backs)
     }
 
     @Test
@@ -1836,6 +1997,91 @@ class BasicUiTests {
         }
         composeTestRule.onNodeWithText("Similar Collections").assertExists()
         composeTestRule.onAllNodesWithText("Collection 17")[0].assertIsFocused()
+    }
+
+    @Test
+    fun collection_details_similar_up_down_returns_to_high_index_with_only_two_members() {
+        val movies =
+            (1..2).map {
+                DiscoverItem(it, SeerrItemType.MOVIE, "Member $it", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
+            }
+        val similar = (101..109).map { CollectionDetailsData(it, "Related $it", null, null, null, emptyList()) }
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        val state =
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Test Collection", null, null, null, movies),
+                    focusedKey = "tmdb:movie:2",
+                    focusedIndex = 1,
+                    similar = similar,
+                    similarFocusedId = 101,
+                ),
+            )
+        every { vm.state } returns state
+        every { vm.position(any()) } answers {
+            val index = firstArg<Int>()
+            state.value =
+                state.value.copy(focusedKey = "tmdb:movie:${movies[index].id}", focusedIndex = index, similarFocusedId = null)
+        }
+        every { vm.focusSimilar(any()) } answers { state.value = state.value.copy(similarFocusedId = firstArg()) }
+        composeTestRule.setContent {
+            WholphinTheme { SeerrCollectionDetails(Destination.SeerrCollection(7, 1, 2, "viewer"), viewModel = vm) }
+        }
+        for (id in 101..108) {
+            composeTestRule.onAllNodes(hasText("Related $id") and hasClickAction())[0].assertIsFocused().performKeyInput {
+                pressKey(Key.DirectionRight)
+            }
+        }
+        composeTestRule.onAllNodes(hasText("Related 109") and hasClickAction())[0].assertIsFocused().performKeyInput {
+            pressKey(Key.DirectionUp)
+        }
+        composeTestRule.onAllNodes(hasText("Member 2") and hasClickAction())[0].assertIsFocused().performKeyInput {
+            pressKey(Key.DirectionDown)
+        }
+        composeTestRule.onAllNodes(hasText("Related 109") and hasClickAction())[0].assertIsFocused().assertIsDisplayed()
+    }
+
+    @Test
+    fun collection_details_repeated_similar_member_transitions_keep_focus_with_multiple_rows() {
+        val movies =
+            (1..8).map {
+                DiscoverItem(it, SeerrItemType.MOVIE, "Member $it", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
+            }
+        val similar = (101..109).map { CollectionDetailsData(it, "Related $it", null, null, null, emptyList()) }
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        val state =
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Test Collection", null, null, null, movies),
+                    focusedKey = "tmdb:movie:8",
+                    focusedIndex = 7,
+                    similar = similar,
+                    similarFocusedId = 109,
+                ),
+            )
+        every { vm.state } returns state
+        every { vm.position(any()) } answers {
+            val index = firstArg<Int>()
+            state.value =
+                state.value.copy(focusedKey = "tmdb:movie:${movies[index].id}", focusedIndex = index, similarFocusedId = null)
+        }
+        every { vm.focusSimilar(any()) } answers { state.value = state.value.copy(similarFocusedId = firstArg()) }
+        composeTestRule.setContent {
+            WholphinTheme { SeerrCollectionDetails(Destination.SeerrCollection(7, 4, 8, "viewer"), viewModel = vm) }
+        }
+        repeat(2) {
+            composeTestRule.onAllNodes(hasText("Related 109") and hasClickAction())[0].assertIsFocused().performKeyInput {
+                pressKey(Key.DirectionUp)
+            }
+            composeTestRule.onAllNodes(hasText("Member 8") and hasClickAction())[0].assertIsFocused().performKeyInput {
+                pressKey(Key.DirectionDown)
+            }
+            composeTestRule.onAllNodes(hasText("Related 109") and hasClickAction())[0].assertIsFocused().assertIsDisplayed()
+        }
     }
 
     @Test
