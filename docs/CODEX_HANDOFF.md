@@ -119,6 +119,23 @@ not current instruction.
 
 ## Non-obvious invariants and negative knowledge
 
+- Collection Details B06 passed the operator's final 2026-11-18 emulator acceptance for
+  R1/R2/R3 and two-stage Back-to-Request; the earlier failed pass remains historical evidence.
+  Immediate Back after cold entry must exit; Back from a card only
+  becomes the poster/Request shortcut after deliberate in-page navigation. A Similar card's
+  horizontal index is not used to choose a member on Up: the saved member key does that.
+  The source-supported focus hazard is that member focus clears `similarFocusedId`, while the nested
+  `LazyRow` may still be scrolled to a later Similar card. A single movable `FocusRequester`
+  can then target an uncomposed first card, producing a footer scroll without focus transfer.
+  Retain a visit-local Similar return target, prepare the nested row after the parent footer is
+  visible, and reserve selected-card auto-focus for entry restoration; normal Up/Down uses
+  explicit epochs. On poster Back, the Collections browser can otherwise spatially focus the
+  drawer avatar; its lifecycle-resume focus epoch reselects the saved collection card, without
+  stealing toolbar focus. The member key fallback must tolerate an empty collection. A focusable
+  card's separate title-text semantics node is not the focused
+  target in Compose tests. The diagnostic register owns operator/runtime evidence; automated
+  tests and emulator smoke did not themselves establish acceptance; the separate operator pass did.
+
 - Similar Collections C4.2 consumes Seerr PR #63's lightweight authenticated
   `GET /collection/{id}/similar` separately from the full collection-details response.
   Polling the full details endpoint would repeatedly map constituent media and requests;

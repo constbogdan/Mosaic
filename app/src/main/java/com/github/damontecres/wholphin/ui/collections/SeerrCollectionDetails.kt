@@ -1,8 +1,12 @@
 package com.github.damontecres.wholphin.ui.collections
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -28,6 +33,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -52,6 +62,21 @@ import com.github.damontecres.wholphin.ui.discover.LocalQuickMovieRequest
 import com.github.damontecres.wholphin.ui.nav.Destination
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 
+internal enum class CollectionFocusSection { POSTER, MOVIES, SIMILAR }
+
+internal fun collectionMovieUpTargetsPoster(section: CollectionFocusSection?): Boolean = section == CollectionFocusSection.MOVIES
+
+internal fun collectionMovieDownTargetsSimilar(
+    section: CollectionFocusSection?,
+    focusedIndex: Int,
+    movieCount: Int,
+    columns: Int,
+    hasSimilar: Boolean,
+): Boolean =
+    section == CollectionFocusSection.MOVIES &&
+        hasSimilar && movieCount > 0 && columns > 0 &&
+        focusedIndex in 0 until movieCount && focusedIndex / columns == (movieCount - 1) / columns
+
 @Composable
 internal fun SeerrCollectionDetails(
     destination: Destination.SeerrCollection,
@@ -66,6 +91,12 @@ internal fun SeerrCollectionDetails(
     val similarListState = rememberLazyListState()
     var requestWasOpen by remember { mutableStateOf(false) }
     var returnFocusPending by remember { mutableStateOf(false) }
+    var focusSection by remember(destination.entryToken) { mutableStateOf<CollectionFocusSection?>(null) }
+    var backShortcutArmed by rememberSaveable(destination.entryToken) { mutableStateOf(state.similarFocusedId != null) }
+    var lastSimilarFocusId by rememberSaveable(destination.entryToken) { mutableStateOf<Int?>(null) }
+    var memberFocusEpoch by remember(destination.entryToken) { mutableStateOf(0L) }
+    var similarFocusEpoch by remember(destination.entryToken) { mutableStateOf(0L) }
+    var entryFocusRestored by remember(destination.entryToken) { mutableStateOf(false) }
     val posterActionable =
         state.owner == destination.owner && state.details != null && !state.loading && !state.error && !state.denied &&
             !state.requestEligibilityLoading &&
@@ -73,8 +104,23 @@ internal fun SeerrCollectionDetails(
     LaunchedEffect(destination.collectionId, destination.owner, destination.entryToken) {
         viewModel.show(destination.collectionId, destination.owner, destination.entryToken)
     }
+    LaunchedEffect(state.owner, state.details) {
+        if (state.owner != destination.owner || state.details == null) {
+            entryFocusRestored = false
+            focusSection = null
+            lastSimilarFocusId = null
+        }
+    }
     DisposableEffect(viewModel, destination.collectionId, destination.owner, destination.entryToken) {
         onDispose { viewModel.onScreenHidden(destination.entryToken) }
+    }
+    BackHandler(
+        enabled =
+            backShortcutArmed &&
+                focusSection in setOf(CollectionFocusSection.MOVIES, CollectionFocusSection.SIMILAR) &&
+                state.owner == destination.owner && state.details != null && state.request == null,
+    ) {
+        posterFocus.tryRequestFocus()
     }
     LaunchedEffect(state.request, state.loading, state.requestEligibilityLoading, state.details, posterActionable) {
         if (state.request != null) {
@@ -102,7 +148,18 @@ internal fun SeerrCollectionDetails(
             onSubmit = viewModel::submitRequests,
         )
     }
-    Column(modifier.fillMaxSize()) {
+    Column(
+        modifier
+            .fillMaxSize()
+            .onPreviewKeyEvent {
+                if (it.type == KeyEventType.KeyDown &&
+                    it.key in setOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)
+                ) {
+                    backShortcutArmed = true
+                }
+                false
+            },
+    ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(24.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -125,14 +182,52 @@ internal fun SeerrCollectionDetails(
                     modifier =
                         posterModifier
                             .focusRequester(posterFocus)
-                            .semantics { contentDescription = requestLabel }
+                            .onFocusChanged {
+                                if (it.isFocused) {
+                                    focusSection = CollectionFocusSection.POSTER
+                                } else if (focusSection == CollectionFocusSection.POSTER) {
+                                    focusSection = null
+                                }
+                            }.onPreviewKeyEvent {
+                                if (it.type == KeyEventType.KeyDown && it.key == Key.DirectionDown) {
+                                    memberFocusEpoch++
+                                    true
+                                } else {
+                                    false
+                                }
+                            }.semantics { contentDescription = requestLabel }
                             .testTag("collectionRequestPoster"),
                     colors = CardDefaults.colors(containerColor = Color.Transparent),
                 ) {
                     posterContent()
                 }
             } else {
-                Box(posterModifier.testTag("collectionPoster"), contentAlignment = Alignment.Center) { posterContent() }
+                var posterFocused by remember { mutableStateOf(false) }
+                Box(
+                    posterModifier
+                        .focusRequester(posterFocus)
+                        .onFocusChanged {
+                            posterFocused = it.isFocused
+                            if (it.isFocused) {
+                                focusSection = CollectionFocusSection.POSTER
+                            } else if (focusSection == CollectionFocusSection.POSTER) {
+                                focusSection = null
+                            }
+                        }.onPreviewKeyEvent {
+                            if (it.type == KeyEventType.KeyDown && it.key == Key.DirectionDown) {
+                                memberFocusEpoch++
+                                true
+                            } else {
+                                false
+                            }
+                        }.border(
+                            3.dp,
+                            if (posterFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                            RoundedCornerShape(8.dp),
+                        ).focusable()
+                        .testTag("collectionPoster"),
+                    contentAlignment = Alignment.Center,
+                ) { posterContent() }
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
                 Text(
@@ -170,27 +265,91 @@ internal fun SeerrCollectionDetails(
 
             state.details != null -> {
                 val movies = state.details.movies
-                LaunchedEffect(state.owner, destination.collectionId) {
-                    if (state.similarFocusedId == null) gridFocus.tryRequestFocus()
+                val columns = 6
+                val memberFocusKey =
+                    state.focusedKey?.takeIf { key -> movies.any { "tmdb:movie:${it.id}" == key } }
+                        ?: movies.firstOrNull()?.let { "tmdb:movie:${it.id}" }
+                val similarFocusTargetId =
+                    (state.similarFocusedId ?: lastSimilarFocusId)?.takeIf { id -> state.similar.any { it.id == id } }
+                LaunchedEffect(state.details, state.similar.isNotEmpty(), destination.entryToken) {
+                    if (!entryFocusRestored) {
+                        if (state.similarFocusedId != null && state.similar.isEmpty()) return@LaunchedEffect
+                        entryFocusRestored = true
+                        when {
+                            state.similarFocusedId != null -> similarFocusEpoch++
+                            else -> memberFocusEpoch++
+                        }
+                    }
                 }
                 CardGrid(
                     pager = movies,
                     totalItems = movies.size,
-                    focusAnchorKey = state.focusedKey,
+                    focusAnchorKey = memberFocusKey,
                     backToTopOnBack = false,
                     itemKey = { "tmdb:movie:${movies[it].id}" },
-                    onClickItem = { _, item -> viewModel.open(item) },
-                    onLongClickItem = { _, item -> quickMovieRequest.open(item, onOpenDetails = { viewModel.open(item) }) },
+                    onClickItem = { _, item ->
+                        backShortcutArmed = true
+                        viewModel.open(item)
+                    },
+                    onLongClickItem = { _, item ->
+                        backShortcutArmed = true
+                        quickMovieRequest.open(item, onOpenDetails = { viewModel.open(item) })
+                    },
                     onClickPlay = { _, _ -> },
                     letterPosition = { 0 },
                     gridFocusRequester = gridFocus,
                     initialPosition = state.focusedIndex,
-                    positionCallback = { _, index -> viewModel.position(index) },
-                    onFirstRowUp = { posterActionable && posterFocus.tryRequestFocus() },
+                    columns = columns,
+                    focusRequestEpoch = memberFocusEpoch,
+                    positionCallback = { _, index ->
+                        focusSection = CollectionFocusSection.MOVIES
+                        viewModel.position(index)
+                    },
+                    onGridFocusChanged = { hasFocus ->
+                        if (!hasFocus && focusSection != CollectionFocusSection.POSTER) focusSection = null
+                    },
+                    onFirstRowUp = {
+                        collectionMovieUpTargetsPoster(focusSection) && posterFocus.tryRequestFocus()
+                    },
                     showJumpButtons = false,
                     showLetterButtons = false,
-                    footerFocusRequester = similarFocus.takeIf { state.similarFocusedId != null },
-                    modifier = Modifier.weight(1f),
+                    footerFocusRequester = similarFocus.takeIf { state.similar.isNotEmpty() },
+                    autoScrollToFooterOnRequester = false,
+                    footerFocusRequestEpoch = similarFocusEpoch,
+                    useFooterAsFocusRestorer = state.similarFocusedId != null,
+                    prepareFooterFocus = {
+                        val targetIndex = state.similar.indexOfFirst { it.id == similarFocusTargetId }.coerceAtLeast(0)
+                        similarListState.scrollToItem(targetIndex)
+                    },
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .padding(start = 24.dp, end = 40.dp)
+                            .onPreviewKeyEvent {
+                                if (it.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                                when {
+                                    focusSection == CollectionFocusSection.SIMILAR && it.key == Key.DirectionUp -> {
+                                        memberFocusEpoch++
+                                        true
+                                    }
+
+                                    it.key == Key.DirectionDown &&
+                                        collectionMovieDownTargetsSimilar(
+                                            focusSection,
+                                            state.focusedIndex,
+                                            movies.size,
+                                            columns,
+                                            state.similar.isNotEmpty(),
+                                        ) -> {
+                                        similarFocusEpoch++
+                                        true
+                                    }
+
+                                    else -> {
+                                        false
+                                    }
+                                }
+                            },
                     cardContent = { (item, _, onClick, onLongClick, _, cardModifier) ->
                         DiscoverItemCard(
                             item = item,
@@ -214,10 +373,19 @@ internal fun SeerrCollectionDetails(
                                         SimilarCollectionsRow(
                                             collections = state.similar,
                                             selectedId = state.similarFocusedId,
+                                            focusTargetId = similarFocusTargetId,
+                                            restoreSelectedFocus = focusSection == null && state.similarFocusedId != null,
                                             focusRequester = similarFocus,
                                             listState = similarListState,
-                                            onFocus = viewModel::focusSimilar,
-                                            onOpen = viewModel::openSimilar,
+                                            onFocus = {
+                                                focusSection = CollectionFocusSection.SIMILAR
+                                                lastSimilarFocusId = it
+                                                viewModel.focusSimilar(it)
+                                            },
+                                            onOpen = {
+                                                backShortcutArmed = true
+                                                viewModel.openSimilar(it)
+                                            },
                                         )
                                     }
                                     if (state.similarLoading && state.similar.isEmpty()) {
@@ -270,6 +438,8 @@ internal fun collectionMovieArtworkAlpha(availability: SeerrAvailability?): Floa
 private fun SimilarCollectionsRow(
     collections: List<CollectionDetailsData>,
     selectedId: Int?,
+    focusTargetId: Int?,
+    restoreSelectedFocus: Boolean,
     focusRequester: FocusRequester,
     listState: LazyListState,
     onFocus: (Int) -> Unit,
@@ -287,18 +457,18 @@ private fun SimilarCollectionsRow(
         Text(
             stringResource(R.string.collections_similar),
             style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(start = 24.dp, bottom = 8.dp),
+            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp),
         )
         LazyRow(
             state = listState,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.fillMaxWidth().height(235.dp).padding(start = 24.dp, end = 40.dp),
+            contentPadding = PaddingValues(start = 8.dp, end = 8.dp),
+            modifier = Modifier.fillMaxWidth().height(235.dp),
         ) {
             items(collections, key = { it.id }) { item ->
-                if (selectedId == item.id) {
-                    LaunchedEffect(item.id) {
-                        focusRequester.tryRequestFocus()
-                    }
+                if (restoreSelectedFocus && selectedId == item.id) {
+                    // Entry restoration only. A selected card must not reclaim focus during Similar -> member traversal.
+                    LaunchedEffect(item.id) { focusRequester.tryRequestFocus() }
                 }
                 CollectionCard(
                     name = item.name,
@@ -310,8 +480,15 @@ private fun SimilarCollectionsRow(
                     modifier = Modifier.width(125.dp),
                     cardModifier =
                         Modifier
-                            .then(if (selectedId == item.id) Modifier.focusRequester(focusRequester) else Modifier)
-                            .onFocusChanged { if (it.isFocused) onFocus(item.id) },
+                            .then(
+                                if (focusTargetId == item.id ||
+                                    (focusTargetId == null && item.id == collections.first().id)
+                                ) {
+                                    Modifier.focusRequester(focusRequester)
+                                } else {
+                                    Modifier
+                                },
+                            ).onFocusChanged { if (it.isFocused) onFocus(item.id) },
                 )
             }
         }

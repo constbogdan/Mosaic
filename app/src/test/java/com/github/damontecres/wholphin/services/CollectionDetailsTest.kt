@@ -12,8 +12,11 @@ import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.data.model.SeerrItemType
 import com.github.damontecres.wholphin.data.model.SeerrServer
 import com.github.damontecres.wholphin.data.model.SeerrUser
+import com.github.damontecres.wholphin.ui.collections.CollectionFocusSection
 import com.github.damontecres.wholphin.ui.collections.SeerrCollectionDetailsViewModel
 import com.github.damontecres.wholphin.ui.collections.collectionMovieArtworkAlpha
+import com.github.damontecres.wholphin.ui.collections.collectionMovieDownTargetsSimilar
+import com.github.damontecres.wholphin.ui.collections.collectionMovieUpTargetsPoster
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -40,6 +43,23 @@ import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CollectionDetailsTest {
+    @Test fun collectionSectionTraversalDoesNotSkipMoviesFromSimilar() {
+        // CardGrid can retain movie index zero while its Similar footer owns focus.
+        assertFalse(collectionMovieUpTargetsPoster(CollectionFocusSection.SIMILAR))
+        assertTrue(collectionMovieUpTargetsPoster(CollectionFocusSection.MOVIES))
+        assertFalse(collectionMovieUpTargetsPoster(CollectionFocusSection.POSTER))
+        assertFalse(collectionMovieDownTargetsSimilar(CollectionFocusSection.SIMILAR, 0, 2, 6, true))
+    }
+
+    @Test fun collectionDownEntersSimilarOnlyFromLastPopulatedMovieRow() {
+        assertFalse(collectionMovieDownTargetsSimilar(CollectionFocusSection.MOVIES, 0, 8, 6, true))
+        assertTrue(collectionMovieDownTargetsSimilar(CollectionFocusSection.MOVIES, 6, 8, 6, true))
+        assertTrue(collectionMovieDownTargetsSimilar(CollectionFocusSection.MOVIES, 7, 8, 6, true))
+        assertTrue(collectionMovieDownTargetsSimilar(CollectionFocusSection.MOVIES, 0, 2, 6, true))
+        assertFalse(collectionMovieDownTargetsSimilar(CollectionFocusSection.MOVIES, 0, 2, 6, false))
+        assertFalse(collectionMovieDownTargetsSimilar(CollectionFocusSection.MOVIES, 2, 2, 6, true))
+    }
+
     @Test fun collectionArtworkDimsOnlyConfirmedMissingStatuses() {
         assertEquals(.45f, collectionMovieArtworkAlpha(SeerrAvailability.PENDING))
         assertEquals(.45f, collectionMovieArtworkAlpha(SeerrAvailability.PROCESSING))

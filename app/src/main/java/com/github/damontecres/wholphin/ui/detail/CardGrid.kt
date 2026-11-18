@@ -141,6 +141,10 @@ fun <T : CardGridItem> CardGrid(
     backToTopOnBack: Boolean = true,
     footerContent: (@Composable () -> Unit)? = null,
     footerFocusRequester: FocusRequester? = null,
+    autoScrollToFooterOnRequester: Boolean = true,
+    footerFocusRequestEpoch: Long = 0,
+    useFooterAsFocusRestorer: Boolean = true,
+    prepareFooterFocus: (suspend () -> Unit)? = null,
 ) {
     val leadingEmptySlots = if (alignWindowToAbsoluteRows) gridLeadingSlots(positionOffset, columns) else 0
     val startPosition =
@@ -155,9 +159,22 @@ fun <T : CardGridItem> CardGrid(
             cacheWindow = LazyLayoutCacheWindow(aheadFraction = 2f, behindFraction = 0.5f),
             initialFirstVisibleItemIndex = focusedIndex + leadingEmptySlots,
         )
-    LaunchedEffect(footerFocusRequester, pager.size, footerContent != null) {
-        if (footerFocusRequester != null && footerContent != null) {
+    LaunchedEffect(footerFocusRequester, pager.size, footerContent != null, autoScrollToFooterOnRequester) {
+        if (autoScrollToFooterOnRequester && footerFocusRequester != null && footerContent != null) {
             gridState.scrollToItem(pager.size + leadingEmptySlots)
+        }
+    }
+    LaunchedEffect(footerFocusRequestEpoch) {
+        if (footerFocusRequestEpoch > 0 && footerFocusRequester != null && footerContent != null) {
+            val footerIndex = pager.size + leadingEmptySlots
+            if (gridState.layoutInfo.visibleItemsInfo.none { it.index == footerIndex }) {
+                // Keep part of the preceding movie row in view when the viewport permits it.
+                gridState.scrollToItem(footerIndex, -(gridState.layoutInfo.viewportEndOffset / 2))
+            }
+            withFrameNanos { }
+            prepareFooterFocus?.invoke()
+            withFrameNanos { }
+            footerFocusRequester.tryRequestFocus()
         }
     }
     val scope = rememberCoroutineScope()
@@ -380,7 +397,7 @@ fun <T : CardGridItem> CardGrid(
                                 .fillMaxSize()
                                 .onFocusChanged { onGridFocusChanged?.invoke(it.hasFocus) }
                                 .focusGroup()
-                                .focusRestorer(footerFocusRequester ?: firstFocus)
+                                .focusRestorer(if (useFooterAsFocusRestorer) footerFocusRequester ?: firstFocus else firstFocus)
                                 .focusProperties {
                                     onEnter = {
                                         if (focusedIndex < 0 && gridState.firstVisibleItemIndex <= startPosition) {
