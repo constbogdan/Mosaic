@@ -264,6 +264,36 @@ class DiscoverMovieRequestTest {
             assertEquals(false, submitted.is4k)
         }
 
+    @Test fun dialogDismissalDoesNotReloadMovieAndSuccessfulRequestKeepsItsTargetedRefresh() =
+        runTest(dispatcher) {
+            model.onResume()
+            runCurrent()
+            assertTrue(model.requestOnClick())
+            runCurrent()
+            model.closeRequestDialog()
+            runCurrent()
+            coVerify(exactly = 1) { movies.movieMovieIdGet(42) }
+
+            assertTrue(model.requestOnClick())
+            runCurrent()
+            val request = movieRequestForQuality(model.state.value.requestData, 42, MOVIE_PROFILE_1080P_HDR)!!
+            val responded = CompletableDeferred<Unit>()
+            val targetedFetch = CompletableDeferred<Unit>()
+            var fetchCount = 1 // The constructor's entry GET has already completed.
+            coEvery { movies.movieMovieIdGet(42) } coAnswers {
+                if (++fetchCount == 3) targetedFetch.complete(Unit)
+                details
+            }
+            http.onResponse = { responded.complete(Unit) }
+            model.request(request)
+            runCurrent()
+            responded.await()
+            targetedFetch.await()
+            runCurrent()
+            // Initial load, pre-submit eligibility, and post-submit status refresh: no extra dialog load.
+            coVerify(exactly = 3) { movies.movieMovieIdGet(42) }
+        }
+
     @Test fun reopeningClearsOldProfilesAndFailedRefreshCannotRestoreThem() =
         runTest(dispatcher) {
             assertTrue(model.requestOnClick())
@@ -576,6 +606,7 @@ class DiscoverMovieRequestTest {
     ) {
         current.value = session
         connection.value = SeerrState(SeerrConnectionStatus.Success(session))
+        dispatcher.scheduler.runCurrent()
         assertEquals(standard, model.requestEnabled.first())
         assertEquals(fourK, model.request4kEnabled.first())
         // Eligibility remains separately observable; the redesigned details dialog submits standard profiles only.
@@ -594,6 +625,13 @@ class DiscoverMovieRequestTest {
         refreshed = CompletableDeferred()
         model.cancelRequest(id, is4k)
         refreshed!!.await()
+        model.state.first { state ->
+            state.movie.successValue
+                ?.mediaInfo
+                ?.requests
+                .orEmpty()
+                .map { it.id } == records.filterNot { it.id == id }.map { it.id }
+        }
         assertEquals(
             records
                 .filterNot {
