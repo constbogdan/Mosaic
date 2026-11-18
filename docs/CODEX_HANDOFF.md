@@ -119,6 +119,15 @@ not current instruction.
 
 ## Non-obvious invariants and negative knowledge
 
+- Movie Details B02 keeps a full Seerr movie GET on genuine later lifecycle resumes because
+  the bundled client has no lighter authoritative per-movie availability read. The first
+  `LifecycleResumeEffect` must only join the ViewModel's constructor-owned load; request and
+  cancellation retain their separate targeted status reads. A later resume supersedes even an
+  unfinished entry read, while same-session status and optional rating/related metadata have
+  separate work ownership. Never treat acquisition progress as proof of availability. Movie,
+  people, trailer, rating and related-result publication must all remain fenced by the current
+  Seerr client/account and entry generation. The diagnostic register owns operator acceptance.
+
 - Collection Details B06 passed the operator's final 2026-11-18 emulator acceptance for
   R1/R2/R3 and two-stage Back-to-Request; the earlier failed pass remains historical evidence.
   Immediate Back after cold entry must exit; Back from a card only

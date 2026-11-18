@@ -61,6 +61,7 @@ import com.github.damontecres.wholphin.ui.collections.CollectionMovieLinkViewMod
 import com.github.damontecres.wholphin.ui.components.ErrorMessage
 import com.github.damontecres.wholphin.ui.components.HeaderUtils
 import com.github.damontecres.wholphin.ui.components.LoadingPage
+import com.github.damontecres.wholphin.ui.components.TextButton
 import com.github.damontecres.wholphin.ui.data.ItemDetailsDialog
 import com.github.damontecres.wholphin.ui.data.ItemDetailsDialogInfo
 import com.github.damontecres.wholphin.ui.discover.QuickMovieConfirmGate
@@ -88,7 +89,7 @@ internal fun DiscoverMovieDetails(
     val resources = LocalResources.current
     val context = LocalContext.current
     LifecycleResumeEffect(Unit) {
-        viewModel.init()
+        viewModel.onResume()
         onPauseOrDispose { }
     }
     val state by viewModel.state.collectAsState()
@@ -108,7 +109,10 @@ internal fun DiscoverMovieDetails(
 
     when (val st = state.movie) {
         is DataLoadingState.Error -> {
-            ErrorMessage(st, modifier)
+            Column(modifier = modifier) {
+                ErrorMessage(st)
+                TextButton(stringRes = R.string.retry, onClick = viewModel::retry)
+            }
         }
 
         DataLoadingState.Loading,

@@ -103,10 +103,22 @@ class DiscoverMovieViewModel
         @Volatile private var profileLoadJob: Job? = null
         private val requestInFlight = AtomicBoolean(false)
 
+        // All details lifecycle decisions and publications are confined to Main.
+        private var detailsSession: ProfileSession? = null
+        private var detailsEpoch = 0
+        private var movieEpoch = 0
+        private var movieLoadJob: Job? = null
+        private var fieldsJob: Job? = null
+        private var statusFetchInFlight = false
+        private var metadataStarted = false
+        private val metadataJobs = mutableListOf<Job>()
+        private var hasResumed = false
+
         init {
             viewModelScope.launch(WholphinDispatchers.Main.immediate) {
                 seerrServerRepository.connection.collect {
                     openingSession?.let { session -> if (!isCurrent(session)) closeRequestDialog() }
+                    ensureDetailsSession()
                 }
             }
         }
@@ -128,106 +140,248 @@ class DiscoverMovieViewModel
             combine(seerrServerRepository.current, state) { current, state -> current.canRequestMovie(state.movie.successValue, true) }
 
         init {
-            init()
+            viewModelScope.launch(WholphinDispatchers.Main.immediate) { ensureDetailsSession() }
+        }
+
+        private fun ensureDetailsSession(): Boolean {
+            val current = activeSession()
+            if (current?.current == detailsSession?.current && current?.client === detailsSession?.client) return false
+            detailsEpoch++
+            movieEpoch++
+            movieLoadJob?.cancel()
+            fieldsJob?.cancel()
+            statusFetchInFlight = false
+            metadataJobs.forEach(Job::cancel)
+            metadataJobs.clear()
+            metadataStarted = false
+            detailsSession = current
+            _state.update {
+                it.copy(
+                    movie = DataLoadingState.Pending,
+                    rating = null,
+                    people = emptyList(),
+                    trailers = emptyList(),
+                    similar = emptyList(),
+                    recommended = emptyList(),
+                    canCancelRequest = false,
+                )
+            }
+            if (current != null) startMovieLoad(current)
+            return true
+        }
+
+        fun onResume() {
+            viewModelScope.launch(WholphinDispatchers.Main.immediate) {
+                val changed = ensureDetailsSession()
+                if (!hasResumed) {
+                    hasResumed = true
+                } else if (!changed) {
+                    // A real later resume is a newer freshness event, even if the entry read is unfinished.
+                    detailsSession?.let { startMovieLoad(it, retry = true) }
+                }
+            }
+        }
+
+        fun retry() {
+            viewModelScope.launch(WholphinDispatchers.Main.immediate) {
+                if (!ensureDetailsSession()) detailsSession?.let { startMovieLoad(it, retry = true) }
+            }
+        }
+
+        private fun isCurrentDetails(
+            session: ProfileSession,
+            epoch: Int,
+        ): Boolean = epoch == detailsEpoch && detailsSession == session && isCurrent(session)
+
+        private fun startMovieLoad(
+            session: ProfileSession,
+            retry: Boolean = false,
+        ) {
+            if (statusFetchInFlight && !retry) return // Equivalent in-flight status read.
+            movieLoadJob?.cancel()
+            statusFetchInFlight = true
+            val sessionEpoch = detailsEpoch
+            val loadEpoch = ++movieEpoch
+            if (state.value.movie !is DataLoadingState.Success<*>) {
+                _state.update { it.copy(movie = DataLoadingState.Loading) }
+            }
+            movieLoadJob =
+                viewModelScope.launch(WholphinDispatchers.Main.immediate) {
+                    try {
+                        Timber.v("Load movie %s", item.id)
+                        val movie = withContext(WholphinDispatchers.IO) { session.client.moviesApi.movieMovieIdGet(movieId = item.id) }
+                        if (!isCurrentDetails(session, sessionEpoch) || loadEpoch != movieEpoch) return@launch
+                        statusFetchInFlight = false
+                        _state.update {
+                            it.copy(
+                                movie = DataLoadingState.Success(movie),
+                                canCancelRequest =
+                                    movie.mediaInfo.singleCancellationTarget(session.current.config, SeerrItemType.MOVIE, item.id) != null,
+                            )
+                        }
+                        if (!metadataStarted) startMetadata(session, sessionEpoch)
+                        startFieldsLoad(session, sessionEpoch, loadEpoch, movie)
+                    } catch (ex: CancellationException) {
+                        throw ex
+                    } catch (ex: Exception) {
+                        if (isCurrentDetails(session, sessionEpoch) && loadEpoch == movieEpoch) {
+                            statusFetchInFlight = false
+                            Timber.e(ex, "Error updating movie details")
+                            _state.update { it.copy(movie = DataLoadingState.Error(ex)) }
+                        }
+                    }
+                }
+        }
+
+        private fun startFieldsLoad(
+            session: ProfileSession,
+            sessionEpoch: Int,
+            loadEpoch: Int,
+            movie: MovieDetails,
+        ) {
+            fieldsJob?.cancel()
+            fieldsJob =
+                viewModelScope.launchIO {
+                    try {
+                        val people =
+                            movie.credits
+                                ?.cast
+                                ?.map { seerrService.createDiscoverItem(it) }
+                                .orEmpty() +
+                                movie.credits
+                                    ?.crew
+                                    ?.map { seerrService.createDiscoverItem(it) }
+                                    .orEmpty()
+                        val trailers =
+                            movie.relatedVideos
+                                ?.filter { it.type == RelatedVideo.Type.TRAILER }
+                                ?.filter { it.name.isNotNullOrBlank() && it.url.isNotNullOrBlank() }
+                                ?.map { RemoteTrailer(it.name!!, it.url!!, it.site) }
+                                .orEmpty()
+                        val discoveredItem = seerrService.createDiscoverItem(movie)
+                        withContext(WholphinDispatchers.Main.immediate) {
+                            if (isCurrentDetails(session, sessionEpoch) && loadEpoch == movieEpoch) {
+                                _state.update { it.copy(people = people, trailers = trailers) }
+                                backdropService.submit(discoveredItem)
+                            }
+                        }
+                    } catch (
+                        ex: CancellationException,
+                    ) {
+                        throw ex
+                    } catch (ex: Exception) {
+                        Timber.e(ex, "Error loading movie presentation fields")
+                        withContext(WholphinDispatchers.Main.immediate) {
+                            if (isCurrentDetails(session, sessionEpoch) && loadEpoch == movieEpoch) {
+                                _state.update { it.copy(movie = DataLoadingState.Error(ex)) }
+                            }
+                        }
+                    }
+                }
+        }
+
+        private fun startMetadata(
+            session: ProfileSession,
+            epoch: Int,
+        ) {
+            metadataStarted = true // An empty related result is still a completed entry fetch.
+            metadataJobs +=
+                viewModelScope.launchIO {
+                    val rating =
+                        getDiscoverRating(item.id) {
+                            DiscoverRating(session.client.moviesApi.movieMovieIdRatingsGet(movieId = item.id))
+                        }
+                    withContext(WholphinDispatchers.Main.immediate) {
+                        if (isCurrentDetails(session, epoch)) _state.update { it.copy(rating = rating) }
+                    }
+                }
+            metadataJobs +=
+                viewModelScope.launchIO {
+                    try {
+                        val result =
+                            session.client.moviesApi
+                                .movieMovieIdSimilarGet(movieId = item.id, page = 1)
+                                .results
+                                ?.map { seerrService.createDiscoverItem(it) }
+                                .orEmpty()
+                        withContext(WholphinDispatchers.Main.immediate) {
+                            if (isCurrentDetails(session, epoch)) _state.update { it.copy(similar = result) }
+                        }
+                    } catch (ex: CancellationException) {
+                        throw ex
+                    } catch (ex: Exception) {
+                        Timber.e(ex, "Error loading similar movies")
+                    }
+                }
+            metadataJobs +=
+                viewModelScope.launchIO {
+                    try {
+                        val result =
+                            session.client.moviesApi
+                                .movieMovieIdRecommendationsGet(movieId = item.id, page = 1)
+                                .results
+                                ?.map { seerrService.createDiscoverItem(it) }
+                                .orEmpty()
+                        withContext(WholphinDispatchers.Main.immediate) {
+                            if (isCurrentDetails(session, epoch)) _state.update { it.copy(recommended = result) }
+                        }
+                    } catch (ex: CancellationException) {
+                        throw ex
+                    } catch (ex: Exception) {
+                        Timber.e(ex, "Error loading recommended movies")
+                    }
+                }
         }
 
         private fun fetchAndSetItem(
-            expectedClient: SeerrApiClient? = null,
-            ownerId: Int? = null,
+            expectedClient: SeerrApiClient,
+            ownerId: Int?,
         ): Deferred<MovieDetails?> =
             viewModelScope.async(WholphinDispatchers.IO) {
+                val token =
+                    withContext(WholphinDispatchers.Main.immediate) {
+                        val session = detailsSession
+                        val currentOwnerId = seerrServerRepository.currentUserId.firstOrNull()
+                        if (session == null || session.client !== expectedClient || session.current.config.id != ownerId ||
+                            currentOwnerId != ownerId || !isCurrent(session)
+                        ) {
+                            null
+                        } else {
+                            movieLoadJob?.cancel()
+                            statusFetchInFlight = false
+                            ++movieEpoch to detailsEpoch
+                        }
+                    } ?: return@async null
                 try {
-                    val movie = (expectedClient ?: seerrService.api).moviesApi.movieMovieIdGet(movieId = item.id)
+                    val movie = expectedClient.moviesApi.movieMovieIdGet(movieId = item.id)
                     currentCoroutineContext().ensureActive()
-                    if (expectedClient != null &&
-                        (seerrService.api !== expectedClient || seerrServerRepository.currentUserId.firstOrNull() != ownerId)
-                    ) {
-                        return@async null
+                    withContext(WholphinDispatchers.Main.immediate) {
+                        val session = detailsSession
+                        val currentOwnerId = seerrServerRepository.currentUserId.firstOrNull()
+                        if (session == null || session.client !== expectedClient || session.current.config.id != ownerId ||
+                            currentOwnerId != ownerId || !isCurrentDetails(session, token.second) || movieEpoch != token.first
+                        ) {
+                            return@withContext null
+                        }
+                        _state.update {
+                            it.copy(
+                                movie = DataLoadingState.Success(movie),
+                                canCancelRequest =
+                                    movie.mediaInfo.singleCancellationTarget(session.current.config, SeerrItemType.MOVIE, item.id) != null,
+                            )
+                        }
+                        startFieldsLoad(session, token.second, token.first, movie)
+                        movie
                     }
-                    _state.update { it.copy(movie = DataLoadingState.Success(movie)) }
-                    movie
-                } catch (ex: CancellationException) {
+                } catch (
+                    ex: CancellationException,
+                ) {
                     throw ex
                 } catch (ex: Exception) {
                     Timber.e(ex, "Error updating movie details")
                     null
                 }
             }
-
-        fun init(): Job =
-            viewModelScope.launchIO {
-                Timber.v("Init for movie %s", item.id)
-                try {
-                    val movie = seerrService.api.moviesApi.movieMovieIdGet(movieId = item.id)
-                    _state.update { it.copy(movie = DataLoadingState.Success(movie)) }
-                    val discoveredItem = seerrService.createDiscoverItem(movie)
-                    backdropService.submit(discoveredItem)
-
-                    updateCanCancel()
-
-                    viewModelScope.launchIO {
-                        val rating =
-                            getDiscoverRating(item.id) {
-                                DiscoverRating(
-                                    seerrService.api.moviesApi.movieMovieIdRatingsGet(movieId = item.id),
-                                )
-                            }
-                        _state.update { it.copy(rating = rating) }
-                    }
-                    if (state.value.similar.isEmpty()) {
-                        viewModelScope.launchIO {
-                            val result =
-                                seerrService.api.moviesApi
-                                    .movieMovieIdSimilarGet(movieId = item.id, page = 1)
-                                    .results
-                                    ?.map { seerrService.createDiscoverItem(it) }
-                                    .orEmpty()
-                            _state.update { it.copy(similar = result) }
-                        }
-                        viewModelScope.launchIO {
-                            val result =
-                                seerrService.api.moviesApi
-                                    .movieMovieIdRecommendationsGet(movieId = item.id, page = 1)
-                                    .results
-                                    ?.map { seerrService.createDiscoverItem(it) }
-                                    .orEmpty()
-                            _state.update { it.copy(recommended = result) }
-                        }
-                    }
-                    val people =
-                        movie.credits
-                            ?.cast
-                            ?.map { seerrService.createDiscoverItem(it) }
-                            .orEmpty() +
-                            movie.credits
-                                ?.crew
-                                ?.map { seerrService.createDiscoverItem(it) }
-                                .orEmpty()
-                    _state.update { it.copy(people = people) }
-                    val trailers =
-                        movie.relatedVideos
-                            ?.filter { it.type == RelatedVideo.Type.TRAILER }
-                            ?.filter { it.name.isNotNullOrBlank() && it.url.isNotNullOrBlank() }
-                            ?.map {
-                                RemoteTrailer(it.name!!, it.url!!, it.site)
-                            }.orEmpty()
-                    _state.update { it.copy(trailers = trailers) }
-                } catch (ex: CancellationException) {
-                    throw ex
-                } catch (ex: Exception) {
-                    Timber.e(ex, "Error updating movie details")
-                    _state.update { it.copy(movie = DataLoadingState.Error(ex)) }
-                }
-            }
-
-        private suspend fun updateCanCancel() {
-            val user = userConfig.firstOrNull()
-            val canCancel =
-                state.value.movie.successValue
-                    ?.mediaInfo
-                    .singleCancellationTarget(user, SeerrItemType.MOVIE, item.id) != null
-            _state.update { it.copy(canCancelRequest = canCancel) }
-        }
 
         fun navigateTo(destination: Destination) {
             navigationManager.navigateTo(destination)
@@ -279,7 +433,6 @@ class DiscoverMovieViewModel
                         }
                     }
                     fetchAndSetItem(prepared.client, prepared.current.config.id).await()
-                    updateCanCancel()
                 } catch (ex: CancellationException) {
                     throw ex
                 } catch (ex: Exception) {
@@ -311,7 +464,6 @@ class DiscoverMovieViewModel
                     currentCoroutineContext().ensureActive()
                     if (seerrService.api !== client || seerrServerRepository.currentUserId.firstOrNull() != owner?.id) return@launchIO
                     fetchAndSetItem(client, owner?.id).await()
-                    updateCanCancel()
                 } catch (ex: CancellationException) {
                     throw ex
                 } catch (ex: Exception) {
