@@ -163,7 +163,7 @@ class AppDatabaseMigrationTest {
         }
 
     private fun assertHealthy(db: SupportSQLiteDatabase) {
-        assertEquals(38, db.version)
+        assertEquals(39, db.version)
         assertEquals(listOf(listOf("ok")), rows(db, "PRAGMA integrity_check"))
         assertTrue(rows(db, "PRAGMA foreign_key_check").isEmpty())
     }
@@ -177,6 +177,8 @@ class AppDatabaseMigrationTest {
         assertTrue("season_integrity_expectations" in tables)
         assertTrue("SeriesTrackChoice" in tables)
         assertTrue("PlaybackLanguageChoice" in tables)
+        assertTrue("jellyfin_identity_items" in tables)
+        assertTrue("jellyfin_identity_snapshots" in tables)
     }
 
     @Test
@@ -225,7 +227,7 @@ class AppDatabaseMigrationTest {
 
     @Test
     fun `every supported historical schema upgrades without losing server or user identity`() {
-        for (version in listOf(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 20, 30, 31, 32, 33, 34, 35, 36, 37)) {
+        for (version in listOf(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 20, 30, 31, 32, 33, 34, 35, 36, 37, 38)) {
             val name = fixture(version) { seedIdentity(it, version) }
             val db = open(name).openHelper.writableDatabase
             assertHealthy(db)

@@ -242,7 +242,7 @@ internal fun MovieDetails(
                     viewModel.navigateTo(extra.destination)
                 },
                 onClickDiscover = { index, item ->
-                    viewModel.navigateTo(item.destination)
+                    viewModel.navigateToSeerrItem(item)
                 },
                 canDelete = state.canDelete,
                 onConfirmDelete = { state.movie?.let { viewModel.deleteItem(it) } },

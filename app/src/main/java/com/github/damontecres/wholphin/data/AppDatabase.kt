@@ -11,6 +11,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.github.damontecres.wholphin.data.model.GetItemsFilter
 import com.github.damontecres.wholphin.data.model.ItemPlayback
 import com.github.damontecres.wholphin.data.model.ItemTrackModification
+import com.github.damontecres.wholphin.data.model.JellyfinIdentityItem
+import com.github.damontecres.wholphin.data.model.JellyfinIdentitySnapshot
 import com.github.damontecres.wholphin.data.model.JellyfinServer
 import com.github.damontecres.wholphin.data.model.JellyfinUser
 import com.github.damontecres.wholphin.data.model.LibraryDisplayInfo
@@ -53,8 +55,10 @@ import java.util.UUID
         RememberedTab::class,
         SeasonIntegrityExpectationCache::class,
         SeriesTrackChoice::class,
+        JellyfinIdentityItem::class,
+        JellyfinIdentitySnapshot::class,
     ],
-    version = 38,
+    version = 39,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(3, 4),
@@ -76,6 +80,7 @@ import java.util.UUID
         AutoMigration(35, 36),
         AutoMigration(36, 37, spec = Migrations.Migrate36to37::class),
         AutoMigration(37, 38),
+        AutoMigration(38, 39),
     ],
 )
 @TypeConverters(Converters::class)
@@ -99,6 +104,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun seasonIntegrityDao(): SeasonIntegrityDao
 
     abstract fun seriesTrackChoiceDao(): SeriesTrackChoiceDao
+
+    abstract fun jellyfinIdentityDao(): JellyfinIdentityDao
 }
 
 class Converters {

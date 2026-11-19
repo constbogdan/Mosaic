@@ -11,6 +11,7 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import com.github.damontecres.wholphin.data.AppDatabase
 import com.github.damontecres.wholphin.data.ItemPlaybackDao
+import com.github.damontecres.wholphin.data.JellyfinIdentityDao
 import com.github.damontecres.wholphin.data.JellyfinServerDao
 import com.github.damontecres.wholphin.data.LibraryDisplayInfoDao
 import com.github.damontecres.wholphin.data.Migrations
@@ -88,6 +89,10 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun seriesTrackChoiceTabDao(db: AppDatabase): SeriesTrackChoiceDao = db.seriesTrackChoiceDao()
+
+    @Provides
+    @Singleton
+    fun jellyfinIdentityDao(db: AppDatabase): JellyfinIdentityDao = db.jellyfinIdentityDao()
 
     @Provides
     @Singleton

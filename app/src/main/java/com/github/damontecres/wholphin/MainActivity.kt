@@ -42,6 +42,7 @@ import com.github.damontecres.wholphin.services.EnhancedFeatureController
 import com.github.damontecres.wholphin.services.ImageUrlService
 import com.github.damontecres.wholphin.services.IntentResult
 import com.github.damontecres.wholphin.services.IntentService
+import com.github.damontecres.wholphin.services.JellyfinIdentityIndexSessionListener
 import com.github.damontecres.wholphin.services.LatestNextUpSchedulerService
 import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.services.PlaybackLifecycleObserver
@@ -125,6 +126,10 @@ class MainActivity : AppCompatActivity() {
 
     @Inject
     lateinit var userSwitchListener: UserSwitchListener
+
+    // Observes authenticated Jellyfin sessions and checks snapshot age on genuine app resumes.
+    @Inject
+    lateinit var jellyfinIdentityIndexSessionListener: JellyfinIdentityIndexSessionListener
 
     @Inject
     lateinit var tvProviderSchedulerService: TvProviderSchedulerService
@@ -305,6 +310,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         Timber.d("onResume")
+        jellyfinIdentityIndexSessionListener.refreshOnResume()
         viewModel.appResume()
         lifecycleScope.launchDefault {
             screensaverService.pulse()

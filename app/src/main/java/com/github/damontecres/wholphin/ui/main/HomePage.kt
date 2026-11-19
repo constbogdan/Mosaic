@@ -261,7 +261,10 @@ fun HomePage(
                 onUpdateBackdrop = viewModel::updateBackdrop,
                 onUpdateAcquiringBackdrop = viewModel::updateBackdrop,
                 onClickAcquiring = { item ->
-                    viewModel.navigationManager.navigateTo(item.destination())
+                    when (val destination = item.destination()) {
+                        is Destination.DiscoveredItem -> viewModel.navigationManager.navigateToSeerrItem(destination.item)
+                        else -> viewModel.navigationManager.navigateTo(destination)
+                    }
                 },
                 onClickAcquiringMore = {
                     viewModel.navigationManager.navigateTo(homeAcquiringMoreDestination())

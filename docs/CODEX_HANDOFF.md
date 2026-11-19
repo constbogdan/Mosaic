@@ -119,6 +119,49 @@ not current instruction.
 
 ## Non-obvious invariants and negative knowledge
 
+- G15 Stage 1's local Jellyfin identity index is an observation of the authenticated user's
+  `/UserViews` and paged `/Items?fields=ProviderIds` response, including mixed user views. It is
+  not proof of current access or exhaustive underlying UUIDs. Stock Jellyfin 10.10.7 can group
+  by presentation key before returning a page, and the public query has no grouping-disable
+  parameter. A completed scan
+  therefore never turns an index miss into “unowned”; missing/malformed TMDb metadata and
+  offset-page mutation remain unresolved. Room schema 39 replaces a user's complete snapshot
+  transactionally only after all selected views pass consistency checks; failed or session-changed
+  scans retain the last snapshot. The marker and candidate read is transactional too, so it cannot
+  mix generations. An activity-scoped authenticated-session observer now starts one asynchronous
+  scan when no matching successful Room snapshot exists or the previous snapshot is at least
+  24 hours old; a genuine app resume also checks that age, while later app starts reuse a
+  recent snapshot. Explicit `refresh()` remains available for a separately approved
+  library-change policy. A stale refresh never blocks
+  navigation and retains the previous snapshot until a complete replacement succeeds.
+  `ServerRepository.changeUser` updates the shared API client before publishing `current`, so a
+  scan checks both the `CurrentUser` instance and the API client's URL/token before and after
+  provider calls. Checking `current` alone leaves a cross-account transition gap. Logout and
+  account/server changes cancel the observer's scan. Logs contain only hashed user/server IDs,
+  bounded counts/timing, and exception class. A skipped scan is not a live Jellyfin re-verification.
+  G15 Stage 2 routes Seerr-backed Movie/Series card selections through one shared resolver:
+  typed TMDb ID -> current server/user Room candidates -> one bounded current-user Jellyfin
+  `/Items?ids=...` read requiring exact UUID, kind and explicit `ProviderIds.Tmdb` -> native
+  Details only for a unique verified item. Missing, failed, timed-out or ambiguous matches
+  use Discover; a session change suppresses pending navigation. Repeated OK events do not
+  push duplicate destinations. Discover Details `Go To` uses the same verification path,
+  never Seerr's Jellyfin ID. Completed Downloads retain their pre-existing acquisition-readiness
+  destination, which is separate from this G15 resolver and was not changed in Stage 2.
+  The 2026-11-19 in-place Debug emulator pass observed native Movie Details
+  from Leaving Soon for The Mighty Quinn, native Series Details for Inspector Morse, and
+  a Discover fallback for The Odyssey; a recent Room snapshot was reused without a scan.
+  The operator additionally accepted Watchlist and Collections navigation on the emulator.
+  G15 is approved for publication for this routing scope. Account switching, permission
+  revocation, selection timeout and the 24-hour age transition have focused test coverage
+  but were not manually exercised; other Seerr entry surfaces were not all traversed on-device.
+  Event-driven index refresh on Jellyfin library changes is deferred. The 24-hour
+  session/resume check is deliberately simple and does not continuously rescan while the
+  application stays foregrounded. Jellyfin presentation-key grouping, missing explicit
+  provider metadata and offset-page library mutation can still yield a safe Discover
+  fallback rather than exhaustive owned-item discovery.
+  Q08's former standard/4K selection policy was superseded by the confirmed
+  one-managed-version, one-language-variant-per-user architecture.
+
 - Movie Details B02 keeps a full Seerr movie GET on genuine later lifecycle resumes because
   the bundled client has no lighter authoritative per-movie availability read. The first
   `LifecycleResumeEffect` must only join the ViewModel's constructor-owned load; request and

@@ -120,11 +120,11 @@ fun DiscoverPersonPage(
                     CardGrid(
                         pager = state.data,
                         onClickItem = { index: Int, item: DiscoverItem ->
-                            viewModel.navigationManager.navigateTo(Destination.DiscoveredItem(item))
+                            viewModel.navigationManager.navigateToSeerrItem(item)
                         },
                         onLongClickItem = { _: Int, item: DiscoverItem ->
                             quickMovieRequest.open(item, onOpenDetails = {
-                                viewModel.navigationManager.navigateTo(Destination.DiscoveredItem(item))
+                                viewModel.navigationManager.navigateToSeerrItem(item)
                             })
                         },
                         onClickPlay = { _, item ->

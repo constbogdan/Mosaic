@@ -940,6 +940,11 @@ class SeriesViewModel
             navigationManager.navigateTo(destination)
         }
 
+        fun navigateToSeerrItem(item: com.github.damontecres.wholphin.data.model.DiscoverItem) {
+            release()
+            navigationManager.navigateToSeerrItem(item)
+        }
+
         private var chosenStreamsJob: Job? = null
 
         fun lookUpChosenTracks(

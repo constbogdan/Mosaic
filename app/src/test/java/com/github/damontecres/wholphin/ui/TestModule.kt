@@ -14,6 +14,7 @@ import com.github.damontecres.wholphin.BuildConfig
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.AppDatabase
 import com.github.damontecres.wholphin.data.ItemPlaybackDao
+import com.github.damontecres.wholphin.data.JellyfinIdentityDao
 import com.github.damontecres.wholphin.data.JellyfinServerDao
 import com.github.damontecres.wholphin.data.LibraryDisplayInfoDao
 import com.github.damontecres.wholphin.data.Migrations
@@ -239,6 +240,10 @@ object TestDatabaseModule {
         @Provides
         @Singleton
         fun serverDao(db: AppDatabase): JellyfinServerDao = db.serverDao()
+
+        @Provides
+        @Singleton
+        fun jellyfinIdentityDao(db: AppDatabase): JellyfinIdentityDao = db.jellyfinIdentityDao()
 
         @Provides
         @Singleton

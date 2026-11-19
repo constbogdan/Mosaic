@@ -284,7 +284,7 @@ fun SeriesDetails(
                 },
                 discovered = state.discovered,
                 onClickDiscover = { index, item ->
-                    viewModel.navigateTo(item.destination)
+                    viewModel.navigateToSeerrItem(item)
                 },
                 onShowContextMenu = {
                     showContextMenu = it

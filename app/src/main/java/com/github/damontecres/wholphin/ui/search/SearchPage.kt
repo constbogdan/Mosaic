@@ -176,16 +176,7 @@ fun SearchPage(
     }
 
     val onClickDiscover = { _: Int, item: DiscoverItem ->
-        val dest =
-            if (item.jellyfinItemId != null && item.type.baseItemKind != null) {
-                Destination.MediaItem(
-                    itemId = item.jellyfinItemId,
-                    type = item.type.baseItemKind,
-                )
-            } else {
-                Destination.DiscoveredItem(item)
-            }
-        viewModel.navigationManager.navigateTo(dest)
+        viewModel.navigationManager.navigateToSeerrItem(item)
     }
 
     var showHeader by rememberSaveable { mutableStateOf(true) }
