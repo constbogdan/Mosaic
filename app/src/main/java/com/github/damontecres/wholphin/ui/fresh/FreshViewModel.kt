@@ -163,7 +163,7 @@ internal class FreshViewModel
             val current = state.value
             val index = current.entries.indexOfFirst { it.key == entry.key }
             if (index >= 0) state.value = current.copy(focusedIndex = index, focusedKey = entry.key)
-            navigation.navigateTo(entry.item.destination)
+            navigation.navigateToSeerrItem(entry.item)
         }
 
         private fun request(page: Int) {

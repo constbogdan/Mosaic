@@ -387,13 +387,12 @@ class DiscoverMovieViewModel
             navigationManager.navigateTo(destination)
         }
 
-        fun goTo(
-            mediaInfo: MediaInfo?,
-            type: BaseItemKind,
-        ) {
-            viewModelScope.launchDefault {
-                goToButtonDiscover(mediaInfo, type, context, navigationManager)
-            }
+        fun navigateToSeerrItem(item: com.github.damontecres.wholphin.data.model.DiscoverItem) {
+            navigationManager.navigateToSeerrItem(item)
+        }
+
+        fun goTo() {
+            goToButtonDiscover(item, context, navigationManager)
         }
 
         fun request(request: MovieRequest) {

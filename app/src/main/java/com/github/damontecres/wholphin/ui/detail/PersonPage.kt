@@ -288,10 +288,10 @@ fun PersonPage(
                 },
                 discovered = discovered,
                 onClickDiscover = { index, item ->
-                    viewModel.navigationManager.navigateTo(item.destination)
+                    viewModel.navigationManager.navigateToSeerrItem(item)
                 },
                 onLongClickDiscover = { item ->
-                    quickMovieRequest.open(item, onOpenDetails = { viewModel.navigationManager.navigateTo(item.destination) })
+                    quickMovieRequest.open(item, onOpenDetails = { viewModel.navigationManager.navigateToSeerrItem(item) })
                 },
                 onClickViewMoreDiscover = {
                     state.discoverPerson?.let {

@@ -159,7 +159,7 @@ internal fun DiscoverMovieDetails(
                         }
                 },
                 onClickItem = { index, item ->
-                    viewModel.navigateTo(Destination.DiscoveredItem(item))
+                    viewModel.navigateToSeerrItem(item)
                 },
                 onClickPerson = { item ->
                     viewModel.navigateTo(Destination.DiscoveredItem(item))
@@ -174,12 +174,12 @@ internal fun DiscoverMovieDetails(
                         )
                 },
                 goToOnClick = {
-                    viewModel.goTo(movie.mediaInfo, BaseItemKind.MOVIE)
+                    viewModel.goTo()
                 },
                 moreOnClick = {},
                 onLongClickPerson = { index, person -> },
                 onLongClickSimilar = { _, similar ->
-                    quickMovieRequest.open(similar, onOpenDetails = { viewModel.navigateTo(Destination.DiscoveredItem(similar)) })
+                    quickMovieRequest.open(similar, onOpenDetails = { viewModel.navigateToSeerrItem(similar) })
                 },
                 trailerOnClick = {
                     TrailerService.onClick(context, it, viewModel::navigateTo)

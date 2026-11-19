@@ -270,6 +270,11 @@ class MovieViewModel
             navigationManager.navigateTo(destination)
         }
 
+        fun navigateToSeerrItem(item: com.github.damontecres.wholphin.data.model.DiscoverItem) {
+            release()
+            navigationManager.navigateToSeerrItem(item)
+        }
+
         fun clearChosenStreams(chosenStreams: ChosenStreams?) {
             viewModelScope.launchIO {
                 itemPlaybackRepository.deleteChosenStreams(chosenStreams)

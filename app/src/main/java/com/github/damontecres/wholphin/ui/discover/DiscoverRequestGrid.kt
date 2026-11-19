@@ -300,10 +300,10 @@ fun DiscoverRequestGrid(
                     initialPosition = state.startIndex,
                     pager = s.data,
                     onClickItem = { index, item ->
-                        viewModel.navigationManager.navigateTo(item.destination)
+                        viewModel.navigationManager.navigateToSeerrItem(item)
                     },
                     onLongClickItem = { _, item ->
-                        quickMovieRequest.open(item, onOpenDetails = { viewModel.navigationManager.navigateTo(item.destination) })
+                        quickMovieRequest.open(item, onOpenDetails = { viewModel.navigationManager.navigateToSeerrItem(item) })
                     },
                     onClickPlay = { _, _ -> },
                     letterPosition = { 0 },

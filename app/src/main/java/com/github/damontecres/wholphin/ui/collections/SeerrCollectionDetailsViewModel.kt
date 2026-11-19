@@ -431,8 +431,7 @@ internal class SeerrCollectionDetailsViewModel
             val index = details.movies.indexOfFirst { it.id == movie.id }
             if (index < 0) return
             state.value = current.copy(focusedKey = "tmdb:movie:${movie.id}", focusedIndex = index, similarFocusedId = null)
-            // No Jellyfin ID is inferred from Seerr availability; Discover resolves ordinary details.
-            navigation.navigateTo(movie.destination)
+            navigation.navigateToSeerrItem(movie)
         }
 
         private fun request(id: Int) {

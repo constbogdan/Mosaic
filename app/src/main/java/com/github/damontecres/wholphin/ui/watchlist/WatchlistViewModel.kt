@@ -445,7 +445,7 @@ class WatchlistViewModel
             val current = state.value
             val index = current.entries.indexOfFirst { it.key == entry.key }
             if (index >= 0) state.value = current.copy(focusedIndex = index, focusedKey = entry.key)
-            navigation.navigateTo(Destination.DiscoveredItem(entry.item))
+            navigation.navigateToSeerrItem(entry.item)
         }
 
         fun remove(entry: WatchlistEntry) = changeMembership(entry, false)

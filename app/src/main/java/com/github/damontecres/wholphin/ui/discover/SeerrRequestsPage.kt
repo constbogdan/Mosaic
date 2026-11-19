@@ -243,11 +243,11 @@ fun SeerrRequestsPage(
                     CardGrid(
                         pager = state.data,
                         onClickItem = { index: Int, item: RequestGridItem ->
-                            viewModel.navigationManager.navigateTo(Destination.DiscoveredItem(item.item))
+                            viewModel.navigationManager.navigateToSeerrItem(item.item)
                         },
                         onLongClickItem = { _: Int, item: RequestGridItem ->
                             quickMovieRequest.open(item.item, onOpenDetails = {
-                                viewModel.navigationManager.navigateTo(Destination.DiscoveredItem(item.item))
+                                viewModel.navigationManager.navigateToSeerrItem(item.item)
                             })
                         },
                         onClickPlay = { _, item ->

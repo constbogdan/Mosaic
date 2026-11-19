@@ -130,13 +130,13 @@ fun DiscoverSeriesDetails(
                 recommended = state.recommended,
                 modifier = modifier,
                 onClickItem = { index, item ->
-                    viewModel.navigateTo(Destination.DiscoveredItem(item))
+                    viewModel.navigateToSeerrItem(item)
                 },
                 onClickPerson = {
                     viewModel.navigateTo(Destination.DiscoveredItem(it))
                 },
                 goToOnClick = {
-                    viewModel.goTo(item.mediaInfo, BaseItemKind.SERIES)
+                    viewModel.goTo()
                 },
                 overviewOnClick = {
                     overviewDialog =
@@ -169,7 +169,7 @@ fun DiscoverSeriesDetails(
                 },
                 onLongClickPerson = { _, _ -> },
                 onLongClickSimilar = { _, similar ->
-                    quickMovieRequest.open(similar, onOpenDetails = { viewModel.navigateTo(Destination.DiscoveredItem(similar)) })
+                    quickMovieRequest.open(similar, onOpenDetails = { viewModel.navigateToSeerrItem(similar) })
                 },
             )
         }

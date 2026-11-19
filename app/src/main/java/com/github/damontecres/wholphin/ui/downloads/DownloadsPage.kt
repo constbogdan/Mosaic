@@ -128,7 +128,11 @@ class DownloadsViewModel
                         R.string.movie
                     },
                 )
-            item.destination(fallbackTitle)?.let(navigationManager::navigateTo)
+            when (val destination = item.destination(fallbackTitle)) {
+                is Destination.DiscoveredItem -> navigationManager.navigateToSeerrItem(destination.item)
+                null -> Unit
+                else -> navigationManager.navigateTo(destination)
+            }
         }
 
         fun recordFocusedItem(

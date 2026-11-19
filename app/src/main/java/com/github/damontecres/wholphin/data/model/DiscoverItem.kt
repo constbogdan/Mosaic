@@ -111,17 +111,7 @@ data class DiscoverItem(
     override val sortName: String get() = title ?: ""
 
     val destination: Destination
-        get() {
-            val jfType = type.baseItemKind
-            return if (jellyfinItemId != null && jfType != null) {
-                Destination.MediaItem(
-                    itemId = jellyfinItemId,
-                    type = jfType,
-                )
-            } else {
-                Destination.DiscoveredItem(this)
-            }
-        }
+        get() = Destination.DiscoveredItem(this)
 }
 
 /**
