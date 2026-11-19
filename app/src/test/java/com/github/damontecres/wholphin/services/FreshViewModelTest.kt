@@ -434,7 +434,8 @@ class FreshViewModelTest {
                 vm.open(selected)
                 assertEquals(selected.key, vm.state.value.focusedKey)
                 assertEquals(30, vm.state.value.focusedIndex)
-                verify(exactly = 1) { navigation.navigateTo(any()) }
+                verify(exactly = 1) { navigation.navigateToSeerrItem(selected.item, null) }
+                verify(exactly = 0) { navigation.navigateTo(any()) }
             } finally {
                 Dispatchers.resetMain()
             }

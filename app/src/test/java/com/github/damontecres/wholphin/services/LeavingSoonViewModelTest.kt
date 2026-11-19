@@ -5,7 +5,6 @@ import com.github.damontecres.wholphin.data.model.DiscoverItem
 import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.data.model.SeerrItemType
 import com.github.damontecres.wholphin.ui.leavingsoon.LeavingSoonViewModel
-import com.github.damontecres.wholphin.ui.nav.Destination
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -311,17 +310,14 @@ class LeavingSoonViewModelTest {
                 runCurrent()
                 vm.open(movie)
                 assertEquals(movie.key, vm.state.value.focusedKey)
-                verify(exactly = 1) {
-                    navigation.navigateTo(match { it is Destination.DiscoveredItem && it.item.type == SeerrItemType.MOVIE })
-                }
+                verify(exactly = 1) { navigation.navigateToSeerrItem(movie.item, null) }
                 vm.open(series)
                 assertEquals(series.key, vm.state.value.focusedKey)
-                verify(exactly = 1) {
-                    navigation.navigateTo(match { it is Destination.DiscoveredItem && it.item.type == SeerrItemType.TV })
-                }
+                verify(exactly = 1) { navigation.navigateToSeerrItem(series.item, null) }
                 vm.open(series.copy(hasTmdbIdentity = false))
                 vm.open(entry(99))
-                verify(exactly = 2) { navigation.navigateTo(any()) }
+                verify(exactly = 2) { navigation.navigateToSeerrItem(any(), null) }
+                verify(exactly = 0) { navigation.navigateTo(any()) }
             } finally {
                 Dispatchers.resetMain()
             }

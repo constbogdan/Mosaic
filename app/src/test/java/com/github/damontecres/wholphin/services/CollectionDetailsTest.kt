@@ -286,7 +286,8 @@ class CollectionDetailsTest {
                 assertEquals("tmdb:movie:2", vm.state.value.focusedKey)
                 assertEquals(1, vm.state.value.focusedIndex)
                 assertEquals(null, movies[1].jellyfinItemId)
-                verify(exactly = 1) { navigation.navigateTo(movies[1].destination) }
+                verify(exactly = 1) { navigation.navigateToSeerrItem(movies[1], null) }
+                verify(exactly = 0) { navigation.navigateTo(any()) }
             } finally {
                 hideScreen()
                 advanceUntilIdle()

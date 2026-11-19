@@ -161,6 +161,13 @@ not current instruction.
   fallback rather than exhaustive owned-item discovery.
   Q08's former standard/4K selection policy was superseded by the confirmed
   one-managed-version, one-language-variant-per-user architecture.
+  Publication is separate from acceptance: G15 is in Draft Mosaic PR #136
+  targeting `main`, not merged or released. Its first hosted Full run exposed
+  three legacy card-navigation tests that still expected a direct Discover
+  push instead of delegation to the shared G15 resolver. Only those tests were
+  corrected; the full local Default Debug graph passed 1,143 JVM tests,
+  Kotlin compilation and Debug assembly. Incremental identity indexing and
+  event-driven refresh are deferred enhancements, not routing blockers.
 
 - Movie Details B02 keeps a full Seerr movie GET on genuine later lifecycle resumes because
   the bundled client has no lighter authoritative per-movie availability read. The first
