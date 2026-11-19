@@ -96,7 +96,47 @@ class RequestSeasonRulesTest {
     fun nonEditablePendingAndUnknownSeasonNumbersAreNeverBulkTargets() {
         val seasons = listOf(season(1, RequestStatus.PENDING, editable = false), season(null), season(2))
         assertEquals(setOf(2), seasons.requestableSeasonNumbers())
-        assertEquals(setOf(1), seasons.initialRequestSeasonNumbers(null))
+        assertEquals(emptySet<Int>(), seasons.initialRequestSeasonNumbers(null))
+        assertEquals(setOf(2), seasons.initialRequestSeasonNumbers(2))
+        assertEquals(emptySet<Int>(), seasons.initialRequestSeasonNumbers(1))
+    }
+
+    @Test
+    fun ownedAndOtherwiseIneligibleSeasonsAreNeverSelectedByDefault() {
+        val seasons =
+            listOf(
+                season(1, availability = SeerrAvailability.AVAILABLE, editable = false),
+                season(2, availability = SeerrAvailability.PARTIALLY_AVAILABLE, editable = false),
+                season(3, RequestStatus.APPROVED, SeerrAvailability.PROCESSING, editable = false),
+                season(4, RequestStatus.COMPLETED, editable = false),
+            )
+        assertEquals(emptySet<Int>(), seasons.initialRequestSeasonNumbers(null))
+        seasons.forEach { assertEquals(emptySet<Int>(), seasons.initialRequestSeasonNumbers(it.season.seasonNumber)) }
+    }
+
+    @Test
+    fun foreignPendingAndOwnPendingKeepOnlyOwnEditableRequestSelected() {
+        val seasons =
+            listOf(
+                season(1, RequestStatus.PENDING, SeerrAvailability.PENDING, editable = false),
+                season(2, RequestStatus.PENDING, SeerrAvailability.PENDING),
+                season(3),
+            )
+        assertEquals(setOf(2), seasons.initialRequestSeasonNumbers(null))
+        assertEquals(setOf(2, 3), seasons.initialRequestSeasonNumbers(3))
+        assertEquals(setOf(3), seasons.requestableSeasonNumbers())
+    }
+
+    @Test
+    fun unownedAndFourKRequestableSeasonsRequireExplicitSelection() {
+        val standard = listOf(season(1, availability = SeerrAvailability.AVAILABLE, editable = false))
+        val fourK = listOf(season(1))
+        val unowned = listOf(season(1), season(2))
+        assertEquals(emptySet<Int>(), standard.initialRequestSeasonNumbers(null))
+        assertEquals(emptySet<Int>(), fourK.initialRequestSeasonNumbers(null))
+        assertEquals(setOf(1), fourK.initialRequestSeasonNumbers(1))
+        assertEquals(emptySet<Int>(), unowned.initialRequestSeasonNumbers(null))
+        assertEquals(setOf(2), unowned.initialRequestSeasonNumbers(2))
     }
 
     private fun season(

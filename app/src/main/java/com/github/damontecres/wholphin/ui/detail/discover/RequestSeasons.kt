@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -73,9 +74,14 @@ internal fun RequestSeason.isRequestable(): Boolean =
         status !in setOf(RequestStatus.PENDING, RequestStatus.APPROVED, RequestStatus.COMPLETED) &&
         availability in setOf(SeerrAvailability.UNKNOWN, SeerrAvailability.DELETED)
 
+private fun RequestSeason.isSelectableForRequest(): Boolean =
+    season.seasonNumber != null && ((status == RequestStatus.PENDING && editable) || isRequestable())
+
 internal fun List<RequestSeason>.initialRequestSeasonNumbers(initialSeasonNumber: Int?): Set<Int> =
-    filter { it.status == RequestStatus.PENDING || (it.isRequestable() && it.season.seasonNumber == initialSeasonNumber) }
-        .mapNotNull { it.season.seasonNumber }
+    filter {
+        (it.status == RequestStatus.PENDING && it.isSelectableForRequest()) ||
+            (it.isRequestable() && it.season.seasonNumber == initialSeasonNumber)
+    }.mapNotNull { it.season.seasonNumber }
         .toSet()
 
 internal fun List<RequestSeason>.requestableSeasonNumbers(): Set<Int> =
@@ -104,22 +110,6 @@ fun RequestSeasons(
     var is4k by remember(requestEnabled, request4kEnabled) { mutableStateOf(!requestEnabled && request4kEnabled) }
     val seasons = remember(is4k, seasons, seasons4k) { if (is4k) seasons4k else seasons }
 
-    val availableSeasons =
-        remember(seasons) {
-            mutableStateSetOf(
-                *seasons
-                    .filter { season ->
-                        !season.editable && (
-                            season.status == RequestStatus.PENDING ||
-                                season.status == RequestStatus.APPROVED ||
-                                season.status == RequestStatus.COMPLETED ||
-                                season.availability == SeerrAvailability.PARTIALLY_AVAILABLE ||
-                                season.availability == SeerrAvailability.AVAILABLE
-                        )
-                    }.mapNotNull { season -> season.season.seasonNumber }
-                    .toTypedArray(),
-            )
-        }
     val selectedSeasons =
         remember(seasons, initialSeasonNumber) {
             mutableStateSetOf<Int>(
@@ -216,7 +206,7 @@ fun RequestSeasons(
                     Button(
                         onClick = ::submit,
                         enabled = selectedSeasons.isNotEmpty() && (if (is4k) request4kEnabled else requestEnabled),
-                        modifier = Modifier.focusRequester(submitFocusRequester),
+                        modifier = Modifier.focusRequester(submitFocusRequester).testTag("requestSeasonSubmit"),
                     ) {
                         Text(text = stringResource(R.string.submit_request))
                     }
@@ -225,7 +215,7 @@ fun RequestSeasons(
             initialSeason?.let { season ->
                 item(key = "initial_${season.season.seasonNumber}") {
                     val seasonNumber = season.season.seasonNumber
-                    val checked = seasonNumber in selectedSeasons || seasonNumber in availableSeasons
+                    val checked = seasonNumber in selectedSeasons
                     SeasonListItem(
                         season = season,
                         checked = checked,
@@ -291,7 +281,7 @@ fun RequestSeasons(
                         },
                     ) { _, season ->
                         val seasonNumber = season.season.seasonNumber
-                        val checked = seasonNumber in selectedSeasons || seasonNumber in availableSeasons
+                        val checked = seasonNumber in selectedSeasons
                         SeasonListItem(
                             season = season,
                             checked = checked,
@@ -417,7 +407,7 @@ fun SeasonListItem(
     modifier: Modifier = Modifier,
 ) {
     ListItem(
-        enabled = season.editable,
+        enabled = season.isSelectableForRequest(),
         selected = false,
         headlineContent = {
             val seasonNumber = season.season.seasonNumber
@@ -475,8 +465,10 @@ fun SeasonListItem(
             Row {
                 Switch(
                     checked = checked,
+                    enabled = season.isSelectableForRequest(),
+                    modifier = Modifier.testTag("requestSeasonSwitch:${season.season.seasonNumber}"),
                     onCheckedChange = {
-                        onClick.invoke()
+                        if (season.isSelectableForRequest()) onClick.invoke()
                     },
                 )
             }

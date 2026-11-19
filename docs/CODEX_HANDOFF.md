@@ -168,6 +168,39 @@ not current instruction.
   corrected; the full local Default Debug graph passed 1,143 JVM tests,
   Kotlin compilation and Debug assembly. Incremental identity indexing and
   event-driven refresh are deferred enhancements, not routing blockers.
+  PR #136 subsequently passed hosted Full validation and merged into `main`
+  as `0d4ff42ed98881ed981ed99feec59a744097abee`; the preceding Draft
+  publication status is historical. This merge does not establish a release.
+  G23/D-023 Series action-state safety remains a separate investigation gate,
+  not covered by G15 routing acceptance.
+  The 2026-11-19 G23 controlled fixture on this merged baseline reproduces the
+  intermediate Request label: owned seasons disable it, while an eligible missing/4K
+  or editable pending season can enable it. Selecting Request opens a season dialog;
+  seven delayed-state fixtures made zero automatic request submissions. Focused
+  tests (27/27) and targeted Fast validation passed. A separate foreign-pending
+  fixture found that the dialog preselects another user's noneditable pending
+  season when a different missing season makes Request eligible; an explicit
+  Submit could carry the wrong season, although inspected Seerr source filters
+  existing pending seasons. B05 is only conditional on a separately approved
+  default-selection correction. Rendered D-pad focus and deployed payload
+  behavior remain unverified.
+  A separately authorized B05 slice now makes the season dialog's
+  checked switches match submitted IDs: foreign/noneditable pending seasons are
+  neither selected nor focusable, while current-user editable pending requests
+  remain selected for the existing edit path and missing/4K seasons still require
+  explicit selection. The controlled Compose D-pad fixture uses only a local
+  submit callback, never Seerr transport. The existing `androidTest` source set
+  cannot currently compile (missing test dependencies and stale test signatures),
+  so an emulator app-start smoke is not proof of the foreign-pending dialog
+  interaction. On 2026-11-19 the operator accepted the source-level finding and
+  approved retaining this narrow correction. Final focused Fast validation passed
+  (five relevant JVM/Compose test filters, changed-scope pre-commit and whitespace
+  check). The installed Debug 1.0.117 APK was identified on `emulator-5554`, but
+  no existing series-dialog fixture can create a controlled foreign-pending case;
+  the Home fixture is unrelated and the existing `androidTest` source set does
+  not compile. Thus this is not controlled emulator dialog acceptance. The
+  transient Request label issue was deliberately not changed.
+  See `C:\Projects\mosaic-diagnostics\D023_G23_SERIES_ACTION_ASSESSMENT.md`.
 
 - Movie Details B02 keeps a full Seerr movie GET on genuine later lifecycle resumes because
   the bundled client has no lighter authoritative per-movie availability read. The first

@@ -28,6 +28,8 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasClickAction
@@ -59,10 +61,12 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.Text
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionItem
+import com.github.damontecres.wholphin.api.seerr.model.Season
 import com.github.damontecres.wholphin.data.model.CatalogMediaType
 import com.github.damontecres.wholphin.data.model.DiscoverItem
 import com.github.damontecres.wholphin.data.model.DiscoverRating
 import com.github.damontecres.wholphin.data.model.MediaKey
+import com.github.damontecres.wholphin.data.model.RequestStatus
 import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.data.model.SeerrItemType
 import com.github.damontecres.wholphin.data.model.WatchlistCategory
@@ -101,6 +105,8 @@ import com.github.damontecres.wholphin.ui.detail.CardGrid
 import com.github.damontecres.wholphin.ui.detail.discover.ExpandableDiscoverButtons
 import com.github.damontecres.wholphin.ui.detail.discover.OriginalLanguageText
 import com.github.damontecres.wholphin.ui.detail.discover.RequestMovieDialog
+import com.github.damontecres.wholphin.ui.detail.discover.RequestSeason
+import com.github.damontecres.wholphin.ui.detail.discover.RequestSeasons
 import com.github.damontecres.wholphin.ui.detail.discover.SeerrProfile
 import com.github.damontecres.wholphin.ui.detail.discover.SeerrRequestData
 import com.github.damontecres.wholphin.ui.detail.discover.originalLanguageName
@@ -221,6 +227,45 @@ class BasicUiTests {
         Assert.assertEquals(1, details)
         composeTestRule.runOnIdle { showing.value = false }
         card.assertIsFocused()
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
+    fun foreign_pending_season_is_not_selected_or_submitted_by_dpad() {
+        val foreignPending = RequestSeason(Season(seasonNumber = 1), RequestStatus.PENDING, SeerrAvailability.PENDING, false)
+        val missing = RequestSeason(Season(seasonNumber = 2), RequestStatus.UNKNOWN, SeerrAvailability.UNKNOWN, true)
+        val submitted = mutableListOf<List<Int>>()
+        composeTestRule.setContent {
+            WholphinTheme {
+                RequestSeasons(
+                    id = 42,
+                    title = "Fixture series",
+                    seasons = listOf(foreignPending, missing),
+                    seasons4k = emptyList(),
+                    data = SeerrRequestData(serverId = 11),
+                    requestEnabled = true,
+                    request4kEnabled = false,
+                    onSubmit = { submitted += it.seasons },
+                )
+            }
+        }
+        composeTestRule.onNodeWithTag("requestSeasonSubmit").assertIsNotEnabled()
+        composeTestRule.onNodeWithTag("requestSeasonSwitch:1", useUnmergedTree = true).assertIsOff().assertIsNotEnabled()
+        Assert.assertTrue(submitted.isEmpty())
+        val requestable = composeTestRule.onNodeWithTag("requestSeasonSwitch:2", useUnmergedTree = true)
+        requestable
+            .assertIsOff()
+            .assertIsEnabled()
+            .requestFocus()
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        requestable.assertIsOn()
+        composeTestRule
+            .onNodeWithTag(
+                "requestSeasonSubmit",
+            ).assertIsEnabled()
+            .requestFocus()
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        Assert.assertEquals(listOf(listOf(2)), submitted)
     }
 
     @Test

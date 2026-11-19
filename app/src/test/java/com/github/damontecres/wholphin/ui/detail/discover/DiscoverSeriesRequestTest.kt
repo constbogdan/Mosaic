@@ -14,6 +14,7 @@ import com.github.damontecres.wholphin.api.seerr.model.Season
 import com.github.damontecres.wholphin.api.seerr.model.TvDetails
 import com.github.damontecres.wholphin.api.seerr.requestSession
 import com.github.damontecres.wholphin.data.model.DiscoverItem
+import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.services.EnhancedFeatureGate
 import com.github.damontecres.wholphin.services.SeerrAcquisitionTracker
 import com.github.damontecres.wholphin.services.SeerrApi
@@ -23,6 +24,7 @@ import com.github.damontecres.wholphin.util.DataLoadingState
 import com.github.damontecres.wholphin.util.WholphinDispatchers
 import com.github.damontecres.wholphin.util.configure
 import com.github.damontecres.wholphin.util.reset
+import com.github.damontecres.wholphin.util.successValue
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -301,6 +303,175 @@ class DiscoverSeriesRequestTest {
                     .map { it.season.seasonNumber },
             )
         }
+
+    @Test fun delayedAvailabilityForOwnedSeriesShowsDisabledRequestBeforeGoTo() =
+        runTest(dispatcher) {
+            assertDelayedAvailabilityTransition(
+                TvDetails(
+                    id = 42,
+                    seasons = listOf(Season(seasonNumber = 1, status = 5, status4k = 5)),
+                    mediaInfo = MediaInfo(id = 84, tmdbId = 42, status = 5),
+                ),
+                expectedAvailability = SeerrAvailability.AVAILABLE,
+                expectedStandardRequest = false,
+                expectedFourKRequest = false,
+                expectedRequestableSeasons = emptySet(),
+            )
+        }
+
+    @Test fun delayedAvailabilityForPartialSeriesKeepsOnlyMissingSeasonRequestable() =
+        runTest(dispatcher) {
+            assertDelayedAvailabilityTransition(
+                TvDetails(
+                    id = 42,
+                    seasons =
+                        listOf(
+                            Season(seasonNumber = 1, status = 5, status4k = 5),
+                            Season(seasonNumber = 2, status = 1, status4k = 1),
+                        ),
+                    mediaInfo = MediaInfo(id = 84, tmdbId = 42, status = 4),
+                ),
+                expectedAvailability = SeerrAvailability.PARTIALLY_AVAILABLE,
+                expectedStandardRequest = true,
+                expectedFourKRequest = true,
+                expectedRequestableSeasons = setOf(2),
+            )
+        }
+
+    @Test fun standardOwnedWithFourKOnlyPermissionCanLegitimatelyOfferFourKRequest() =
+        runTest(dispatcher) {
+            assertDelayedAvailabilityTransition(
+                TvDetails(
+                    id = 42,
+                    seasons = listOf(Season(seasonNumber = 1, status = 5, status4k = 1)),
+                    mediaInfo = MediaInfo(id = 84, tmdbId = 42, status = 5),
+                ),
+                expectedAvailability = SeerrAvailability.AVAILABLE,
+                expectedStandardRequest = false,
+                expectedFourKRequest = true,
+                expectedRequestableSeasons = emptySet(),
+                expectedFourKRequestableSeasons = setOf(1),
+                permissions = 1024,
+            )
+        }
+
+    @Test fun delayedAvailabilityForPendingSeriesUsesPendingSeasonSelectionWithoutSubmitting() =
+        runTest(dispatcher) {
+            val pending = cancelRecord().copy(seasons = listOf(Season(seasonNumber = 2, status = 1)))
+            assertDelayedAvailabilityTransition(
+                TvDetails(
+                    id = 42,
+                    seasons = listOf(Season(seasonNumber = 1, status = 5), Season(seasonNumber = 2, status = 2)),
+                    mediaInfo = MediaInfo(id = 84, tmdbId = 42, status = 1, requests = listOf(pending)),
+                ),
+                expectedAvailability = SeerrAvailability.PENDING,
+                expectedStandardRequest = true,
+                expectedFourKRequest = true,
+                expectedRequestableSeasons = emptySet(),
+                expectedInitiallySelectedSeasons = setOf(2),
+            )
+        }
+
+    @Test fun delayedAvailabilityForUnownedSeriesRequiresExplicitSeasonSelection() =
+        runTest(dispatcher) {
+            assertDelayedAvailabilityTransition(
+                TvDetails(
+                    id = 42,
+                    seasons = listOf(Season(seasonNumber = 1, status = 1), Season(seasonNumber = 2, status = 1)),
+                    mediaInfo = MediaInfo(id = 84, tmdbId = 42, status = 1),
+                ),
+                expectedAvailability = SeerrAvailability.UNKNOWN,
+                expectedStandardRequest = true,
+                expectedFourKRequest = true,
+                expectedRequestableSeasons = setOf(1, 2),
+            )
+        }
+
+    @Test fun delayedAvailabilityForProcessingSeriesDoesNotEnableAnotherRequest() =
+        runTest(dispatcher) {
+            val processing = cancelRecord().copy(status = 2, seasons = listOf(Season(seasonNumber = 2, status = 2)))
+            assertDelayedAvailabilityTransition(
+                TvDetails(
+                    id = 42,
+                    seasons = listOf(Season(seasonNumber = 1, status = 5), Season(seasonNumber = 2, status = 3)),
+                    mediaInfo = MediaInfo(id = 84, tmdbId = 42, status = 3, requests = listOf(processing)),
+                ),
+                expectedAvailability = SeerrAvailability.PROCESSING,
+                expectedStandardRequest = false,
+                expectedFourKRequest = false,
+                expectedRequestableSeasons = emptySet(),
+                permissions = 32,
+            )
+        }
+
+    @Test fun foreignPendingSeasonIsNotInitiallySelectedAlongsideAnEligibleMissingSeason() =
+        runTest(dispatcher) {
+            val foreignPending = cancelRecord(ownerId = 8).copy(seasons = listOf(Season(seasonNumber = 1, status = 1)))
+            assertDelayedAvailabilityTransition(
+                TvDetails(
+                    id = 42,
+                    seasons = listOf(Season(seasonNumber = 1, status = 2), Season(seasonNumber = 2, status = 1)),
+                    mediaInfo = MediaInfo(id = 84, tmdbId = 42, status = 2, requests = listOf(foreignPending)),
+                ),
+                expectedAvailability = SeerrAvailability.PENDING,
+                expectedStandardRequest = true,
+                expectedFourKRequest = false,
+                expectedRequestableSeasons = setOf(2),
+                expectedInitiallySelectedSeasons = emptySet(),
+                permissions = 32,
+            )
+        }
+
+    private suspend fun assertDelayedAvailabilityTransition(
+        details: TvDetails,
+        expectedAvailability: SeerrAvailability,
+        expectedStandardRequest: Boolean,
+        expectedFourKRequest: Boolean,
+        expectedRequestableSeasons: Set<Int>,
+        expectedInitiallySelectedSeasons: Set<Int> = emptySet(),
+        expectedFourKRequestableSeasons: Set<Int>? = null,
+        permissions: Int = 1056,
+    ) {
+        val releaseEnrichment = CompletableDeferred<Unit>()
+        current.value = requestSession(permissions)
+        coEvery { tvApi.tvTvIdGet(42) } returns details
+        coEvery { service.createDiscoverItem(any<TvDetails>()) } coAnswers {
+            releaseEnrichment.await()
+            mockk(relaxed = true)
+        }
+        coEvery { tvApi.tvTvIdRatingsGet(42) } coAnswers { awaitCancellation() }
+        coEvery { tvApi.tvTvIdSimilarGet(42, 1) } coAnswers { awaitCancellation() }
+        coEvery { tvApi.tvTvIdRecommendationsGet(42, 1) } coAnswers { awaitCancellation() }
+
+        model.init()
+        dispatcher.scheduler.runCurrent()
+        assertEquals(details, model.state.value.tvSeries.successValue)
+        assertEquals(SeerrAvailability.UNKNOWN, model.state.value.availability)
+        assertEquals(emptyList<RequestSeason>(), model.state.value.seasons)
+        assertEquals(expectedStandardRequest, model.requestEnabled.value)
+        assertEquals(expectedFourKRequest, model.request4kEnabled.value)
+        // Selection of the transient Request action only fetches dialog options; it cannot POST.
+        if (expectedStandardRequest || expectedFourKRequest) model.requestOnClick()
+        dispatcher.scheduler.runCurrent()
+        coVerify(exactly = 0) { service.requestTv(any(), any()) }
+
+        releaseEnrichment.complete(Unit)
+        dispatcher.scheduler.runCurrent()
+        assertEquals(expectedAvailability, model.state.value.availability)
+        assertEquals(expectedStandardRequest, model.requestEnabled.value)
+        assertEquals(expectedFourKRequest, model.request4kEnabled.value)
+        val seasons = model.state.value.seasons
+        assertEquals(expectedRequestableSeasons, seasons.requestableSeasonNumbers())
+        assertEquals(expectedInitiallySelectedSeasons, seasons.initialRequestSeasonNumbers(null))
+        expectedFourKRequestableSeasons?.let {
+            assertEquals(
+                it,
+                model.state.value.seasons4k
+                    .requestableSeasonNumbers(),
+            )
+        }
+        coVerify(exactly = 0) { service.requestTv(any(), any()) }
+    }
 
     @Test fun cancellationUsesExactOwnedRequestAndRefreshesSeries() =
         runTest(dispatcher) {
