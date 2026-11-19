@@ -113,6 +113,7 @@ class HomeViewModelTest {
                     mediaManagementService = mockk<MediaManagementService>(relaxed = true),
                     latestNextUpService = mockk<LatestNextUpService>(relaxed = true),
                     homeAcquiringSource = acquiringSource,
+                    acquisitionTracker = mockk(relaxed = true),
                 )
 
             advanceUntilIdle()
@@ -336,6 +337,7 @@ class HomeViewModelTest {
                     mockk<HomeAcquiringStateProvider> {
                         every { state } returns acquisition
                     },
+                acquisitionTracker = mockk(relaxed = true),
             )
     }
 }

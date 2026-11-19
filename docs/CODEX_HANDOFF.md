@@ -202,6 +202,74 @@ not current instruction.
   transient Request label issue was deliberately not changed.
   See `C:\Projects\mosaic-diagnostics\D023_G23_SERIES_ACTION_ASSESSMENT.md`.
 
+- G04/B10 has a **superseding operator authorization** for local implementation
+  of lightweight acquisition polling. In the isolated G04 worktree, Seerr
+  discovery is one newest-25 request-list page per interested cycle, with
+  targeted reads for already-known off-window acquisitions; one shared tracker
+  polls only while Home, Downloads or native Series Details is visible.
+  Downloads explicitly refreshes on entry and retains its fast cadence;
+  changing cadence alone no longer triggers a duplicate entry cycle. A first
+  emulator pass measured one list GET per Home cycle (25 records), a 7.352 s
+  cold/0.923 s warm cycle and zero acquisition GETs over 71 seconds on
+  Settings. After correction, Fast validation passed 586 focused JVM tests;
+  the rebuilt Debug APK showed one immediate Downloads cycle followed by
+  roughly 8.5-second fast cycles, then zero calls during 30 seconds in the
+  background and one immediate cycle on return. A controlled completion or
+  import transition was not observed. Older never-seen acquisitions beyond
+  the 25-row window are not discoverable, and off-page nav state is last-known.
+  G04 remains PARTIAL; publication, merge and release must be verified separately.
+  A final lifecycle review passed 132 current focused tracker/readiness/transport/
+  Downloads JVM tests and 45 model tests in addition to the earlier 586-test
+  Fast run. Existing fixtures cover phase classification and reconciliation;
+  no controlled live import-to-Jellyfin-ready or off-window targeted transition
+  occurred on the emulator. The operator accepted the newest-25, unseen-older,
+  last-known off-screen and no-continuous-general-discovery policy limits and
+  separately authorized Draft PR publication, not merge or release. No B10
+  production change was justified by the final review.
+  A future foreground top-right progress indicator can lease the same singleton,
+  but `queueingRequests` loses local-origin identity after reconciliation and
+  expires after 15 minutes; `requests` has no local-origin marker. A local-only
+  indicator needs a small session-scoped request-ID projection. The current
+  poll loop always fetches newest-25 even with only a header lease, so avoiding
+  continuous general discovery for that future consumer also needs a targeted-
+  only interest mode in the same loop. Do not add a second loop or background
+  poller, and do not mistake Seerr progress for Jellyfin readiness.
+  See the current D-004/G04 assessment in mosaic-diagnostics. Earlier
+  investigation-only notes below are historical.
+- G04's demand-driven follow-up is **investigation only**, on integrated main
+  `20302997`. The current acquisition tracker is one foreground-wide loop;
+  Downloads leaving only reverts its cadence from eight to thirty seconds after
+  a completed cycle. Home Acquiring, the global Downloads nav indicator, request
+  presentation and contextual Series integrity read its shared snapshot. A
+  Downloads-only visibility gate therefore either leaves the always-visible
+  indicator as a permanent polling demand or changes its off-page freshness
+  contract. Jellyfin Recently Added uses `getLatestMedia` independently but
+  still needs a normal Home/Jellyfin refresh to appear. Local Seerr request
+  filters classify request/media status, not all live queue entries or verified
+  Jellyfin readiness; neither the 25 locally retained records nor a newest-page
+  limit proves complete acquisition coverage. B10 has only a conditional
+  visibility-only design boundary using the existing full-history query, subject
+  to operator badge/Home freshness decisions and runtime/lifecycle proof. Do not
+  start a second poller, infer readiness from Seerr status, or treat an unobserved
+  completion timestamp as a precise import time. See the current D-004/G04
+  assessment in `C:\Projects\mosaic-diagnostics`.
+
+- G04 independent source review found a client-only cost candidate that does
+  not change the live Home/nav contract: the local Seerr request list accepts
+  `take` without a defined maximum. For the observed 477 requests, a bounded
+  `take=250` would require two full-history pages rather than ten at 50, but
+  response bytes, server DB/profile work, tail latency and deployed support
+  are not measured. Benchmark before selecting the page size; never truncate
+  old active/completed requests. `MediaRequest.id` is generated at insertion,
+  not a change sequence. Existing requests can change status, media/season
+  state or transient queue progress without a new ID; request `updatedAt`
+  likewise cannot capture all media/queue changes. Do not build an ID-only or
+  request-timestamp-only incremental poller. A later demand-driven lease
+  remains separate and requires explicit off-page nav-badge/Home freshness
+  acceptance. G04 is PARTIAL; B10 has design/validation candidates only, no
+  implementation authorization. See the independent section in the D-004/G04
+  assessment.
+
 - Movie Details B02 keeps a full Seerr movie GET on genuine later lifecycle resumes because
   the bundled client has no lighter authoritative per-movie availability read. The first
   `LifecycleResumeEffect` must only join the ViewModel's constructor-owned load; request and

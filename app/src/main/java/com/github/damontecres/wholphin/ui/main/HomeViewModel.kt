@@ -19,6 +19,7 @@ import com.github.damontecres.wholphin.services.LatestNextUpService
 import com.github.damontecres.wholphin.services.MediaManagementService
 import com.github.damontecres.wholphin.services.NavDrawerService
 import com.github.damontecres.wholphin.services.NavigationManager
+import com.github.damontecres.wholphin.services.SeerrAcquisitionTracker
 import com.github.damontecres.wholphin.services.ServerReportService
 import com.github.damontecres.wholphin.services.UserPreferencesService
 import com.github.damontecres.wholphin.services.deleteItem
@@ -72,6 +73,7 @@ class HomeViewModel
         private val mediaManagementService: MediaManagementService,
         private val latestNextUpService: LatestNextUpService,
         homeAcquiringSource: HomeAcquiringStateProvider,
+        private val acquisitionTracker: SeerrAcquisitionTracker,
     ) : ViewModel() {
         private val _state = MutableStateFlow(HomeState.EMPTY)
         val state: StateFlow<HomeState> = _state
@@ -146,6 +148,15 @@ class HomeViewModel
                     }
                 }
             }
+        }
+
+        fun pageStarted() {
+            acquisitionTracker.setProgressVisible("home", true)
+            acquisitionTracker.refreshNow()
+        }
+
+        fun pageStopped() {
+            acquisitionTracker.setProgressVisible("home", false)
         }
 
         suspend fun loadHomeRows(
