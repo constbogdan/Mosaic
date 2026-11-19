@@ -109,6 +109,7 @@ class JellyfinAcquisitionReadinessServiceTest {
                     currentTimeMillis = { testScheduler.currentTime },
                 )
             try {
+                tracker.setProgressVisible("test", true)
                 tracker.startForeground()
                 runCurrent()
                 val before =
@@ -184,6 +185,7 @@ class JellyfinAcquisitionReadinessServiceTest {
                 )
             try {
                 assertFalse(current.value.permitsRequest(SeerrItemType.MOVIE, true))
+                tracker.setProgressVisible("test", true)
                 tracker.startForeground()
                 runCurrent()
                 val historical =
@@ -665,6 +667,7 @@ class JellyfinAcquisitionReadinessServiceTest {
                     currentTimeMillis = { testScheduler.currentTime },
                 )
             try {
+                tracker.setProgressVisible("test", true)
                 tracker.startForeground()
                 for (phase in listOf("downloading", "importing", "importBlocked", "failed")) {
                     current = upgrade(phase)

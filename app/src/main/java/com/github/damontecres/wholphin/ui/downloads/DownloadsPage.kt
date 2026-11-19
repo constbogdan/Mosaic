@@ -114,10 +114,14 @@ class DownloadsViewModel
             restoreTargetIndex = focusedItemIndex
             pageVisit.update { it + 1 }
             tracker.setFastPolling(true)
+            tracker.setProgressVisible("downloads", true)
             tracker.refreshNow()
         }
 
-        fun pageStopped() = tracker.setFastPolling(false)
+        fun pageStopped() {
+            tracker.setProgressVisible("downloads", false)
+            tracker.setFastPolling(false)
+        }
 
         fun open(item: DownloadDisplayItem) {
             val fallbackTitle =

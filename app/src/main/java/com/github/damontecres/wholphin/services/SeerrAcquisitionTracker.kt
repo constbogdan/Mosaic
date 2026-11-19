@@ -4,6 +4,7 @@ import com.github.damontecres.wholphin.data.model.AcquisitionEntry
 import com.github.damontecres.wholphin.data.model.AcquisitionHealth
 import com.github.damontecres.wholphin.data.model.AcquisitionPhase
 import com.github.damontecres.wholphin.data.model.AcquisitionStatus
+import com.github.damontecres.wholphin.data.model.RequestStatus
 import com.github.damontecres.wholphin.data.model.SeerrAcquisitionState
 import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.data.model.SeerrRequestAcquisition
@@ -19,18 +20,24 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import java.time.Instant
@@ -66,6 +73,7 @@ data class SeerrAcquisitionSession(
 @Singleton
 class SeerrAcquisitionTracker internal constructor(
     private val loadRequests: suspend () -> List<SeerrRequestAcquisition>,
+    private val loadTrackedRequest: suspend (Int) -> SeerrRequestAcquisition? = { null },
     private val enrichRequests: suspend (List<SeerrRequestAcquisition>) -> List<SeerrRequestAcquisition> = { it },
     private val resolveJellyfinReadiness: suspend (List<SeerrRequestAcquisition>) -> List<SeerrRequestAcquisition> = { it },
     private val sessions: Flow<SeerrAcquisitionSession?>,
@@ -83,6 +91,7 @@ class SeerrAcquisitionTracker internal constructor(
         enhancedFeatureGate: EnhancedFeatureGate,
     ) : this(
         loadRequests = seerrService::getRequestAcquisitions,
+        loadTrackedRequest = seerrService::getTrackedRequestAcquisition,
         enrichRequests = seerrService::enrichRequestAcquisitions,
         resolveJellyfinReadiness = jellyfinReadinessService::enrich,
         sessions =
@@ -109,6 +118,7 @@ class SeerrAcquisitionTracker internal constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val refreshRequests = Channel<Unit>(Channel.CONFLATED)
+    private val visibleConsumers = MutableStateFlow<Set<String>>(emptySet())
     private val fastPolling = AtomicBoolean(false)
     private val ledger = SeerrAcquisitionLedger()
     private val queueingLock = Any()
@@ -125,14 +135,16 @@ class SeerrAcquisitionTracker internal constructor(
         _state.update { it.copy(isRunning = true) }
         foregroundJob =
             scope.launch {
-                sessions.collectLatest { session ->
-                    if (session == null) {
-                        resetSession(null)
-                    } else {
-                        if (_state.value.session != session) resetSession(session)
-                        poll(session)
+                combine(sessions, visibleConsumers) { session, consumers -> session to consumers.isNotEmpty() }
+                    .distinctUntilChanged()
+                    .collectLatest { (session, observing) ->
+                        if (session == null) {
+                            resetSession(null)
+                        } else {
+                            if (_state.value.session != session) resetSession(session)
+                            if (observing) poll(session) else _state.update { it.copy(isRefreshing = false) }
+                        }
                     }
-                }
             }
     }
 
@@ -140,6 +152,8 @@ class SeerrAcquisitionTracker internal constructor(
     fun stopForeground() {
         foregroundJob?.cancel()
         foregroundJob = null
+        visibleConsumers.value = emptySet()
+        fastPolling.set(false)
         _state.update { it.copy(isRunning = false, isRefreshing = false) }
     }
 
@@ -148,13 +162,26 @@ class SeerrAcquisitionTracker internal constructor(
     fun deactivate() {
         foregroundJob?.cancel()
         foregroundJob = null
+        visibleConsumers.value = emptySet()
         fastPolling.set(false)
         resetSession(null)
         _state.update { it.copy(isRunning = false, isRefreshing = false) }
     }
 
     fun refreshNow() {
-        if (acquisitionEnabled() && _state.value.isRunning) refreshRequests.trySend(Unit)
+        if (acquisitionEnabled() && _state.value.isRunning && visibleConsumers.value.isNotEmpty()) {
+            refreshRequests.trySend(Unit)
+        }
+    }
+
+    /** The foreground lifecycle is an outer gate; only visible progress surfaces request polling. */
+    fun setProgressVisible(
+        consumer: String,
+        visible: Boolean,
+    ) {
+        visibleConsumers.update { current ->
+            if (visible) current + consumer else current - consumer
+        }
     }
 
     fun registerQueueing(submission: SeerrRequestAcquisition) {
@@ -201,16 +228,37 @@ class SeerrAcquisitionTracker internal constructor(
             fastPolling.set(false)
             return
         }
-        if (fastPolling.getAndSet(enabled) != enabled) refreshNow()
+        fastPolling.set(enabled)
     }
 
     private suspend fun poll(session: SeerrAcquisitionSession) {
+        // The first cycle satisfies a refresh requested while the visibility lease was opening.
+        refreshRequests.tryReceive()
         var failures = 0
         while (currentCoroutineContext().isActive) {
             try {
                 _state.update { it.copy(isRefreshing = true) }
                 val now = currentTimeMillis()
-                val fetched = stampAvailabilityTransitions(loadRequests(), _state.value.requests, now)
+                val previous = _state.value.requests
+                val recent = loadRequests()
+                val recentIds = recent.mapTo(mutableSetOf()) { it.request.requestId }
+                val known =
+                    (previous + synchronized(queueingLock) { queueingRequests.values.map { it.acquisition } })
+                        .distinctBy { it.request.requestId }
+                        .filter { it.request.requestId !in recentIds && it.shouldRefreshKnownRequest(now) }
+                val resolved =
+                    coroutineScope {
+                        val permits = Semaphore(3)
+                        known
+                            .map { candidate ->
+                                async { permits.withPermit { loadTrackedRequest(candidate.request.requestId) } }
+                            }.awaitAll()
+                            .filterNotNull()
+                    }
+                val refreshedIds = known.mapTo(mutableSetOf()) { it.request.requestId }
+                val cached = previous.filter { it.request.requestId !in recentIds && it.request.requestId !in refreshedIds }
+                val discovered = (recent + resolved + cached).distinctBy { it.request.requestId }
+                val fetched = stampAvailabilityTransitions(discovered, previous, now)
                 val withRetainedReadiness = retainJellyfinReadiness(fetched, _state.value.requests)
                 val retained =
                     enrichRequests(
@@ -236,6 +284,13 @@ class SeerrAcquisitionTracker internal constructor(
                         lastError = null,
                     )
                 }
+                Timber.d(
+                    "Acquisition poll complete: recent=%d targeted=%d retained=%d elapsedMs=%d",
+                    recent.size,
+                    known.size,
+                    requests.size,
+                    currentTimeMillis() - now,
+                )
             } catch (ex: CancellationException) {
                 throw ex
             } catch (ex: Exception) {
@@ -358,7 +413,9 @@ class SeerrAcquisitionTracker internal constructor(
                 }
             val recent = requests.filterNot { it.isActiveRequest(nowEpochMillis) }.take(RECENT_TERMINAL_REQUESTS)
             val previouslyAcquiringIds =
-                previous.filter { it.hasKnownAcquisitionEntries() }.mapTo(mutableSetOf()) { it.request.requestId }
+                previous
+                    .filter { it.hasKnownAcquisitionEntries() && it.shouldRefreshKnownRequest(nowEpochMillis) }
+                    .mapTo(mutableSetOf()) { it.request.requestId }
             val retainedIds =
                 (active + completedWithinUiWindow + recent)
                     .mapTo(mutableSetOf()) { it.request.requestId }
@@ -483,6 +540,43 @@ private fun SeerrRequestAcquisition.hasKnownAcquisitionEntries(): Boolean =
         SeerrAcquisitionState.Processing,
         -> false
     }
+
+/** Keep older known work observable without re-reading historical terminal requests forever. */
+private fun SeerrRequestAcquisition.shouldRefreshKnownRequest(nowEpochMillis: Long): Boolean {
+    // Completed queue evidence is retained for readiness, but must not turn an old terminal
+    // request into a permanent targeted poll after the Downloads completion window expires.
+    if (request.availability == SeerrAvailability.AVAILABLE &&
+        !request.availableSinceEpochMillis.isWithinDownloadsCompletedWindow(nowEpochMillis) &&
+        request.seasonAvailableSinceEpochMillis.values.none { it.isWithinDownloadsCompletedWindow(nowEpochMillis) }
+    ) {
+        return false
+    }
+    if (request.availability == SeerrAvailability.BLOCKLISTED || request.availability == SeerrAvailability.DELETED) return false
+    if (hasKnownAcquisitionEntries()) return true
+    if (request.status in setOf(RequestStatus.PENDING, RequestStatus.APPROVED) &&
+        request.availability != SeerrAvailability.AVAILABLE
+    ) {
+        return true
+    }
+    if (request.availability != SeerrAvailability.AVAILABLE) return false
+    return when (request.mediaType) {
+        com.github.damontecres.wholphin.data.model.SeerrItemType.MOVIE -> {
+            !request.jellyfinReadiness.movieReady &&
+                request.availableSinceEpochMillis.isWithinDownloadsCompletedWindow(nowEpochMillis)
+        }
+
+        com.github.damontecres.wholphin.data.model.SeerrItemType.TV -> {
+            request.requestedSeasonNumbers.any { season ->
+                !request.jellyfinReadiness.seasonReady(season, request.seasonEpisodeCounts[season]) &&
+                    request.seasonAvailableSinceEpochMillis[season].isWithinDownloadsCompletedWindow(nowEpochMillis)
+            }
+        }
+
+        else -> {
+            false
+        }
+    }
+}
 
 internal fun stampAvailabilityTransitions(
     current: List<SeerrRequestAcquisition>,

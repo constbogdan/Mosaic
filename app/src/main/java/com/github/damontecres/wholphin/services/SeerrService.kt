@@ -2,6 +2,7 @@ package com.github.damontecres.wholphin.services
 
 import com.github.damontecres.wholphin.api.seerr.RequestApi
 import com.github.damontecres.wholphin.api.seerr.SeerrApiClient
+import com.github.damontecres.wholphin.api.seerr.infrastructure.ClientException
 import com.github.damontecres.wholphin.api.seerr.model.CreditCast
 import com.github.damontecres.wholphin.api.seerr.model.CreditCrew
 import com.github.damontecres.wholphin.api.seerr.model.MediaInfo
@@ -73,24 +74,31 @@ class SeerrService
 
         val active get() = seerrServerRepository.active
 
+        /** Discovery is intentionally bounded; older known requests are polled by ID. */
         suspend fun getRequestAcquisitions(): List<SeerrRequestAcquisition> =
-            paginateSeerrRequestAcquisitions { take, skip ->
-                api.requestApi
-                    .requestGet(
-                        take = take,
-                        skip = skip,
-                        filter = RequestApi.FilterRequestGet.ALL,
-                        sort = RequestApi.SortRequestGet.MODIFIED,
-                        sortDirection = RequestApi.SortDirectionRequestGet.DESC,
-                    ).let { response ->
-                        SeerrRequestAcquisitionPage(
-                            requests = response.results.orEmpty().map { it.toSeerrRequestAcquisition() },
-                            page = response.pageInfo?.page,
-                            pages = response.pageInfo?.pages,
-                            totalResults = response.pageInfo?.results,
-                        )
-                    }
+            api.requestApi
+                .requestGet(
+                    take = ACQUISITION_DISCOVERY_WINDOW,
+                    skip = 0,
+                    filter = RequestApi.FilterRequestGet.ALL,
+                    sort = RequestApi.SortRequestGet.ADDED,
+                    sortDirection = RequestApi.SortDirectionRequestGet.DESC,
+                ).results
+                .orEmpty()
+                .map { it.toSeerrRequestAcquisition() }
+
+        suspend fun getTrackedRequestAcquisition(requestId: Int): SeerrRequestAcquisition? =
+            try {
+                api.requestApi.requestRequestIdGet(requestId.toString()).toSeerrRequestAcquisition()
+            } catch (error: ClientException) {
+                // A request deleted or no longer visible to this user must not stay in the
+                // account-scoped snapshot. Other failures preserve the last good cycle.
+                if (error.statusCode == 403 || error.statusCode == 404) null else throw error
             }
+
+        private companion object {
+            const val ACQUISITION_DISCOVERY_WINDOW = 25
+        }
 
         /** Resolve display/navigation metadata after the tracker has trimmed request history. */
         suspend fun enrichRequestAcquisitions(requests: List<SeerrRequestAcquisition>): List<SeerrRequestAcquisition> =

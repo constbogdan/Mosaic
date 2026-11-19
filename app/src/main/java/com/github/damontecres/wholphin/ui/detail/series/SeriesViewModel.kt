@@ -146,6 +146,15 @@ class SeriesViewModel
         @Assisted val seasonEpisodeIds: SeasonEpisodeIds?,
         @Assisted val seriesPageType: SeriesPageType,
     ) : ViewModel() {
+        fun startAcquisitionObservation() {
+            seerrAcquisitionTracker.setProgressVisible("series-$seriesId", true)
+            seerrAcquisitionTracker.refreshNow()
+        }
+
+        fun stopAcquisitionObservation() {
+            seerrAcquisitionTracker.setProgressVisible("series-$seriesId", false)
+        }
+
         @AssistedFactory
         interface Factory {
             fun create(

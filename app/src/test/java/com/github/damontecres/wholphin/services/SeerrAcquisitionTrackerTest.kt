@@ -27,6 +27,7 @@ import com.github.damontecres.wholphin.util.reset
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +45,203 @@ import java.util.UUID
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SeerrAcquisitionTrackerTest {
+    @Test
+    fun pollingRequiresVisibleConsumerAndCoalescesMultipleConsumers() =
+        runTest {
+            var loads = 0
+            val tracker =
+                tracker(
+                    sessions = MutableStateFlow(SeerrAcquisitionSession(1, 1)),
+                    observeInitially = false,
+                ) {
+                    loads++
+                    emptyList()
+                }
+            tracker.startForeground()
+            runCurrent()
+            assertEquals(0, loads)
+
+            tracker.setProgressVisible("home", true)
+            runCurrent()
+            assertEquals(1, loads)
+            tracker.setProgressVisible("downloads", true)
+            tracker.setProgressVisible("home", false)
+            runCurrent()
+            assertEquals(1, loads)
+
+            tracker.setProgressVisible("downloads", false)
+            runCurrent()
+            advanceTimeBy(60_000)
+            runCurrent()
+            assertEquals(1, loads)
+
+            tracker.setProgressVisible("downloads", true)
+            runCurrent()
+            assertEquals(2, loads)
+            tracker.stopForeground()
+        }
+
+    @Test
+    fun downloadsEntryCadenceChangeDoesNotDoubleRefresh() =
+        runTest {
+            var loads = 0
+            val tracker =
+                tracker(MutableStateFlow(SeerrAcquisitionSession(1, 1))) {
+                    loads++
+                    emptyList()
+                }
+            tracker.startForeground()
+            runCurrent()
+            assertEquals(1, loads)
+
+            tracker.setFastPolling(true)
+            tracker.setProgressVisible("downloads", true)
+            tracker.refreshNow()
+            runCurrent()
+            assertEquals(2, loads)
+
+            advanceTimeBy(8_000)
+            runCurrent()
+            assertEquals(3, loads)
+            tracker.stopForeground()
+        }
+
+    @Test
+    fun olderKnownAcquisitionUsesTargetedLookupAfterLeavingRecentWindow() =
+        runTest {
+            val old = movieRequest(1, 100.0, 75.0)
+            val progressed = movieRequest(1, 100.0, 25.0)
+            var recent = listOf(old)
+            val targeted = mutableListOf<Int>()
+            val tracker =
+                tracker(
+                    sessions = MutableStateFlow(SeerrAcquisitionSession(1, 1)),
+                    trackedLoader = { id ->
+                        targeted += id
+                        progressed
+                    },
+                ) { recent }
+            tracker.startForeground()
+            runCurrent()
+            assertEquals(
+                listOf(1),
+                tracker.state.value.requests
+                    .map { it.request.requestId },
+            )
+
+            recent = (100..124).map { movieRequest(it, null, null) }
+            tracker.refreshNow()
+            runCurrent()
+            assertEquals(listOf(1), targeted)
+            assertTrue(
+                tracker.state.value.requests
+                    .any { it.request.requestId == 1 && it.acquisition == progressed.acquisition },
+            )
+            tracker.stopForeground()
+        }
+
+    @Test
+    fun failedTargetedLookupPreservesLastGoodSnapshot() =
+        runTest {
+            val old = movieRequest(1, 100.0, 75.0)
+            var recent = listOf(old)
+            val tracker =
+                tracker(
+                    sessions = MutableStateFlow(SeerrAcquisitionSession(1, 1)),
+                    trackedLoader = { error("target unavailable") },
+                ) { recent }
+            tracker.startForeground()
+            runCurrent()
+            val good = tracker.state.value.requests
+
+            recent = (100..124).map { movieRequest(it, null, null) }
+            tracker.refreshNow()
+            runCurrent()
+
+            assertEquals(good, tracker.state.value.requests)
+            assertEquals(1, tracker.state.value.consecutiveFailures)
+            tracker.stopForeground()
+        }
+
+    @Test
+    fun disappearingKnownRequestIsRemovedWithoutCrossSessionFallback() =
+        runTest {
+            var recent = listOf(movieRequest(1, 100.0, 75.0))
+            val sessions = MutableStateFlow<SeerrAcquisitionSession?>(SeerrAcquisitionSession(1, 1))
+            val tracker = tracker(sessions = sessions, trackedLoader = { null }) { recent }
+            tracker.startForeground()
+            runCurrent()
+            recent = (100..124).map { movieRequest(it, null, null) }
+            tracker.refreshNow()
+            runCurrent()
+            assertFalse(
+                tracker.state.value.requests
+                    .any { it.request.requestId == 1 },
+            )
+
+            sessions.value = SeerrAcquisitionSession(2, 2)
+            runCurrent()
+            assertEquals(SeerrAcquisitionSession(2, 2), tracker.state.value.session)
+            assertFalse(
+                tracker.state.value.requests
+                    .any { it.request.requestId == 1 },
+            )
+            tracker.stopForeground()
+        }
+
+    @Test
+    fun leavingVisibleSurfaceCancelsInFlightDiscovery() =
+        runTest {
+            val response = CompletableDeferred<List<SeerrRequestAcquisition>>()
+            var loads = 0
+            val tracker =
+                tracker(
+                    sessions = MutableStateFlow(SeerrAcquisitionSession(1, 1)),
+                    observeInitially = false,
+                ) {
+                    loads++
+                    response.await()
+                }
+            tracker.startForeground()
+            tracker.setProgressVisible("downloads", true)
+            runCurrent()
+            assertEquals(1, loads)
+            assertTrue(tracker.state.value.isRefreshing)
+
+            tracker.setProgressVisible("downloads", false)
+            runCurrent()
+            assertFalse(tracker.state.value.isRefreshing)
+            response.complete(listOf(movieRequest(1, 100.0, 75.0)))
+            runCurrent()
+            assertTrue(
+                tracker.state.value.requests
+                    .isEmpty(),
+            )
+            tracker.stopForeground()
+        }
+
+    @Test
+    fun backgroundResumeRequiresFreshVisibleConsumer() =
+        runTest {
+            var loads = 0
+            val tracker =
+                tracker(MutableStateFlow(SeerrAcquisitionSession(1, 1))) {
+                    loads++
+                    emptyList()
+                }
+            tracker.startForeground()
+            runCurrent()
+            assertEquals(1, loads)
+            tracker.stopForeground()
+            tracker.startForeground()
+            runCurrent()
+            assertEquals(1, loads)
+            tracker.setProgressVisible("home", true)
+            runCurrent()
+            assertEquals(2, loads)
+            tracker.stopForeground()
+        }
+
     @Test
     fun repositoryWrapperDrivesInjectedTrackerAcrossPluginManualAndDisconnectedStates() =
         runTest {
@@ -64,6 +262,7 @@ class SeerrAcquisitionTrackerTest {
             val gate = mockk<EnhancedFeatureGate> { every { isEnabled(any()) } returns true }
             val tracker = SeerrAcquisitionTracker(service, repository, readiness, gate)
             try {
+                tracker.setProgressVisible("test", true)
                 tracker.startForeground()
                 runCurrent()
                 assertEquals(null, tracker.state.value.session)
@@ -1196,11 +1395,14 @@ class SeerrAcquisitionTrackerTest {
         sessions: MutableStateFlow<SeerrAcquisitionSession?>,
         resolveReadiness: suspend (List<SeerrRequestAcquisition>) -> List<SeerrRequestAcquisition> = { it },
         acquisitionEnabled: () -> Boolean = { true },
+        observeInitially: Boolean = true,
+        trackedLoader: suspend (Int) -> SeerrRequestAcquisition? = { null },
         loader: suspend () -> List<SeerrRequestAcquisition>,
     ): SeerrAcquisitionTracker {
         val tracker =
             SeerrAcquisitionTracker(
                 loadRequests = loader,
+                loadTrackedRequest = trackedLoader,
                 resolveJellyfinReadiness = resolveReadiness,
                 sessions = sessions,
                 dispatcher = StandardTestDispatcher(testScheduler),
@@ -1209,6 +1411,7 @@ class SeerrAcquisitionTrackerTest {
                 currentTimeMillis = { testScheduler.currentTime },
                 acquisitionEnabled = acquisitionEnabled,
             )
+        if (observeInitially) tracker.setProgressVisible("test", true)
         backgroundScope.coroutineContext[Job]?.invokeOnCompletion { tracker.stopForeground() }
         return tracker
     }

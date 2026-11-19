@@ -181,9 +181,11 @@ fun SeriesDetails(
         }
 
     LifecycleResumeEffect(destination.itemId) {
+        viewModel.startAcquisitionObservation()
         viewModel.refresh()
 
         onPauseOrDispose {
+            viewModel.stopAcquisitionObservation()
             viewModel.release()
         }
     }

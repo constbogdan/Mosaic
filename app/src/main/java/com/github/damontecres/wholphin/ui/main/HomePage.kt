@@ -120,8 +120,9 @@ fun HomePage(
 ) {
     val context = LocalContext.current
     LifecycleStartEffect(Unit) {
+        viewModel.pageStarted()
         viewModel.init()
-        onStopOrDispose { }
+        onStopOrDispose { viewModel.pageStopped() }
     }
     val state by viewModel.state.collectAsState()
     val loading = state.loadingState
