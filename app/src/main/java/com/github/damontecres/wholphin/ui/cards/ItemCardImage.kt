@@ -113,6 +113,7 @@ fun ItemCardImage(
     contentScale: ContentScale = ContentScale.Fit,
     mediaPresentation: CardMediaPresentation? = null,
     artworkAlpha: Float = 1f,
+    artworkColorFilter: ColorFilter? = null,
     fallback: @Composable BoxScope.() -> Unit = {
         ItemCardImageFallback(
             name = name,
@@ -130,6 +131,7 @@ fun ItemCardImage(
                 model = imageUrl,
                 contentDescription = name,
                 contentScale = contentScale,
+                colorFilter = artworkColorFilter,
                 alignment = Alignment.Center,
                 onError = {
                     logCoilError(imageUrl, it.result)

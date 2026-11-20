@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -71,6 +72,7 @@ fun DiscoverItemCard(
     compactLabels: Boolean = false,
     showAvailableIndicator: Boolean = true,
     artworkAlpha: Float = 1f,
+    artworkColorFilter: ColorFilter? = null,
     bottomBadge: String? = null,
 ) {
     val focused by interactionSource.collectIsFocusedAsState()
@@ -125,6 +127,7 @@ fun DiscoverItemCard(
                     useFallbackText = useFallbackText,
                     contentScale = ContentScale.FillBounds,
                     artworkAlpha = artworkAlpha,
+                    artworkColorFilter = artworkColorFilter,
                     modifier =
                         Modifier
                             .fillMaxSize(),

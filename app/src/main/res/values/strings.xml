@@ -35,9 +35,7 @@
     <string name="collections_preparing">Collections are preparing. Retry to check again.</string>
     <string name="collections_unavailable">Collections are unavailable. Retry when connected.</string>
     <string name="collections_partial">Some collections could not be loaded. Counts may be incomplete.</string>
-    <string name="collections_stale">Showing an older Collections snapshot.</string>
     <string name="collections_count">%1$d/%2$d</string>
-    <string name="collections_count_unknown">Count unavailable</string>
     <string name="collections_details_title">Collection</string>
     <string name="collections_similar">Similar Collections</string>
     <string name="collections_similar_unavailable">Similar Collections could not be refreshed.</string>

@@ -1646,6 +1646,23 @@ class BasicUiTests {
     }
 
     @Test
+    fun collections_stale_last_good_remains_visible_without_technical_notice() {
+        val entry =
+            CollectionsEntry(
+                LibraryCollectionItem(7, "Alien Collection", null, null, null, 1, 4, LibraryCollectionItem.Completeness.INCOMPLETE),
+                null,
+                null,
+            )
+        val vm = mockk<CollectionsViewModel>(relaxed = true)
+        every { vm.state } returns
+            MutableStateFlow(CollectionsScreenState(owner = "viewer", entries = listOf(entry), total = 1, stale = true))
+        composeTestRule.setContent { WholphinTheme { CollectionsPage(viewModel = vm) } }
+        composeTestRule.onAllNodesWithText("Alien Collection")[0].assertExists()
+        composeTestRule.onAllNodesWithText("1/4").assertCountEquals(1)
+        composeTestRule.onAllNodesWithText("Showing an older Collections snapshot.").assertCountEquals(0)
+    }
+
+    @Test
     fun collection_details_back_follows_grid_poster_navigation_contract() {
         val movie = DiscoverItem(42, SeerrItemType.MOVIE, "Alien", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
         val second = DiscoverItem(43, SeerrItemType.MOVIE, "Aliens", null, null, SeerrAvailability.AVAILABLE, null, null, null, null, null)
@@ -1800,7 +1817,7 @@ class BasicUiTests {
     }
 
     @Test
-    fun collection_details_unknown_count_remains_a_badge() {
+    fun collection_details_unknown_count_has_no_badge() {
         val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
         every { vm.state } returns
             MutableStateFlow(
@@ -1813,8 +1830,90 @@ class BasicUiTests {
         composeTestRule.setContent {
             WholphinTheme { SeerrCollectionDetails(Destination.SeerrCollection(7, null, null, "viewer"), viewModel = vm) }
         }
-        composeTestRule.onAllNodesWithText("Count unavailable").assertCountEquals(1)
+        composeTestRule.onAllNodesWithText("Count unavailable").assertCountEquals(0)
         composeTestRule.onAllNodesWithText("Request Collection").assertCountEquals(0)
+    }
+
+    @Test
+    fun collection_details_prefers_authoritative_count_and_suppresses_known_zero() {
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        val details = CollectionDetailsData(645, "James Bond", null, null, null, emptyList(), availableMovies = 10, totalMovies = 26)
+        val state = MutableStateFlow(CollectionDetailsState(owner = "viewer", collectionId = 645, details = details))
+        val destination = mutableStateOf(Destination.SeerrCollection(645, 1, 2, "viewer"))
+        every { vm.state } returns state
+        composeTestRule.setContent {
+            WholphinTheme { SeerrCollectionDetails(destination.value, viewModel = vm) }
+        }
+        composeTestRule.onAllNodesWithText("10/26").assertCountEquals(1)
+        composeTestRule.onAllNodesWithText("1/2").assertCountEquals(0)
+        composeTestRule.runOnIdle { destination.value = Destination.SeerrCollection(645, null, null, "viewer") }
+        composeTestRule.onAllNodesWithText("10/26").assertCountEquals(1)
+        composeTestRule.runOnIdle { state.value = state.value.copy(details = details.copy(availableMovies = 0)) }
+        composeTestRule.onAllNodesWithText("10/26").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("Count unavailable").assertCountEquals(0)
+    }
+
+    @Test
+    fun collection_unreleased_card_is_focusable_but_cannot_open() {
+        val future =
+            DiscoverItem(
+                43,
+                SeerrItemType.MOVIE,
+                "Future",
+                null,
+                null,
+                SeerrAvailability.AVAILABLE,
+                LocalDate.now().plusYears(1),
+                null,
+                null,
+                null,
+                null,
+            )
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        every { vm.state } returns
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Saga", null, null, null, listOf(future)),
+                ),
+            )
+        composeTestRule.setContent {
+            WholphinTheme { SeerrCollectionDetails(Destination.SeerrCollection(7, null, null, "viewer"), viewModel = vm) }
+        }
+        composeTestRule
+            .onAllNodes(hasText("Future") and hasClickAction())[0]
+            .requestFocus()
+            .assertIsFocused()
+            .performClickEnter()
+        verify(exactly = 0) { vm.open(any()) }
+    }
+
+    @Test
+    fun collection_released_unavailable_card_remains_focusable_and_actionable() {
+        val released = LocalDate.now().minusDays(1)
+        val available =
+            DiscoverItem(42, SeerrItemType.MOVIE, "Available", null, null, SeerrAvailability.AVAILABLE, released, null, null, null, null)
+        val unavailable =
+            DiscoverItem(43, SeerrItemType.MOVIE, "Unavailable", null, null, SeerrAvailability.UNKNOWN, released, null, null, null, null)
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        every { vm.state } returns
+            MutableStateFlow(
+                CollectionDetailsState(
+                    owner = "viewer",
+                    collectionId = 7,
+                    details = CollectionDetailsData(7, "Saga", null, null, null, listOf(available, unavailable)),
+                ),
+            )
+        composeTestRule.setContent {
+            WholphinTheme { SeerrCollectionDetails(Destination.SeerrCollection(7, null, null, "viewer"), viewModel = vm) }
+        }
+        composeTestRule
+            .onAllNodes(hasText("Unavailable") and hasClickAction())[0]
+            .requestFocus()
+            .assertIsFocused()
+            .performClickEnter()
+        verify(exactly = 1) { vm.open(unavailable) }
     }
 
     @Test
@@ -1961,7 +2060,7 @@ class BasicUiTests {
         composeTestRule.onAllNodes(hasScrollToIndexAction())[0].performScrollToIndex(1)
         composeTestRule.onNodeWithText("Similar Collections").assertExists()
         composeTestRule.onAllNodesWithText("Another Collection").assertCountEquals(2)
-        composeTestRule.onNodeWithText("Count unavailable").assertExists()
+        composeTestRule.onAllNodesWithText("Count unavailable").assertCountEquals(0)
         composeTestRule.onAllNodesWithText("Another Collection")[0].assertIsFocused()
     }
 

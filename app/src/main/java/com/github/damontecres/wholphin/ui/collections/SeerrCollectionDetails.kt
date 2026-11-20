@@ -33,6 +33,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorMatrixColorFilter
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -101,6 +102,14 @@ internal fun SeerrCollectionDetails(
         state.owner == destination.owner && state.details != null && !state.loading && !state.error && !state.denied &&
             !state.requestEligibilityLoading &&
             state.requestEligibility.values.any { it == CollectionRequestEligibility.ELIGIBLE }
+    val counts =
+        collectionDetailCounts(
+            state.details?.availableMovies,
+            state.details?.totalMovies,
+            destination.availableMovies,
+            destination.totalMovies,
+        )
+    val unreleasedPosterFilter = remember { ColorMatrixColorFilter(collectionUnreleasedPosterMatrix()) }
     LaunchedEffect(destination.collectionId, destination.owner, destination.entryToken) {
         viewModel.show(destination.collectionId, destination.owner, destination.entryToken)
     }
@@ -170,8 +179,8 @@ internal fun SeerrCollectionDetails(
                 CollectionDetailsPosterContent(
                     name = state.details?.name,
                     image = state.details?.posterUrl ?: state.details?.backdropUrl,
-                    available = destination.availableMovies,
-                    total = destination.totalMovies,
+                    available = counts?.available,
+                    total = counts?.total,
                     showCount = state.owner == destination.owner && state.details != null,
                 )
             }
@@ -265,6 +274,7 @@ internal fun SeerrCollectionDetails(
 
             state.details != null -> {
                 val movies = state.details.movies
+                val hasAvailableReleasedMember = collectionHasAvailableReleasedMember(movies)
                 val columns = 6
                 val memberFocusKey =
                     state.focusedKey?.takeIf { key -> movies.any { "tmdb:movie:${it.id}" == key } }
@@ -289,11 +299,13 @@ internal fun SeerrCollectionDetails(
                     itemKey = { "tmdb:movie:${movies[it].id}" },
                     onClickItem = { _, item ->
                         backShortcutArmed = true
-                        viewModel.open(item)
+                        if (collectionMemberActionable(item)) viewModel.open(item)
                     },
                     onLongClickItem = { _, item ->
                         backShortcutArmed = true
-                        quickMovieRequest.open(item, onOpenDetails = { viewModel.open(item) })
+                        if (collectionMemberActionable(item)) {
+                            quickMovieRequest.open(item, onOpenDetails = { viewModel.open(item) })
+                        }
                     },
                     onClickPlay = { _, _ -> },
                     letterPosition = { 0 },
@@ -351,6 +363,7 @@ internal fun SeerrCollectionDetails(
                                 }
                             },
                     cardContent = { (item, _, onClick, onLongClick, _, cardModifier) ->
+                        val actionable = item?.let { collectionMemberActionable(it) } == true
                         DiscoverItemCard(
                             item = item,
                             onClick = onClick,
@@ -358,7 +371,13 @@ internal fun SeerrCollectionDetails(
                             modifier = cardModifier,
                             showOverlay = false,
                             showAvailableIndicator = false,
-                            artworkAlpha = collectionMovieArtworkAlpha(item?.availability),
+                            artworkAlpha =
+                                collectionMovieArtworkAlpha(
+                                    item?.availability,
+                                    actionable,
+                                    hasAvailableReleasedMember,
+                                ),
+                            artworkColorFilter = if (actionable) null else unreleasedPosterFilter,
                             useFallbackText = true,
                             width = Dp.Unspecified,
                         )
@@ -423,16 +442,11 @@ private fun CollectionDetailsPosterContent(
     }
 }
 
-internal fun collectionMovieArtworkAlpha(availability: SeerrAvailability?): Float =
-    when (availability) {
-        SeerrAvailability.PENDING,
-        SeerrAvailability.PROCESSING,
-        SeerrAvailability.BLOCKLISTED,
-        SeerrAvailability.DELETED,
-        -> .45f
-
-        else -> 1f
-    }
+internal fun collectionMovieArtworkAlpha(
+    availability: SeerrAvailability?,
+    actionable: Boolean,
+    hasAvailableReleasedMember: Boolean,
+): Float = if (actionable && hasAvailableReleasedMember && availability != SeerrAvailability.AVAILABLE) .45f else 1f
 
 @Composable
 private fun SimilarCollectionsRow(
@@ -473,8 +487,8 @@ private fun SimilarCollectionsRow(
                 CollectionCard(
                     name = item.name,
                     posterUrl = item.posterUrl,
-                    available = null,
-                    total = null,
+                    available = item.availableMovies,
+                    total = item.totalMovies,
                     onClick = { onOpen(item.id) },
                     onLongClick = {},
                     modifier = Modifier.width(125.dp),
