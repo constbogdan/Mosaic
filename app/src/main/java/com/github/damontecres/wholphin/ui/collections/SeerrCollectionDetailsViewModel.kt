@@ -425,7 +425,7 @@ internal class SeerrCollectionDetailsViewModel
         }
 
         fun open(movie: DiscoverItem) {
-            if (session?.isCurrent() != true) return
+            if (session?.isCurrent() != true || !collectionMemberActionable(movie)) return
             val current = state.value
             val details = current.details ?: return
             val index = details.movies.indexOfFirst { it.id == movie.id }

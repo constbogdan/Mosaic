@@ -14,6 +14,7 @@ import com.github.damontecres.wholphin.data.model.DiscoverItem
 import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.data.model.SeerrItemType
 import com.github.damontecres.wholphin.ui.collections.CollectionRequestEligibility
+import com.github.damontecres.wholphin.ui.collections.collectionMembersOrdered
 import com.github.damontecres.wholphin.ui.collections.collectionRequestEligibility
 import com.github.damontecres.wholphin.ui.detail.CardGridItem
 import com.github.damontecres.wholphin.ui.detail.discover.MovieRequest
@@ -77,6 +78,8 @@ internal data class CollectionDetailsData(
     val backdropUrl: String?,
     val movies: List<DiscoverItem>,
     val nameVerified: Boolean = true,
+    val availableMovies: Int? = null,
+    val totalMovies: Int? = null,
 )
 
 internal data class CollectionMovieLink(
@@ -262,9 +265,8 @@ internal class SeerrCollectionsBackend(
                 .orEmpty()
                 .filter { it.id > 0 && it.mediaType == "movie" }
                 .distinctBy { it.id }
-                .sortedWith(
-                    compareBy<MovieResult> { toLocalDate(it.releaseDate) == null }.thenBy { toLocalDate(it.releaseDate) }.thenBy { it.id },
-                ).map(::movie)
+                .map(::movie)
+                .let(::collectionMembersOrdered)
         val name = response.name?.takeIf { it.isNotBlank() }
         val details =
             CollectionDetailsData(
@@ -275,6 +277,8 @@ internal class SeerrCollectionsBackend(
                 backdropUrl = response.backdropPath?.let { current.imageUrlBuilder(ImageType.BACKDROP, it) },
                 movies = movies,
                 nameVerified = name != null,
+                availableMovies = response.availableMovies,
+                totalMovies = response.totalMovies,
             )
         synchronized(detailsCache) { detailsCache[id] = details }
         return details

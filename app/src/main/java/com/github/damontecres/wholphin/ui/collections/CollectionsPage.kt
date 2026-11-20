@@ -96,7 +96,6 @@ internal fun CollectionsPage(
                 modifier = Modifier.focusRequester(filterFocus).semantics { contentDescription = "Filter: $filterLabel" },
             )
         }
-        if (state.stale) Text(stringResource(R.string.collections_stale), Modifier.padding(8.dp))
         if (state.status == LibraryCollectionsResponse.Status.PARTIAL || state.failedCollections > 0) {
             Text(stringResource(R.string.collections_partial), Modifier.padding(8.dp))
         }
@@ -237,12 +236,8 @@ internal fun CollectionCompletionBadge(
     total: Int?,
     modifier: Modifier = Modifier,
 ) {
-    val count =
-        if (available != null && total != null && available in 0..total) {
-            stringResource(R.string.collections_count, available, total)
-        } else {
-            stringResource(R.string.collections_count_unknown)
-        }
+    val counts = collectionBadgeCounts(available, total) ?: return
+    val count = stringResource(R.string.collections_count, counts.available, counts.total)
     Text(
         text = count,
         color = Color.White,
@@ -254,3 +249,38 @@ internal fun CollectionCompletionBadge(
                 .padding(5.dp),
     )
 }
+
+internal data class CollectionBadgeCounts(
+    val available: Int,
+    val total: Int,
+)
+
+internal fun collectionBadgeCounts(
+    available: Int?,
+    total: Int?,
+): CollectionBadgeCounts? =
+    if (available != null && total != null && total > 0 && available in 1..total) {
+        CollectionBadgeCounts(available, total)
+    } else {
+        null
+    }
+
+internal fun collectionDetailCounts(
+    detailAvailable: Int?,
+    detailTotal: Int?,
+    navigationAvailable: Int?,
+    navigationTotal: Int?,
+): CollectionBadgeCounts? =
+    // A valid authoritative zero is known and suppresses a stale positive navigation badge.
+    collectionKnownCounts(detailAvailable, detailTotal)
+        ?: collectionKnownCounts(navigationAvailable, navigationTotal)
+
+private fun collectionKnownCounts(
+    available: Int?,
+    total: Int?,
+): CollectionBadgeCounts? =
+    if (available != null && total != null && total >= 0 && available in 0..total) {
+        CollectionBadgeCounts(available, total)
+    } else {
+        null
+    }

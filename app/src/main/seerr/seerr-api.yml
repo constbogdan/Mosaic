@@ -2108,6 +2108,14 @@ components:
         id:
           type: integer
           example: 123
+        availableMovies:
+          type: integer
+          minimum: 0
+          nullable: true
+        totalMovies:
+          type: integer
+          minimum: 0
+          nullable: true
         name:
           type: string
           example: A Movie Collection
