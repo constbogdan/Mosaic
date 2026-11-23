@@ -93,10 +93,15 @@ not current instruction.
   require an existing positive TMDB identity. Global badges and ownership remain Phase 3.
   Grid key callbacks must capture the rendered screen-state snapshot, not live delegated state:
   category resets otherwise empty the key lookup before Compose removes the outgoing grid.
-  Random focus must be transferred only after the target and available adjacent pages form one
-  published window; publishing page P before P-1 visibly shifts its index and can restore the
-  wrong card. The typed catalog identity, not the mutable local grid index, anchors detail return
-  and in-flight prepend focus. A 20-item API page need not be a whole visual row: CardGrid uses
+  B11 supersedes the Random grid-jump: retain uniform absolute-index selection over the current
+  filtered total, reuse a complete cached page or fetch only the selected page without artwork,
+  and open the typed item through the shared owned/Discover navigation resolver. Do not publish
+  that lightweight response into the artwork-bearing grid cache or fetch neighboring pages for
+  Random. Back restores the original grid/scroll and Random button focus; session/filter changes
+  fence pending selection. The former adjacent-page window was necessary only for the removed
+  grid-jump, where publishing page P before P-1 shifted card focus. Ordinary grid browsing still
+  anchors detail return and in-flight prepend focus by typed catalog identity, not mutable index.
+  A 20-item API page need not be a whole visual row: CardGrid uses
   its configured `GridCells.Fixed(columns)` count and the absolute window offset to insert
   non-focusable leading slots, preserving card columns across prepends without coupling paging
   to a particular screen width. Keep slot keys absolute so LazyGridState can anchor visible

@@ -18,6 +18,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -80,10 +81,26 @@ fun WatchlistPage(
     var toolbarHasFocus by remember(state.owner) { mutableStateOf(false) }
     var gridHasFocus by remember(state.owner, state.category, state.filters) { mutableStateOf(false) }
     val randomFocusRequester = remember { FocusRequester() }
+    val watchlistIsTop = viewModel.isWatchlistTop()
     BackHandler(enabled = gridHasFocus && state.entries.isNotEmpty() && menu == null) {
         randomFocusRequester.tryRequestFocus()
     }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
+    BackHandler(enabled = watchlistIsTop && state.randomPending) { viewModel.cancelRandom() }
+    LaunchedEffect(state.restoreRandomFocus, watchlistIsTop) {
+        if (state.restoreRandomFocus && watchlistIsTop) {
+            repeat(3) {
+                withFrameNanos { }
+                if (randomFocusRequester.tryRequestFocus()) {
+                    viewModel.consumeRandomReturnFocus()
+                    viewModel.refresh()
+                    return@LaunchedEffect
+                }
+            }
+        }
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (!viewModel.state.value.restoreRandomFocus) viewModel.refresh()
+    }
     TabbedPage(
         selectedTabIndex = state.category.ordinal,
         tabs = tabs,
@@ -160,7 +177,6 @@ fun WatchlistPage(
                         positionOffset = (state.firstPage - 1) * WATCHLIST_PAGE_SIZE,
                         alignWindowToAbsoluteRows = true,
                         focusAnchorKey = state.focusedKey?.let { "${it.mediaType}:${it.tmdbId}" },
-                        focusRequestEpoch = state.randomFocusEpoch,
                         onGridFocusChanged = { gridHasFocus = it },
                         onFirstRowUp = { randomFocusRequester.tryRequestFocus() },
                         backToTopOnBack = false,

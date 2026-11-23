@@ -61,7 +61,8 @@ data class WatchlistScreenState(
     val focusedIndex: Int = 0,
     val focusedKey: MediaKey.Catalog? = null,
     val gridEpoch: Long = 0,
-    val randomFocusEpoch: Long = 0,
+    val randomPending: Boolean = false,
+    val restoreRandomFocus: Boolean = false,
     val failedRandomIndex: Int? = null,
 )
 
@@ -90,7 +91,12 @@ class WatchlistViewModel
                         val previous = state.value
                         val ownerChanged = owner != previous.owner
                         // Hide the old user's rows and selections before reading the new context.
-                        state.value = if (ownerChanged) WatchlistScreenState() else previous.copy(loading = false)
+                        state.value =
+                            if (ownerChanged) {
+                                WatchlistScreenState()
+                            } else {
+                                previous.copy(loading = false, randomPending = false, restoreRandomFocus = false)
+                            }
                         if (owner == null) {
                             state.value =
                                 state.value.copy(
@@ -122,6 +128,7 @@ class WatchlistViewModel
 
         private fun updateFilters(change: (WatchlistFilters) -> WatchlistFilters) {
             val owner = state.value.owner ?: return
+            cancelRandom()
             viewModelScope.launch {
                 try {
                     val saved =
@@ -167,7 +174,7 @@ class WatchlistViewModel
 
         private fun prefetch() {
             val current = state.value
-            if (current.loading || current.error != null || current.entries.isEmpty()) return
+            if (current.loading || current.randomPending || current.error != null || current.entries.isEmpty()) return
             // The grid reports its configured fixed-column count on focus. Do not infer
             // a row distance from the API's unrelated 20-item page size before that.
             val columns = columns ?: return
@@ -195,15 +202,35 @@ class WatchlistViewModel
 
         fun random() {
             val total = state.value.totalResults
-            if (state.value.owner == null || total <= 0) return
+            if (state.value.owner == null || total <= 0 || state.value.loading || state.value.randomPending) return
             jumpToRandom(watchlistRandomTarget(total).index)
         }
 
+        fun cancelRandom() {
+            if (!state.value.randomPending) return
+            load?.cancel()
+            generation++
+            state.value = state.value.copy(loading = false, randomPending = false)
+        }
+
+        fun isWatchlistTop() = navigation.backStack.lastOrNull() == Destination.Watchlist
+
+        fun consumeRandomReturnFocus() {
+            state.value = state.value.copy(restoreRandomFocus = false)
+        }
+
         internal fun jumpToRandom(initialIndex: Int) {
+            if (state.value.owner == null || state.value.randomPending || state.value.totalResults <= 0) return
             load?.cancel()
             val token = ++generation
             val current = state.value
-            state.value = current.copy(loading = true, error = null, failedPage = null, failedRandomIndex = null)
+            val sessionRevision = repository.state.value.revision
+            val stillCurrent = {
+                token == generation && repository.state.value.owner == current.owner &&
+                    repository.state.value.revision == sessionRevision &&
+                    state.value.category == current.category && state.value.filters == current.filters
+            }
+            state.value = current.copy(loading = true, randomPending = true, error = null, failedPage = null, failedRandomIndex = null)
             load =
                 viewModelScope.launch {
                     try {
@@ -217,7 +244,7 @@ class WatchlistViewModel
                         var result =
                             try {
                                 withContext(WholphinDispatchers.IO) {
-                                    repository.page(current.category, target.page, filters = current.filters)
+                                    repository.randomIdentityPage(current.category, target.page, filters = current.filters)
                                 }
                             } catch (_: IllegalArgumentException) {
                                 // A formerly valid absolute page can disappear as the filtered list shrinks.
@@ -228,7 +255,7 @@ class WatchlistViewModel
                                 recounted = fresh
                                 fresh
                             }
-                        if (token != generation || repository.state.value.owner != current.owner) return@launch
+                        if (!stillCurrent()) return@launch
                         if (result.page != target.page || result.totalResults != current.totalResults ||
                             target.offset !in result.entries.indices
                         ) {
@@ -237,7 +264,7 @@ class WatchlistViewModel
                                 recounted ?: withContext(WholphinDispatchers.IO) {
                                     repository.page(current.category, 1, refresh = true, filters = current.filters)
                                 }
-                            if (token != generation || repository.state.value.owner != current.owner) return@launch
+                            if (!stillCurrent()) return@launch
                             if (fresh.totalResults == 0) {
                                 state.value =
                                     current.copy(
@@ -247,6 +274,7 @@ class WatchlistViewModel
                                         totalPages = 1,
                                         totalResults = 0,
                                         loading = false,
+                                        randomPending = false,
                                         focusedIndex = 0,
                                         gridEpoch = current.gridEpoch + 1,
                                     )
@@ -255,77 +283,43 @@ class WatchlistViewModel
                             target = watchlistRandomTarget(fresh.totalResults)
                             result =
                                 withContext(WholphinDispatchers.IO) {
-                                    repository.page(current.category, target.page, filters = current.filters)
+                                    repository.randomIdentityPage(current.category, target.page, filters = current.filters)
                                 }
-                            if (token != generation || repository.state.value.owner != current.owner) return@launch
+                            if (!stillCurrent()) return@launch
                             if (result.totalResults != fresh.totalResults || target.offset !in result.entries.indices) {
                                 throw WatchlistPageShifted()
                             }
                         }
                         checkPage(result, target.page)
-                        // Build a complete, stable window before exposing the target to Compose.
-                        // Publishing the target alone and then prepending changed its grid index
-                        // after focus transfer, visibly moving cards and sometimes restoring another card.
-                        var windowEntries = result.entries
-                        var firstPage = target.page
-                        var lastPage = target.page
-                        var failedNeighbor: Int? = null
-                        for (neighbor in listOf(target.page - 1, target.page + 1)) {
-                            if (neighbor !in 1..result.totalPages) continue
-                            val adjacent =
-                                try {
-                                    withContext(WholphinDispatchers.IO) {
-                                        repository.page(current.category, neighbor, filters = current.filters)
-                                    }
-                                } catch (cancel: CancellationException) {
-                                    throw cancel
-                                } catch (invalid: IllegalArgumentException) {
-                                    throw WatchlistPageShifted()
-                                } catch (_: Exception) {
-                                    if (failedNeighbor == null) failedNeighbor = neighbor
-                                    continue
+                        if (!stillCurrent()) return@launch
+                        val selected = result.entries[target.offset]
+                        var navigated = false
+                        navigation.navigateToSeerrItem(
+                            selected.item,
+                            canNavigate = stillCurrent,
+                            onNavigated = {
+                                navigated = true
+                                if (stillCurrent()) state.value = state.value.copy(restoreRandomFocus = true)
+                            },
+                            onFinished = {
+                                if (stillCurrent()) {
+                                    state.value =
+                                        state.value.copy(
+                                            loading = false,
+                                            randomPending = false,
+                                            error = if (navigated) null else "Could not open Watchlist item. Retry Random.",
+                                        )
                                 }
-                            if (token != generation || repository.state.value.owner != current.owner) return@launch
-                            checkPage(adjacent, neighbor)
-                            if (adjacent.totalResults != result.totalResults ||
-                                adjacent.entries.any { row -> windowEntries.any { it.key == row.key } }
-                            ) {
-                                throw WatchlistPageShifted()
-                            }
-                            if (neighbor < firstPage) {
-                                windowEntries = adjacent.entries + windowEntries
-                                firstPage = neighbor
-                            } else {
-                                windowEntries = windowEntries + adjacent.entries
-                                lastPage = neighbor
-                            }
-                        }
-                        if (token != generation || repository.state.value.owner != current.owner) return@launch
-                        state.value =
-                            current.copy(
-                                entries = windowEntries,
-                                firstPage = firstPage,
-                                page = lastPage,
-                                totalPages = result.totalPages,
-                                totalResults = result.totalResults,
-                                loading = false,
-                                error = if (failedNeighbor != null) "Watchlist page unavailable. Retry to continue browsing." else null,
-                                failedPage = failedNeighbor,
-                                failedRandomIndex = null,
-                                focusedIndex = windowEntries.indexOfFirst { it.key == result.entries[target.offset].key },
-                                focusedKey = result.entries[target.offset].key,
-                                gridEpoch = current.gridEpoch + 1,
-                                randomFocusEpoch = current.randomFocusEpoch + 1,
-                            )
-                        lastRefresh = System.currentTimeMillis()
-                        prefetch()
+                            },
+                        )
                     } catch (cancel: CancellationException) {
                         throw cancel
                     } catch (_: Exception) {
-                        if (token == generation && repository.state.value.owner == current.owner) {
+                        if (stillCurrent()) {
                             state.value =
                                 state.value.copy(
                                     loading = false,
+                                    randomPending = false,
                                     failedRandomIndex = initialIndex,
                                     error = "Watchlist unavailable. Check the connection and backend API support, then retry.",
                                 )
@@ -442,6 +436,7 @@ class WatchlistViewModel
         }
 
         fun open(entry: WatchlistEntry) {
+            cancelRandom()
             val current = state.value
             val index = current.entries.indexOfFirst { it.key == entry.key }
             if (index >= 0) state.value = current.copy(focusedIndex = index, focusedKey = entry.key)

@@ -90,6 +90,19 @@ internal class PersonalWatchlistBackend(
         category: WatchlistCategory,
         page: Int,
         filters: WatchlistFilters,
+    ): WatchlistPage = fetchPage(category, page, filters, includeArtwork = true)
+
+    override suspend fun pageWithoutArtwork(
+        category: WatchlistCategory,
+        page: Int,
+        filters: WatchlistFilters,
+    ): WatchlistPage = fetchPage(category, page, filters, includeArtwork = false)
+
+    private suspend fun fetchPage(
+        category: WatchlistCategory,
+        page: Int,
+        filters: WatchlistFilters,
+        includeArtwork: Boolean,
     ): WatchlistPage {
         val result =
             client.watchlistApi.watchlistPage(
@@ -98,7 +111,7 @@ internal class PersonalWatchlistBackend(
                 sort = "added_desc",
                 watched = filters.watchedQuery,
                 libraryStatus = filters.libraryStatus,
-                includeArtwork = true,
+                includeArtwork = includeArtwork,
                 page = page,
             )
         if (result.source != "local") throw WatchlistUnavailable("This server does not provide the personal local Watchlist API.")

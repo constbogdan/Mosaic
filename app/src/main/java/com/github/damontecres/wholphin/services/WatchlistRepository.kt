@@ -25,6 +25,13 @@ internal interface WatchlistBackend {
         filters: WatchlistFilters = WatchlistFilters(),
     ): WatchlistPage
 
+    /** Identity-only variant; must not be used as an artwork-bearing grid page. */
+    suspend fun pageWithoutArtwork(
+        category: WatchlistCategory,
+        page: Int,
+        filters: WatchlistFilters = WatchlistFilters(),
+    ): WatchlistPage = page(category, page, filters)
+
     suspend fun membership(keys: Set<MediaKey.Catalog>): Map<MediaKey.Catalog, Boolean>
 
     suspend fun add(
@@ -136,6 +143,34 @@ class WatchlistRepository internal constructor(
                     val member = verifiedMembership?.get(it.key) != false
                     publish(it.key, if (member) WatchlistMembership.MEMBER else WatchlistMembership.NOT_MEMBER)
                 }
+            }
+            result
+        }
+
+    /** Reuse a complete grid page, or fetch one identity-only page without caching it. */
+    suspend fun randomIdentityPage(
+        category: WatchlistCategory,
+        page: Int,
+        filters: WatchlistFilters = WatchlistFilters(),
+    ): WatchlistPage =
+        lookups.withLock {
+            require(page > 0)
+            val captured: WatchlistSession
+            val revision: Long
+            synchronized(lock) {
+                captured = current()
+                revision = _state.value.revision
+                pages[Triple(category, filters, page)]?.let { cached ->
+                    val expected = (cached.totalResults - (page - 1) * 20).coerceIn(0, 20)
+                    if (cached.entries.size == expected) {
+                        return@withLock cached
+                    }
+                }
+            }
+            val result = captured.backend.pageWithoutArtwork(category, page, filters)
+            require(result.page == page && result.totalPages >= page && result.totalResults >= 0)
+            synchronized(lock) {
+                if (!valid(captured) || revision != _state.value.revision) throw CancellationException("Watchlist page superseded")
             }
             result
         }
