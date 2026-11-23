@@ -37,23 +37,34 @@ class NavigationManager
         fun navigateToSeerrItem(
             item: DiscoverItem,
             onUnresolved: (suspend () -> Unit)? = null,
+            canNavigate: () -> Boolean = { true },
+            onNavigated: (() -> Unit)? = null,
+            onFinished: (() -> Unit)? = null,
         ) {
             val origin = backStack.lastOrNull() ?: return
             val key = item.id to item.type.name
-            if (lastCompletedSelection == key && origin === lastCompletedDestination) return
+            if (lastCompletedSelection == key && origin === lastCompletedDestination) {
+                onFinished?.invoke()
+                return
+            }
             val owner = servers.current.value
             if (owner == null) {
-                if (onUnresolved == null) {
+                if (onUnresolved == null && canNavigate()) {
                     val destination = Destination.DiscoveredItem(item)
                     navigateTo(destination)
                     lastCompletedSelection = key
                     lastCompletedDestination = destination
-                } else {
+                    onNavigated?.invoke()
+                } else if (onUnresolved != null && canNavigate()) {
                     selectionScope.launch { onUnresolved() }
                 }
+                onFinished?.invoke()
                 return
             }
-            if (pendingSelection == key && selectionJob?.isActive == true) return
+            if (pendingSelection == key && selectionJob?.isActive == true) {
+                onFinished?.invoke()
+                return
+            }
             selectionJob?.cancel()
             pendingSelection = key
             val generation = ++selectionGeneration
@@ -61,17 +72,19 @@ class NavigationManager
                 selectionScope.launch {
                     try {
                         val destination = withContext(WholphinDispatchers.IO) { ownedResolver.resolve(item, owner) }
-                        if (destination != null && servers.current.value === owner && backStack.lastOrNull() === origin) {
+                        if (destination != null && servers.current.value === owner && backStack.lastOrNull() === origin && canNavigate()) {
                             if (onUnresolved != null && destination is Destination.DiscoveredItem) {
                                 onUnresolved()
                             } else {
                                 navigateTo(destination)
                                 lastCompletedSelection = key
                                 lastCompletedDestination = destination
+                                onNavigated?.invoke()
                             }
                         }
                     } finally {
                         if (generation == selectionGeneration) pendingSelection = null
+                        onFinished?.invoke()
                     }
                 }
         }

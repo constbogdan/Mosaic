@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -2530,7 +2532,7 @@ class BasicUiTests {
     }
 
     @Test
-    fun watchlist_random_focuses_settled_window_and_keeps_absolute_footer() {
+    fun watchlist_random_back_restores_random_button_without_replacing_grid() {
         fun row(id: Int) =
             WatchlistEntry(
                 MediaKey.Catalog(CatalogMediaType.MOVIE, id),
@@ -2541,10 +2543,7 @@ class BasicUiTests {
                 null,
                 DiscoverItem(id, SeerrItemType.MOVIE, "Saved $id", null, null, SeerrAvailability.UNKNOWN, null, null, null, null, null),
             )
-        val initial = listOf(row(1))
-        val target = (581..600).map(::row)
-        val previous = (561..580).map(::row)
-        val next = (601..620).map(::row)
+        val initial = (1..20).map(::row)
         val screen =
             MutableStateFlow(WatchlistScreenState(owner = "viewer", entries = initial, page = 1, totalPages = 50, totalResults = 990))
         val repository = mockk<WatchlistRepository>()
@@ -2552,20 +2551,14 @@ class BasicUiTests {
         val viewModel = mockk<WatchlistViewModel>(relaxed = true)
         every { viewModel.state } returns screen
         every { viewModel.repository } returns repository
+        var watchlistIsTop by mutableStateOf(true)
+        every { viewModel.isWatchlistTop() } answers { watchlistIsTop }
+        every { viewModel.consumeRandomReturnFocus() } answers {
+            screen.value = screen.value.copy(restoreRandomFocus = false)
+        }
         every { viewModel.random() } answers {
-            screen.value =
-                WatchlistScreenState(
-                    owner = "viewer",
-                    entries = previous + target + next,
-                    firstPage = 29,
-                    page = 31,
-                    totalPages = 50,
-                    totalResults = 990,
-                    focusedIndex = 26,
-                    focusedKey = target[6].key,
-                    gridEpoch = 1,
-                    randomFocusEpoch = 1,
-                )
+            watchlistIsTop = false
+            screen.value = screen.value.copy(restoreRandomFocus = true)
         }
         var exitCount = 0
         composeTestRule.setContent {
@@ -2574,29 +2567,27 @@ class BasicUiTests {
                 WatchlistPage(viewModel = viewModel)
             }
         }
-        composeTestRule.onNode(hasText("Saved 1", substring = true) and hasClickAction()).requestFocus().performKeyInput {
+        composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).requestFocus().performKeyInput {
             pressKey(Key.DirectionUp)
         }
         composeTestRule.onNodeWithContentDescription("Random").assertIsFocused()
         composeTestRule.onNodeWithContentDescription("Random").requestFocus().performClickEnter()
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("587 / 990").assertIsDisplayed()
-        io.mockk.verify { viewModel.position(26, any()) }
+        Assert.assertEquals(initial, screen.value.entries)
+        Assert.assertEquals(1, screen.value.firstPage)
+        Assert.assertEquals(1, screen.value.page)
         io.mockk.verify(exactly = 0) { viewModel.open(any()) }
-        composeTestRule
-            .onNode(
-                hasText("Saved 587", substring = true) and hasClickAction(),
-            ).assertIsFocused()
+        composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).requestFocus()
+        composeTestRule.runOnIdle { watchlistIsTop = true }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithContentDescription("Random").assertIsFocused()
+        Assert.assertEquals(false, screen.value.restoreRandomFocus)
+        composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).requestFocus().performClickEnter()
+        io.mockk.verify(exactly = 1) { viewModel.open(initial.first()) }
         composeTestRule.runOnUiThread { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
         composeTestRule.onNodeWithContentDescription("Random").assertIsFocused()
         Assert.assertEquals(0, exitCount)
         composeTestRule.runOnUiThread { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
         Assert.assertEquals(1, exitCount)
-
-        composeTestRule.runOnIdle {
-            screen.value = screen.value.copy(entries = (541..560).map(::row) + screen.value.entries, firstPage = 28, focusedIndex = 46)
-        }
-        composeTestRule.onNodeWithText("587 / 990").assertIsDisplayed()
-        io.mockk.verify(exactly = 0) { viewModel.open(any()) }
     }
 }

@@ -119,6 +119,31 @@ class WatchlistContractTest {
             }
         }
 
+    @Test fun identityOnlyPagePreservesPersonalFiltersAndTypedIdsWithoutArtwork() =
+        runTest {
+            val requests = mutableListOf<Request>()
+            val backend =
+                backend { request ->
+                    requests += request
+                    200 to """{"page":3,"totalPages":3,"totalResults":41,"source":"local","results":[
+                        {"tmdbId":645,"mediaType":"movie","title":"Movie","createdAt":"2026-11-10T00:00:00Z"}
+                    ]}"""
+                }
+            val filters = WatchlistFilters(WatchlistFilter.YES, WatchlistFilter.NO)
+            val page = backend.pageWithoutArtwork(WatchlistCategory.MOVIES, 3, filters)
+            assertEquals(41, page.totalResults)
+            assertEquals(MediaKey.Catalog(CatalogMediaType.MOVIE, 645), page.entries.single().key)
+            assertNull(page.entries.single().posterPath)
+            val request = requests.single()
+            assertEquals("me", request.url.queryParameter("owner"))
+            assertEquals("movies", request.url.queryParameter("category"))
+            assertEquals("added_desc", request.url.queryParameter("sort"))
+            assertEquals("not_watched", request.url.queryParameter("watched"))
+            assertEquals("active", request.url.queryParameter("libraryStatus"))
+            assertEquals("false", request.url.queryParameter("includeArtwork"))
+            assertEquals("3", request.url.queryParameter("page"))
+        }
+
     @Test fun everyCombinedFilterUsesServerPaginationTotalsAndNoPerCardMetadataRequests() =
         runTest {
             val requests = mutableListOf<Request>()

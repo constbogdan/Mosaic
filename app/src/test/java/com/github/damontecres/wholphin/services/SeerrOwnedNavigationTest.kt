@@ -23,6 +23,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -89,6 +90,83 @@ class SeerrOwnedNavigationTest {
                 gate.complete(Destination.MediaItem(UUID.randomUUID(), BaseItemKind.MOVIE))
                 runCurrent()
                 assertEquals(1, navigation.backStack.size)
+            } finally {
+                WholphinDispatchers.IO = previousIo
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun `random selection uses the same owned and Discover destinations for movies and series`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val previousIo = WholphinDispatchers.IO
+            Dispatchers.setMain(dispatcher)
+            WholphinDispatchers.IO = dispatcher
+            try {
+                val owner = mockk<CurrentUser>()
+                val servers = mockk<ServerRepository>()
+                every { servers.current } returns MutableStateFlow<CurrentUser?>(owner)
+                val resolver = mockk<SeerrOwnedNavigationResolver>()
+                val navigation = NavigationManager(resolver, servers)
+                navigation.navigateTo(Destination.Watchlist)
+                val movie = item.copy(id = 101, availability = SeerrAvailability.UNKNOWN)
+                val series = item.copy(id = 102, type = SeerrItemType.TV, availability = SeerrAvailability.UNKNOWN)
+                val unownedMovie = movie.copy(id = 103)
+                val unownedSeries = series.copy(id = 104)
+                val destinations =
+                    listOf(
+                        movie to Destination.MediaItem(UUID.randomUUID(), BaseItemKind.MOVIE),
+                        series to Destination.MediaItem(UUID.randomUUID(), BaseItemKind.SERIES),
+                        unownedMovie to Destination.DiscoveredItem(unownedMovie),
+                        unownedSeries to Destination.DiscoveredItem(unownedSeries),
+                    )
+                for ((selected, expected) in destinations) {
+                    coEvery { resolver.resolve(selected, owner) } returns expected
+                    var finished = false
+                    navigation.navigateToSeerrItem(selected, onFinished = { finished = true })
+                    runCurrent()
+                    assertEquals(expected, navigation.backStack.last())
+                    assertEquals(3, navigation.backStack.size)
+                    assertEquals(true, finished)
+                    navigation.goBack()
+                }
+            } finally {
+                WholphinDispatchers.IO = previousIo
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun `changed Watchlist context rejects a pending owned resolution`() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val previousIo = WholphinDispatchers.IO
+            Dispatchers.setMain(dispatcher)
+            WholphinDispatchers.IO = dispatcher
+            try {
+                val owner = mockk<CurrentUser>()
+                val servers = mockk<ServerRepository>()
+                every { servers.current } returns MutableStateFlow<CurrentUser?>(owner)
+                val resolver = mockk<SeerrOwnedNavigationResolver>()
+                val gate = CompletableDeferred<Destination?>()
+                coEvery { resolver.resolve(item, owner) } coAnswers { gate.await() }
+                val navigation = NavigationManager(resolver, servers)
+                navigation.navigateTo(Destination.Watchlist)
+                var current = true
+                var navigated = false
+                var finished = false
+                navigation.navigateToSeerrItem(
+                    item,
+                    canNavigate = { current },
+                    onNavigated = { navigated = true },
+                    onFinished = { finished = true },
+                )
+                runCurrent()
+                current = false
+                gate.complete(Destination.MediaItem(UUID.randomUUID(), BaseItemKind.MOVIE))
+                runCurrent()
+                assertEquals(Destination.Watchlist, navigation.backStack.last())
+                assertFalse(navigated)
+                assertEquals(true, finished)
             } finally {
                 WholphinDispatchers.IO = previousIo
                 Dispatchers.resetMain()

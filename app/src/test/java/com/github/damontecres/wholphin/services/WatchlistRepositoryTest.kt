@@ -18,6 +18,7 @@ import com.github.damontecres.wholphin.ui.detail.gridLeadingSlots
 import com.github.damontecres.wholphin.ui.watchlist.WatchlistViewModel
 import com.github.damontecres.wholphin.ui.watchlist.watchlistRandomTarget
 import com.github.damontecres.wholphin.util.WholphinDispatchers
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -46,6 +47,8 @@ import java.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WatchlistRepositoryTest {
+    private val opened = mutableListOf<DiscoverItem>()
+
     private class Store(
         initial: AppPreferences = AppPreferences.getDefaultInstance(),
     ) : DataStore<AppPreferences> {
@@ -76,6 +79,7 @@ class WatchlistRepositoryTest {
         val batches = mutableListOf<Set<MediaKey.Catalog>>()
         val reads = mutableListOf<Pair<WatchlistCategory, Int>>()
         val queries = mutableListOf<WatchlistFilters>()
+        val identityReads = mutableListOf<Pair<WatchlistCategory, Int>>()
         var additions = 0
         var removals = 0
         var lookup: (suspend (Set<MediaKey.Catalog>) -> Map<MediaKey.Catalog, Boolean>)? = null
@@ -89,6 +93,16 @@ class WatchlistRepositoryTest {
             filters: WatchlistFilters,
         ): WatchlistPage {
             reads += category to page
+            queries += filters
+            return filteredPageResult?.invoke(category, page, filters) ?: pageResult(category, page)
+        }
+
+        override suspend fun pageWithoutArtwork(
+            category: WatchlistCategory,
+            page: Int,
+            filters: WatchlistFilters,
+        ): WatchlistPage {
+            identityReads += category to page
             queries += filters
             return filteredPageResult?.invoke(category, page, filters) ?: pageResult(category, page)
         }
@@ -128,7 +142,16 @@ class WatchlistRepositoryTest {
             val backend = Backend()
             val repository =
                 WatchlistRepository(sessions ?: MutableStateFlow(WatchlistSession("A", backend) { true }), backgroundScope, { 100_000 })
-            val viewModel = WatchlistViewModel(repository, mockk(relaxed = true), preferences)
+            opened.clear()
+            val navigation = mockk<NavigationManager>(relaxed = true)
+            every { navigation.navigateToSeerrItem(any(), null, any(), any(), any()) } answers {
+                if (arg<() -> Boolean>(2).invoke()) {
+                    opened += firstArg<DiscoverItem>()
+                    arg<(() -> Unit)?>(3)?.invoke()
+                }
+                arg<(() -> Unit)?>(4)?.invoke()
+            }
+            val viewModel = WatchlistViewModel(repository, navigation, preferences)
             store.put("watchlist", viewModel)
             block(backend, repository, viewModel)
         } finally {
@@ -855,62 +878,43 @@ class WatchlistRepositoryTest {
         assertTrue(runCatching { watchlistRandomTarget(0) }.isFailure)
     }
 
-    @Test fun randomJumpFetchesOnlyTargetAndNeighborsThenBrowsesBothDirections() =
+    @Test fun emptyWatchlistDoesNotSelectAndSingleItemUsesTheCachedPage() =
+        screenTest { backend, _, viewModel ->
+            backend.pageResult = { _, page -> WatchlistPage(page, 1, 0, emptyList()) }
+            runCurrent()
+            viewModel.random()
+            runCurrent()
+            assertTrue(opened.isEmpty())
+            assertTrue(backend.identityReads.isEmpty())
+            backend.pageResult = { _, page -> WatchlistPage(page, 1, 1, listOf(entry(1000))) }
+            viewModel.refresh(force = true)
+            runCurrent()
+            viewModel.random()
+            runCurrent()
+            assertEquals(1000, opened.single().id)
+            assertTrue(backend.identityReads.isEmpty())
+        }
+
+    @Test fun randomOpensTargetWithoutChangingGridOrFetchingNeighbors() =
         screenTest { backend, _, viewModel ->
             backend.pageResult = { _, page ->
                 WatchlistPage(page, 50, 990, ((page - 1) * 20 + 1..page * 20).map(::entry))
             }
             runCurrent()
+            val original = viewModel.state.value
             viewModel.jumpToRandom(586)
             runCurrent()
-            assertEquals(listOf(1, 30, 29, 31), backend.reads.map { it.second })
-            val jumped = viewModel.state.value
-            assertEquals(29, jumped.firstPage)
-            assertEquals(31, jumped.page)
-            assertEquals(60, jumped.entries.size)
-            assertEquals(26, jumped.focusedIndex)
-            assertEquals(587, (jumped.firstPage - 1) * 20 + jumped.focusedIndex + 1)
-            assertEquals(1L, jumped.randomFocusEpoch)
-            assertEquals(587, jumped.entries[jumped.focusedIndex].key.tmdbId)
-
-            viewModel.position(0, 6)
-            runCurrent()
-            val previous = viewModel.state.value
-            assertEquals(28, previous.firstPage)
-            assertEquals(20, previous.focusedIndex)
-            assertEquals(561, (previous.firstPage - 1) * 20 + previous.focusedIndex + 1)
-            assertEquals(561, previous.entries[previous.focusedIndex].key.tmdbId)
-            viewModel.position(previous.entries.lastIndex, 6)
-            runCurrent()
-            assertEquals(32, viewModel.state.value.page)
-            assertEquals(
-                640,
-                viewModel.state.value.entries
-                    .last()
-                    .key.tmdbId,
-            )
-            assertEquals(listOf(1, 30, 29, 31, 28, 32), backend.reads.map { it.second })
-            viewModel.position(46, 6)
-            viewModel.refresh(force = true)
-            runCurrent()
-            assertEquals(46, viewModel.state.value.focusedIndex)
-            assertEquals(
-                587,
-                viewModel.state.value.entries[46]
-                    .key.tmdbId,
-            )
-            assertEquals(28, viewModel.state.value.firstPage)
-            val origin = viewModel.state.value.entries[46]
-            viewModel.open(origin)
-            assertEquals(origin.key, viewModel.state.value.focusedKey)
-            assertEquals(
-                origin.key,
-                viewModel.state.value.entries[viewModel.state.value.focusedIndex]
-                    .key,
-            )
+            assertEquals(listOf(1), backend.reads.map { it.second })
+            assertEquals(listOf(30), backend.identityReads.map { it.second })
+            assertEquals(587, opened.single().id)
+            assertEquals(original.entries, viewModel.state.value.entries)
+            assertEquals(original.firstPage, viewModel.state.value.firstPage)
+            assertEquals(original.focusedIndex, viewModel.state.value.focusedIndex)
+            assertEquals(original.gridEpoch, viewModel.state.value.gridEpoch)
+            assertTrue(viewModel.state.value.restoreRandomFocus)
         }
 
-    @Test fun randomJumpKeepsCombinedFiltersAndHandlesShortBoundaryPages() =
+    @Test fun randomKeepsCombinedFiltersAndHandlesShortBoundaryPages() =
         screenTest { backend, _, viewModel ->
             backend.filteredPageResult = { category, page, _ ->
                 val total = if (category == WatchlistCategory.MOVIES) 41 else 45
@@ -926,77 +930,63 @@ class WatchlistRepositoryTest {
             val current = viewModel.state.value
             assertEquals(WatchlistCategory.MOVIES, current.category)
             assertEquals(WatchlistFilters(WatchlistFilter.YES, WatchlistFilter.NO), current.filters)
-            assertEquals(3, current.page)
-            assertEquals(2, current.firstPage)
-            assertEquals(21, current.entries.size)
-            assertEquals(41, (current.firstPage - 1) * 20 + current.focusedIndex + 1)
-            assertEquals(listOf(3, 2), backend.reads.takeLast(2).map { it.second })
-            assertTrue(backend.queries.takeLast(2).all { it == current.filters })
+            assertEquals(1, current.page)
+            assertEquals(1, current.firstPage)
+            assertEquals(20, current.entries.size)
+            assertEquals(41, opened.single().id)
+            assertEquals(listOf(3), backend.identityReads.map { it.second })
+            assertEquals(current.filters, backend.queries.last())
             viewModel.jumpToRandom(0)
             runCurrent()
             assertEquals(1, viewModel.state.value.firstPage)
             assertEquals(0, viewModel.state.value.focusedIndex)
+            assertEquals(listOf(41, 1), opened.map { it.id })
+            assertEquals(listOf(3), backend.identityReads.map { it.second })
         }
 
-    @Test fun randomWaitsForNeighborsAndCanRetryAFailedAdjacentPage() =
-        screenTest { backend, _, viewModel ->
-            var failPrevious = true
+    @Test fun randomReusesCachedArtworkPageAndDoesNotCacheLightweightPage() =
+        screenTest { backend, repository, viewModel ->
             backend.pageResult = { _, page ->
-                if (page == 29 && failPrevious) throw IOException("offline")
-                WatchlistPage(page, 50, 990, ((page - 1) * 20 + 1..page * 20).map(::entry))
+                WatchlistPage(page, 3, 45, ((page - 1) * 20 + 1..minOf(page * 20, 45)).map(::entry))
             }
             runCurrent()
-            viewModel.jumpToRandom(586)
-            runCurrent()
-            assertEquals(29, viewModel.state.value.failedPage)
-            assertEquals(40, viewModel.state.value.entries.size)
-            assertEquals(
-                587,
-                viewModel.state.value.entries[viewModel.state.value.focusedIndex]
-                    .key.tmdbId,
-            )
-            failPrevious = false
-            viewModel.retry()
-            runCurrent()
-            assertEquals(29, viewModel.state.value.firstPage)
-            assertEquals(
-                587,
-                viewModel.state.value.entries[viewModel.state.value.focusedIndex]
-                    .key.tmdbId,
-            )
-            viewModel.jumpToRandom(586)
             viewModel.jumpToRandom(0)
             runCurrent()
-            assertEquals(1, viewModel.state.value.firstPage)
-            assertEquals(
-                1,
-                viewModel.state.value.entries[viewModel.state.value.focusedIndex]
-                    .key.tmdbId,
-            )
-            assertEquals(1, backend.reads.count { it.second == 30 })
+            assertEquals(1, opened.single().id)
+            assertTrue(backend.identityReads.isEmpty())
+            viewModel.consumeRandomReturnFocus()
+            viewModel.jumpToRandom(24)
+            runCurrent()
+            assertEquals(listOf(2), backend.identityReads.map { it.second })
+            assertEquals(25, opened.last().id)
+            repository.page(WatchlistCategory.ALL, 2)
+            assertEquals(listOf(1, 2), backend.reads.map { it.second })
+            assertEquals(listOf(2), backend.identityReads.map { it.second })
+            viewModel.jumpToRandom(24)
+            runCurrent()
+            assertEquals(listOf(2), backend.identityReads.map { it.second })
         }
 
-    @Test fun randomDoesNotPublishOrMoveFocusUntilAdjacentPagesSettle() =
+    @Test fun rapidRandomPressesAndBackCancelTheOnlyPendingLookup() =
         screenTest { backend, _, viewModel ->
-            val neighborGate = CompletableDeferred<Unit>()
+            val targetGate = CompletableDeferred<Unit>()
             backend.pageResult = { _, page ->
-                if (page == 29) neighborGate.await()
+                if (page == 30) targetGate.await()
                 WatchlistPage(page, 50, 990, ((page - 1) * 20 + 1..page * 20).map(::entry))
             }
             runCurrent()
             viewModel.jumpToRandom(586)
             runCurrent()
+            viewModel.jumpToRandom(123)
             assertEquals(20, viewModel.state.value.entries.size)
-            assertEquals(0L, viewModel.state.value.randomFocusEpoch)
-            assertEquals(listOf(1, 30, 29), backend.reads.map { it.second })
-            neighborGate.complete(Unit)
+            assertTrue(viewModel.state.value.randomPending)
+            assertEquals(listOf(30), backend.identityReads.map { it.second })
+            viewModel.cancelRandom()
+            targetGate.complete(Unit)
             runCurrent()
-            val settled = viewModel.state.value
-            assertEquals(60, settled.entries.size)
-            assertEquals(587, settled.focusedKey?.tmdbId)
-            assertEquals(587, settled.entries[settled.focusedIndex].key.tmdbId)
-            assertEquals(1L, settled.randomFocusEpoch)
-            assertEquals(listOf(1, 30, 29, 31), backend.reads.map { it.second })
+            assertTrue(opened.isEmpty())
+            assertFalse(viewModel.state.value.randomPending)
+            assertFalse(viewModel.state.value.restoreRandomFocus)
         }
 
     @Test fun categoryResetRejectsDelayedRandomPage() =
@@ -1024,7 +1014,28 @@ class WatchlistRepositoryTest {
                 viewModel.state.value.entries
                     .map { it.key.tmdbId },
             )
-            assertEquals(0L, viewModel.state.value.randomFocusEpoch)
+            assertTrue(opened.isEmpty())
+        }
+
+    @Test fun filterChangeCancelsPendingRandomAndRejectsOldFilteredIdentity() =
+        screenTest { backend, _, viewModel ->
+            val gate = CompletableDeferred<Unit>()
+            backend.filteredPageResult = { _, page, filters ->
+                if (page == 2 && filters == WatchlistFilters()) withContext(NonCancellable) { gate.await() }
+                val total = if (filters == WatchlistFilters()) 40 else 1
+                WatchlistPage(page, (total + 19) / 20, total, ((page - 1) * 20 + 1..minOf(page * 20, total)).map(::entry))
+            }
+            runCurrent()
+            viewModel.jumpToRandom(20)
+            runCurrent()
+            viewModel.owned(WatchlistFilter.NO)
+            runCurrent()
+            gate.complete(Unit)
+            runCurrent()
+            assertEquals(WatchlistFilter.NO, viewModel.state.value.filters.owned)
+            assertEquals(1, viewModel.state.value.totalResults)
+            assertTrue(opened.isEmpty())
+            assertFalse(viewModel.state.value.randomPending)
         }
 
     @Test fun shiftedPageDoesNotSilentlyDeduplicateAbsolutePositions() =
@@ -1064,12 +1075,8 @@ class WatchlistRepositoryTest {
             viewModel.retry()
             runCurrent()
             assertNull(viewModel.state.value.error)
-            assertEquals(
-                587,
-                viewModel.state.value.entries[viewModel.state.value.focusedIndex]
-                    .key.tmdbId,
-            )
-            assertEquals(2, backend.reads.count { it.second == 30 })
+            assertEquals(587, opened.single().id)
+            assertEquals(2, backend.identityReads.count { it.second == 30 })
         }
 
     @Test fun randomTargetRecountsOnceWhenTheFilteredTotalShrinks() =
@@ -1087,12 +1094,34 @@ class WatchlistRepositoryTest {
             total = 21
             viewModel.jumpToRandom(586)
             runCurrent()
-            assertEquals(21, viewModel.state.value.totalResults)
             assertNull(viewModel.state.value.error)
-            val current = viewModel.state.value
-            assertTrue((current.firstPage - 1) * 20 + current.focusedIndex in 0 until 21)
-            assertEquals(1, backend.reads.count { it.second == 30 })
-            assertTrue(backend.reads.size <= 5)
+            assertTrue(opened.single().id in 1..21)
+            assertEquals(1, backend.identityReads.count { it.second == 30 })
+            assertTrue(backend.reads.size + backend.identityReads.size <= 4)
+        }
+
+    @Test fun randomRecountHandlesWatchlistBecomingEmptyWithoutNavigation() =
+        screenTest { backend, _, viewModel ->
+            var total = 40
+            backend.pageResult = { _, page ->
+                if (total == 0) {
+                    if (page > 1) throw IllegalArgumentException("page disappeared")
+                    WatchlistPage(1, 1, 0, emptyList())
+                } else {
+                    WatchlistPage(page, 2, total, ((page - 1) * 20 + 1..page * 20).map(::entry))
+                }
+            }
+            runCurrent()
+            total = 0
+            viewModel.jumpToRandom(20)
+            runCurrent()
+            assertEquals(0, viewModel.state.value.totalResults)
+            assertTrue(
+                viewModel.state.value.entries
+                    .isEmpty(),
+            )
+            assertFalse(viewModel.state.value.randomPending)
+            assertTrue(opened.isEmpty())
         }
 
     @Test fun ownerChangeCannotRestoreAnOldRandomTarget() {
@@ -1119,7 +1148,7 @@ class WatchlistRepositoryTest {
                 viewModel.state.value.entries
                     .map { it.key.tmdbId },
             )
-            assertEquals(0L, viewModel.state.value.randomFocusEpoch)
+            assertTrue(opened.isEmpty())
         }
     }
 }
