@@ -10,8 +10,10 @@ import com.github.damontecres.wholphin.data.model.WatchlistFilter
 import com.github.damontecres.wholphin.data.model.WatchlistFilters
 import com.github.damontecres.wholphin.data.model.watchlistFocusAfterRemoval
 import com.github.damontecres.wholphin.preferences.AppPreferences
+import com.github.damontecres.wholphin.services.BackdropService
 import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.services.WatchlistRepository
+import com.github.damontecres.wholphin.ui.components.ViewOptions
 import com.github.damontecres.wholphin.ui.nav.Destination
 import com.github.damontecres.wholphin.util.WholphinDispatchers
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,6 +25,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import kotlin.random.Random
 
@@ -64,7 +68,21 @@ data class WatchlistScreenState(
     val randomPending: Boolean = false,
     val restoreRandomFocus: Boolean = false,
     val failedRandomIndex: Int? = null,
+    val viewOptions: ViewOptions = ViewOptions(),
 )
+
+internal fun watchlistViewOptions(value: String?): ViewOptions =
+    runCatching { value?.let { Json.decodeFromString<ViewOptions>(it) } }
+        .getOrNull()
+        ?.let {
+            ViewOptions(
+                columns = it.columns.coerceIn(1, 12),
+                spacing = it.spacing.coerceIn(0, 32),
+                showBackdrop = it.showBackdrop,
+                showTitles = it.showTitles,
+            )
+        }
+        ?: ViewOptions()
 
 @HiltViewModel
 class WatchlistViewModel
@@ -73,12 +91,23 @@ class WatchlistViewModel
         val repository: WatchlistRepository,
         private val navigation: NavigationManager,
         private val preferences: DataStore<AppPreferences>,
+        private val backdropService: BackdropService,
     ) : ViewModel() {
         val state = MutableStateFlow(WatchlistScreenState())
         private var load: Job? = null
         private var generation = 0L
         private var lastRefresh = 0L
         private var columns: Int? = null
+        private var viewportRows: Int? = null
+
+        suspend fun updateBackdrop(entry: WatchlistEntry?) {
+            val url = entry?.item?.backDropUrl
+            if (url.isNullOrBlank()) {
+                backdropService.clearBackdrop()
+            } else {
+                backdropService.submit(entry.gridId, url)
+            }
+        }
 
         init {
             viewModelScope.launch {
@@ -93,6 +122,8 @@ class WatchlistViewModel
                         // Hide the old user's rows and selections before reading the new context.
                         state.value =
                             if (ownerChanged) {
+                                columns = null
+                                viewportRows = null
                                 WatchlistScreenState()
                             } else {
                                 previous.copy(loading = false, randomPending = false, restoreRandomFocus = false)
@@ -104,11 +135,17 @@ class WatchlistViewModel
                                 )
                         } else if (!busy) {
                             if (ownerChanged) {
-                                val saved = preferences.data.first().watchlistFiltersMap[owner]
+                                val saved = preferences.data.first()
                                 if (repository.state.value.owner != owner) return@collect
-                                state.value = WatchlistScreenState(owner = owner, filters = WatchlistFilters.decode(saved))
+                                state.value =
+                                    WatchlistScreenState(
+                                        owner = owner,
+                                        filters = WatchlistFilters.decode(saved.watchlistFiltersMap[owner]),
+                                        viewOptions = watchlistViewOptions(saved.watchlistViewOptionsMap[owner]),
+                                    )
+                                columns = state.value.viewOptions.columns
                             }
-                            refresh(force = true)
+                            refresh(force = true, eagerInitialFill = ownerChanged)
                         }
                     }
             }
@@ -118,8 +155,14 @@ class WatchlistViewModel
             if (category == state.value.category) return
             load?.cancel()
             generation++
-            state.value = WatchlistScreenState(owner = state.value.owner, category = category, filters = state.value.filters)
-            refresh(force = true)
+            state.value =
+                WatchlistScreenState(
+                    owner = state.value.owner,
+                    category = category,
+                    filters = state.value.filters,
+                    viewOptions = state.value.viewOptions,
+                )
+            refresh(force = true, eagerInitialFill = true)
         }
 
         fun owned(value: WatchlistFilter) = updateFilters { it.copy(owned = value) }
@@ -141,8 +184,14 @@ class WatchlistViewModel
                     if (filters == state.value.filters) return@launch
                     load?.cancel()
                     generation++
-                    state.value = WatchlistScreenState(owner = owner, category = state.value.category, filters = filters)
-                    refresh(force = true)
+                    state.value =
+                        WatchlistScreenState(
+                            owner = owner,
+                            category = state.value.category,
+                            filters = filters,
+                            viewOptions = state.value.viewOptions,
+                        )
+                    refresh(force = true, eagerInitialFill = true)
                 } catch (cancel: CancellationException) {
                     throw cancel
                 } catch (_: Exception) {
@@ -155,10 +204,34 @@ class WatchlistViewModel
             }
         }
 
-        fun refresh(force: Boolean = false) {
+        fun refresh(
+            force: Boolean = false,
+            eagerInitialFill: Boolean = false,
+        ) {
             if (state.value.owner == null || state.value.loading) return
             if (!force && System.currentTimeMillis() - lastRefresh < 60_000) return
-            request(state.value.firstPage, force = true)
+            request(state.value.firstPage, force = true, eagerInitialFill = eagerInitialFill)
+        }
+
+        fun saveViewOptions(value: ViewOptions) {
+            val owner = state.value.owner ?: return
+            // Only the options actually rendered by Watchlist may be persisted here.
+            val options =
+                ViewOptions(
+                    columns = value.columns.coerceIn(1, 12),
+                    spacing = value.spacing.coerceIn(0, 32),
+                    showBackdrop = value.showBackdrop,
+                    showTitles = value.showTitles,
+                )
+            if (options == state.value.viewOptions) return
+            state.value = state.value.copy(viewOptions = options)
+            columns = options.columns
+            prefetch()
+            viewModelScope.launch {
+                preferences.updateData { current ->
+                    current.toBuilder().putWatchlistViewOptions(owner, Json.encodeToString(options)).build()
+                }
+            }
         }
 
         fun position(
@@ -172,19 +245,31 @@ class WatchlistViewModel
             prefetch()
         }
 
+        fun viewportRows(
+            columns: Int,
+            rows: Int,
+        ) {
+            this.columns = columns.coerceAtLeast(1)
+            viewportRows = rows.coerceAtLeast(1)
+            prefetch()
+        }
+
         private fun prefetch() {
             val current = state.value
             if (current.loading || current.randomPending || current.error != null || current.entries.isEmpty()) return
-            // The grid reports its configured fixed-column count on focus. Do not infer
-            // a row distance from the API's unrelated 20-item page size before that.
+            // Initial fill uses saved columns before layout; the grid replaces them with
+            // measured columns once it reports its viewport. API pages remain fixed at 20.
             val columns = columns ?: return
-            // Preserve the existing three-row lead at either edge of a loaded window.
+            // Fill the visible grid even while the ribbon owns focus, then keep three
+            // additional rows ahead. API pages remain fixed at 20 entries.
+            val aheadCount = (current.focusedIndex + ((viewportRows ?: 0) + 3) * columns).coerceAtMost(current.totalResults)
             when {
                 current.firstPage > 1 && current.focusedIndex < columns * 3 -> {
                     request(current.firstPage - 1, force = false)
                 }
 
-                current.page < current.totalPages && current.focusedIndex >= current.entries.size - columns * 3 -> {
+                current.page < current.totalPages &&
+                    (current.entries.size < aheadCount || current.focusedIndex >= current.entries.size - columns * 3) -> {
                     request(current.page + 1, force = false)
                 }
             }
@@ -331,6 +416,7 @@ class WatchlistViewModel
         private fun request(
             page: Int,
             force: Boolean,
+            eagerInitialFill: Boolean = false,
         ) {
             val token = ++generation
             val current = state.value
@@ -396,7 +482,7 @@ class WatchlistViewModel
                         lastRefresh = System.currentTimeMillis()
                         // Focus may have advanced while the page was in flight. Recheck once;
                         // the loading guard and new boundary keep requests sequential and bounded.
-                        if (page > 1) prefetch()
+                        if (page > 1 || eagerInitialFill) prefetch()
                     } catch (cancel: CancellationException) {
                         throw cancel
                     } catch (error: Exception) {

@@ -1,9 +1,12 @@
 package com.github.damontecres.wholphin.ui.collections
 
+import androidx.datastore.core.DataStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.damontecres.wholphin.api.seerr.infrastructure.ClientException
 import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionsResponse
+import com.github.damontecres.wholphin.preferences.AppPreferences
+import com.github.damontecres.wholphin.services.BackdropService
 import com.github.damontecres.wholphin.services.COLLECTION_PAGE_SIZE
 import com.github.damontecres.wholphin.services.CollectionsEntry
 import com.github.damontecres.wholphin.services.CollectionsFilter
@@ -12,13 +15,17 @@ import com.github.damontecres.wholphin.services.CollectionsSession
 import com.github.damontecres.wholphin.services.CollectionsSessionSource
 import com.github.damontecres.wholphin.services.CollectionsSort
 import com.github.damontecres.wholphin.services.NavigationManager
+import com.github.damontecres.wholphin.ui.components.ViewOptions
 import com.github.damontecres.wholphin.ui.nav.Destination
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.util.UUID
 import javax.inject.Inject
 
@@ -38,7 +45,20 @@ internal data class CollectionsScreenState(
     val focusedKey: String? = null,
     val focusedIndex: Int = 0,
     val gridEpoch: Long = 0,
+    val viewOptions: ViewOptions = ViewOptions(),
 )
+
+internal fun collectionsViewOptions(value: String?): ViewOptions =
+    runCatching { value?.let { Json.decodeFromString<ViewOptions>(it) } }
+        .getOrNull()
+        ?.let {
+            ViewOptions(
+                columns = it.columns.coerceIn(1, 12),
+                spacing = it.spacing.coerceIn(0, 32),
+                showBackdrop = it.showBackdrop,
+                showTitles = it.showTitles,
+            )
+        } ?: ViewOptions()
 
 internal fun validateCollectionsPage(
     result: CollectionsPageData,
@@ -64,12 +84,15 @@ internal class CollectionsViewModel
     constructor(
         source: CollectionsSessionSource,
         private val navigation: NavigationManager,
+        private val preferences: DataStore<AppPreferences>,
+        private val backdropService: BackdropService,
     ) : ViewModel() {
         val state = MutableStateFlow(CollectionsScreenState())
         private var session: CollectionsSession? = null
         private var load: Job? = null
         private var generation = 0L
         private var columns = 6
+        private var viewportRows: Int? = null
         private var pendingPolls = 0
 
         init {
@@ -80,8 +103,37 @@ internal class CollectionsViewModel
                     generation++
                     session = next
                     pendingPolls = 0
+                    viewportRows = null
                     state.value = CollectionsScreenState(owner = next?.owner)
-                    if (next != null) request(0)
+                    if (next != null) {
+                        val saved = preferences.data.first()
+                        if (session !== next || !next.isCurrent()) return@collect
+                        val options = collectionsViewOptions(saved.collectionsViewOptionsMap[next.owner])
+                        state.value = CollectionsScreenState(owner = next.owner, viewOptions = options)
+                        columns = options.columns
+                        request(0)
+                    }
+                }
+            }
+        }
+
+        fun isCollectionsTop() = navigation.backStack.lastOrNull() == Destination.Collections
+
+        suspend fun updateBackdrop(entry: CollectionsEntry?) {
+            val url = entry?.backdropUrl
+            if (url.isNullOrBlank()) backdropService.clearBackdrop() else backdropService.submit(entry.gridId, url)
+        }
+
+        fun saveViewOptions(value: ViewOptions) {
+            val owner = state.value.owner ?: return
+            val options = collectionsViewOptions(Json.encodeToString(value))
+            if (options == state.value.viewOptions) return
+            state.value = state.value.copy(viewOptions = options)
+            columns = options.columns
+            prefetch()
+            viewModelScope.launch {
+                preferences.updateData { current ->
+                    current.toBuilder().putCollectionsViewOptions(owner, Json.encodeToString(options)).build()
                 }
             }
         }
@@ -104,6 +156,7 @@ internal class CollectionsViewModel
                     filter = before.filter,
                     sort = before.sort,
                     gridEpoch = before.gridEpoch + 1,
+                    viewOptions = before.viewOptions,
                 )
             request(0)
         }
@@ -124,8 +177,23 @@ internal class CollectionsViewModel
             val current = state.value
             val key = current.entries.getOrNull(index)?.gridId ?: return
             state.value = current.copy(focusedKey = key, focusedIndex = index)
+            prefetch()
+        }
+
+        fun viewportRows(
+            countColumns: Int,
+            rows: Int,
+        ) {
+            columns = countColumns.coerceAtLeast(1)
+            viewportRows = rows.coerceAtLeast(1)
+            prefetch()
+        }
+
+        private fun prefetch() {
+            val current = state.value
+            val ahead = (current.focusedIndex + ((viewportRows ?: 0) + 3) * columns).coerceAtMost(current.total)
             if (!current.loading && current.error == null && !current.denied && current.entries.size < current.total &&
-                index >= current.entries.size - columns * 3
+                (current.entries.size < ahead || current.focusedIndex >= current.entries.size - columns * 3)
             ) {
                 request(current.entries.size)
             }
@@ -183,6 +251,7 @@ internal class CollectionsViewModel
                                 focusedIndex = index,
                                 gridEpoch = if (skip == 0) before.gridEpoch + 1 else before.gridEpoch,
                             )
+                        if (result.status == LibraryCollectionsResponse.Status.COMPLETE) prefetch()
                         if (result.status == LibraryCollectionsResponse.Status.PENDING && entries.isEmpty() && pendingPolls++ < 5) {
                             delay(2_000)
                             if (token == generation && active.isCurrent()) request(0)

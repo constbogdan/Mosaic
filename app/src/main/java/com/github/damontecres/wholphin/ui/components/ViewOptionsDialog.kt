@@ -56,6 +56,7 @@ fun ViewOptionsDialog(
     onViewOptionsChange: (ViewOptions) -> Unit,
     defaultViewOptions: ViewOptions = ViewOptions(),
     showArtistSource: Boolean = false,
+    optionsOverride: List<AppPreference<ViewOptions, out Any?>>? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.tryRequestFocus() }
@@ -73,8 +74,8 @@ fun ViewOptionsDialog(
             window.setDimAmount(0f)
         }
         val options =
-            remember(viewOptions.type, showArtistSource) {
-                when (viewOptions.type) {
+            remember(viewOptions.type, showArtistSource, optionsOverride) {
+                optionsOverride ?: when (viewOptions.type) {
                     ViewOptionsType.GRID -> ViewOptions.buildGridOptions(showArtistSource)
                     ViewOptionsType.LIST -> ViewOptions.buildListOptions(showArtistSource)
                     ViewOptionsType.DENSE_LIST -> ViewOptions.buildListOptions(showArtistSource)

@@ -27,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -47,6 +48,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.Button
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
@@ -98,6 +102,12 @@ internal fun SeerrCollectionDetails(
     var memberFocusEpoch by remember(destination.entryToken) { mutableStateOf(0L) }
     var similarFocusEpoch by remember(destination.entryToken) { mutableStateOf(0L) }
     var entryFocusRestored by remember(destination.entryToken) { mutableStateOf(false) }
+    val entryLifecycleOwner = LocalLifecycleOwner.current
+    var entryResumed by remember(destination.entryToken, entryLifecycleOwner) {
+        mutableStateOf(entryLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { entryResumed = true }
+    LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { entryResumed = false }
     val posterActionable =
         state.owner == destination.owner && state.details != null && !state.loading && !state.error && !state.denied &&
             !state.requestEligibilityLoading &&
@@ -281,13 +291,29 @@ internal fun SeerrCollectionDetails(
                         ?: movies.firstOrNull()?.let { "tmdb:movie:${it.id}" }
                 val similarFocusTargetId =
                     (state.similarFocusedId ?: lastSimilarFocusId)?.takeIf { id -> state.similar.any { it.id == id } }
-                LaunchedEffect(state.details, state.similar.isNotEmpty(), destination.entryToken) {
-                    if (!entryFocusRestored) {
+                LaunchedEffect(state.details, state.similar.isNotEmpty(), destination.entryToken, entryResumed) {
+                    if (!entryFocusRestored && entryResumed && state.owner == destination.owner &&
+                        state.collectionId == destination.collectionId
+                    ) {
                         if (state.similarFocusedId != null && state.similar.isEmpty()) return@LaunchedEffect
-                        entryFocusRestored = true
-                        when {
-                            state.similarFocusedId != null -> similarFocusEpoch++
-                            else -> memberFocusEpoch++
+                        val target =
+                            if (state.similarFocusedId != null) CollectionFocusSection.SIMILAR else CollectionFocusSection.MOVIES
+                        if (target == CollectionFocusSection.SIMILAR) similarFocusEpoch++ else memberFocusEpoch++
+                        // A new nested entry can load before its navigation transition has
+                        // completed. Confirm focus actually moved; one request is not enough.
+                        repeat(45) { attempt ->
+                            withFrameNanos { }
+                            if (!entryResumed || focusSection != null) {
+                                entryFocusRestored = focusSection == target
+                                return@LaunchedEffect
+                            }
+                            if (attempt % 3 == 0) {
+                                if (target == CollectionFocusSection.SIMILAR) {
+                                    similarFocus.tryRequestFocus()
+                                } else {
+                                    gridFocus.tryRequestFocus()
+                                }
+                            }
                         }
                     }
                 }

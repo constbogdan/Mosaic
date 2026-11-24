@@ -1,12 +1,16 @@
 package com.github.damontecres.wholphin.ui.collections
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,18 +21,26 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -42,15 +54,35 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionsResponse
+import com.github.damontecres.wholphin.preferences.AppPreference
 import com.github.damontecres.wholphin.services.CollectionsEntry
 import com.github.damontecres.wholphin.services.CollectionsFilter
 import com.github.damontecres.wholphin.services.CollectionsSort
+import com.github.damontecres.wholphin.ui.AppColors
 import com.github.damontecres.wholphin.ui.AspectRatios
 import com.github.damontecres.wholphin.ui.cards.ItemCardImage
 import com.github.damontecres.wholphin.ui.components.ExpandableFaButton
 import com.github.damontecres.wholphin.ui.components.LoadingPage
+import com.github.damontecres.wholphin.ui.components.ViewOptions
+import com.github.damontecres.wholphin.ui.components.ViewOptionsDialog
 import com.github.damontecres.wholphin.ui.detail.CardGrid
 import com.github.damontecres.wholphin.ui.tryRequestFocus
+
+private val collectionsPresentationOptions =
+    listOf<AppPreference<ViewOptions, out Any?>>(
+        ViewOptions.ViewOptionsColumns,
+        ViewOptions.ViewOptionsSpacing,
+        ViewOptions.ViewOptionsShowTitles,
+        ViewOptions.ViewOptionsBackdrop,
+        ViewOptions.ViewOptionsReset,
+    )
+
+private fun CollectionsFilter.icon() =
+    when (this) {
+        CollectionsFilter.ALL -> R.string.fa_list_ul
+        CollectionsFilter.INCOMPLETE -> R.string.fa_filter
+        CollectionsFilter.COMPLETE -> R.string.fa_check
+    }
 
 @Composable
 internal fun CollectionsPage(
@@ -58,55 +90,128 @@ internal fun CollectionsPage(
     viewModel: CollectionsViewModel = hiltViewModel(),
 ) {
     val state = viewModel.state.collectAsState().value
-    val filterFocus = remember { FocusRequester() }
-    var toolbarHasFocus by remember(state.owner) { mutableStateOf(false) }
+    var ribbonVisible by remember(state.owner) { mutableStateOf(false) }
+    var ribbonHasFocus by remember(state.owner) { mutableStateOf(false) }
     var gridHasFocus by remember(state.owner, state.filter, state.sort) { mutableStateOf(false) }
-    var restoreFocusEpoch by remember(state.owner, state.filter, state.sort) { mutableStateOf(0L) }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        if (!toolbarHasFocus && state.focusedKey != null) restoreFocusEpoch++
+    var requestFilterFocus by remember(state.owner) { mutableStateOf(false) }
+    var showViewOptions by remember(state.owner) { mutableStateOf(false) }
+    var restoreViewOptionsFocus by remember(state.owner) { mutableStateOf(false) }
+    var restoreFocusEpoch by remember(state.owner, state.filter, state.sort) { mutableLongStateOf(0L) }
+    var backToTopEpoch by remember(state.owner, state.filter, state.sort, state.gridEpoch, state.viewOptions.columns) {
+        mutableLongStateOf(0L)
     }
-    BackHandler(enabled = gridHasFocus && state.entries.isNotEmpty()) { filterFocus.tryRequestFocus() }
-    Column(modifier.fillMaxSize()) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 72.dp, start = 16.dp, end = 40.dp)
-                    .onFocusChanged { toolbarHasFocus = it.hasFocus }
-                    .focusGroup(),
+    val filterFocusRequesters = remember(state.owner) { CollectionsFilter.entries.associateWith { FocusRequester() } }
+    val gridFocusRequester = remember(state.owner, state.filter, state.sort) { FocusRequester() }
+    val viewOptionsFocusRequester = remember(state.owner) { FocusRequester() }
+    val retryFocusRequester = remember(state.owner) { FocusRequester() }
+    val isTop = viewModel.isCollectionsTop()
+    val focused = state.entries.getOrNull(state.focusedIndex)
+    LaunchedEffect(isTop, state.viewOptions.showBackdrop, focused?.gridId, focused?.backdropUrl) {
+        if (isTop) viewModel.updateBackdrop(focused.takeIf { state.viewOptions.showBackdrop })
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (!ribbonHasFocus && state.focusedKey != null) restoreFocusEpoch++
+    }
+    BackHandler(enabled = isTop && gridHasFocus && state.entries.isNotEmpty() && state.focusedIndex >= state.viewOptions.columns) {
+        ribbonVisible = true
+        backToTopEpoch++
+    }
+    LaunchedEffect(state.owner, state.loading, state.entries.isEmpty(), state.status, state.error) {
+        // An uninitialized or PENDING result is transient. Revealing and focusing
+        // the ribbon here makes the first populated grid collapse under focus.
+        if (state.entries.isEmpty() && !state.loading && (state.owner != null || state.error != null) &&
+            (
+                state.error != null || state.denied ||
+                    (state.status != null && state.status != LibraryCollectionsResponse.Status.PENDING)
+            )
         ) {
-            val sortTitle = collectionsSortTitle(state.sort)
-            val sortLabel = stringResource(sortTitle)
-            ExpandableFaButton(
-                title = sortTitle,
-                iconStringRes = R.string.fa_clock,
-                onClick = { viewModel.sort(CollectionsSort.entries[(state.sort.ordinal + 1) % CollectionsSort.entries.size]) },
-                enabled = state.owner != null,
-                modifier = Modifier.semantics { contentDescription = "Sort: $sortLabel" },
-            )
-            val filterTitle = collectionsFilterTitle(state.filter)
-            val filterLabel = stringResource(filterTitle)
-            ExpandableFaButton(
-                title = filterTitle,
-                iconStringRes = R.string.fa_filter,
-                onClick = { viewModel.filter(CollectionsFilter.entries[(state.filter.ordinal + 1) % CollectionsFilter.entries.size]) },
-                enabled = state.owner != null,
-                modifier = Modifier.focusRequester(filterFocus).semantics { contentDescription = "Filter: $filterLabel" },
-            )
+            ribbonVisible = true
+            if (state.error != null && state.owner != null && !ribbonHasFocus) {
+                withFrameNanos { }
+                retryFocusRequester.tryRequestFocus()
+            } else if (state.error == null && !ribbonHasFocus) {
+                requestFilterFocus = true
+            }
+        }
+    }
+    LaunchedEffect(ribbonVisible, requestFilterFocus, state.filter) {
+        if (ribbonVisible && requestFilterFocus) {
+            withFrameNanos { }
+            if (filterFocusRequesters[state.filter]?.tryRequestFocus() == true) requestFilterFocus = false
+        }
+    }
+    LaunchedEffect(restoreViewOptionsFocus, showViewOptions) {
+        if (restoreViewOptionsFocus && !showViewOptions) {
+            withFrameNanos { }
+            if (viewOptionsFocusRequester.tryRequestFocus()) restoreViewOptionsFocus = false
+        }
+    }
+    Column(modifier.fillMaxSize()) {
+        AnimatedVisibility(visible = ribbonVisible, enter = expandVertically(), exit = shrinkVertically()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, top = 16.dp, end = 40.dp, bottom = 4.dp)
+                        .onFocusChanged { ribbonHasFocus = it.hasFocus }
+                        .focusGroup()
+                        .onPreviewKeyEvent {
+                            it.type == KeyEventType.KeyDown && it.key == Key.DirectionDown &&
+                                state.entries.isNotEmpty() && gridFocusRequester.tryRequestFocus()
+                        },
+            ) {
+                CollectionsFilter.entries.forEach { filter ->
+                    val description = stringResource(collectionsFilterTitle(filter))
+                    ExpandableFaButton(
+                        title = collectionsFilterTitle(filter),
+                        iconStringRes = filter.icon(),
+                        iconColor = if (state.filter == filter) AppColors.Discover.Blue else Color.Unspecified,
+                        onClick = { viewModel.filter(filter) },
+                        enabled = state.owner != null,
+                        modifier =
+                            Modifier.focusRequester(filterFocusRequesters.getValue(filter)).semantics {
+                                selected = state.filter == filter
+                                contentDescription = description
+                            },
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                val optionsDescription = stringResource(R.string.view_options)
+                ExpandableFaButton(
+                    title = R.string.view_options,
+                    iconStringRes = R.string.fa_sliders,
+                    onClick = { showViewOptions = true },
+                    enabled = state.owner != null,
+                    modifier = Modifier.focusRequester(viewOptionsFocusRequester).semantics { contentDescription = optionsDescription },
+                )
+                val sortTitle = collectionsSortTitle(state.sort)
+                val sortLabel = stringResource(sortTitle)
+                ExpandableFaButton(
+                    title = sortTitle,
+                    iconStringRes = R.string.fa_clock,
+                    onClick = { viewModel.sort(CollectionsSort.entries[(state.sort.ordinal + 1) % CollectionsSort.entries.size]) },
+                    enabled = state.owner != null,
+                    modifier = Modifier.semantics { contentDescription = "Sort: $sortLabel" },
+                )
+            }
         }
         if (state.status == LibraryCollectionsResponse.Status.PARTIAL || state.failedCollections > 0) {
             Text(stringResource(R.string.collections_partial), Modifier.padding(8.dp))
         }
         if (state.error != null) {
             Text(state.error, Modifier.padding(16.dp))
-            Button(onClick = viewModel::retry, enabled = state.owner != null && !state.loading) {
+            Button(
+                onClick = viewModel::retry,
+                enabled = state.owner != null && !state.loading,
+                modifier = Modifier.focusRequester(retryFocusRequester),
+            ) {
                 Text(stringResource(R.string.retry))
             }
         }
         if (state.loading && state.entries.isEmpty()) {
-            LoadingPage(Modifier.weight(1f), focusEnabled = !toolbarHasFocus)
+            LoadingPage(Modifier.weight(1f), focusEnabled = !ribbonHasFocus)
         } else if (state.entries.isEmpty()) {
             val text =
                 when {
@@ -117,38 +222,67 @@ internal fun CollectionsPage(
                     else -> R.string.collections_empty
                 }
             Text(stringResource(text), Modifier.padding(16.dp))
-            LaunchedEffect(state.owner, state.filter, state.sort, state.denied) {
-                if (!toolbarHasFocus) filterFocus.tryRequestFocus()
-            }
         } else {
-            key(state.owner, state.filter, state.sort, state.gridEpoch) {
-                val gridFocus = remember { FocusRequester() }
-                LaunchedEffect(Unit) { if (!toolbarHasFocus) gridFocus.tryRequestFocus() }
+            key(state.owner, state.filter, state.sort, state.gridEpoch, state.viewOptions.columns) {
+                LaunchedEffect(Unit) {
+                    if (!ribbonVisible && !showViewOptions) {
+                        repeat(45) {
+                            withFrameNanos { }
+                            if (gridHasFocus || ribbonHasFocus || ribbonVisible || showViewOptions || !viewModel.isCollectionsTop()) {
+                                return@LaunchedEffect
+                            }
+                            gridFocusRequester.tryRequestFocus()
+                        }
+                    }
+                }
                 CardGrid(
                     pager = state.entries,
                     totalItems = state.total,
                     focusAnchorKey = state.focusedKey,
                     focusRequestEpoch = restoreFocusEpoch,
-                    onGridFocusChanged = { gridHasFocus = it },
-                    onFirstRowUp = { filterFocus.tryRequestFocus() },
+                    onGridFocusChanged = { focused ->
+                        gridHasFocus = focused
+                        if (focused) ribbonVisible = false
+                    },
+                    onViewportRowsChanged = viewModel::viewportRows,
+                    onFirstRowUp = {
+                        ribbonVisible = true
+                        requestFilterFocus = true
+                        true
+                    },
                     backToTopOnBack = false,
+                    backToTopRequestEpoch = backToTopEpoch,
                     itemKey = { state.entries[it].gridId },
                     onClickItem = { _, item -> viewModel.open(item) },
                     onLongClickItem = { _, _ -> },
                     onClickPlay = { _, _ -> },
                     letterPosition = { 0 },
-                    gridFocusRequester = gridFocus,
+                    gridFocusRequester = gridFocusRequester,
                     initialPosition = state.focusedIndex,
                     positionCallback = { columns, index -> viewModel.position(index, columns) },
                     showJumpButtons = false,
                     showLetterButtons = false,
+                    columns = state.viewOptions.columns,
+                    spacing = state.viewOptions.spacing.dp,
                     modifier = Modifier.weight(1f),
                     cardContent = { (item, _, onClick, onLongClick, _, cardModifier) ->
-                        CollectionsCard(item, onClick, onLongClick, cardModifier)
+                        CollectionsCard(item, onClick, onLongClick, cardModifier, state.viewOptions.showTitles)
                     },
                 )
             }
         }
+    }
+    if (showViewOptions) {
+        ViewOptionsDialog(
+            viewOptions = state.viewOptions,
+            defaultViewOptions = ViewOptions(),
+            optionsOverride = collectionsPresentationOptions,
+            onViewOptionsChange = viewModel::saveViewOptions,
+            onDismissRequest = {
+                showViewOptions = false
+                restoreViewOptionsFocus = true
+            },
+        )
     }
 }
 
@@ -175,6 +309,7 @@ private fun CollectionsCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier,
+    showTitles: Boolean,
 ) {
     CollectionCard(
         name = item?.summary?.name.orEmpty(),
@@ -184,6 +319,7 @@ private fun CollectionsCard(
         onClick = onClick,
         onLongClick = onLongClick,
         modifier = modifier,
+        showTitles = showTitles,
     )
 }
 
@@ -197,6 +333,7 @@ internal fun CollectionCard(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
     cardModifier: Modifier = Modifier,
+    showTitles: Boolean = true,
 ) {
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Card(
@@ -221,12 +358,14 @@ internal fun CollectionCard(
                 CollectionCompletionBadge(available, total, Modifier.align(Alignment.TopEnd))
             }
         }
-        Text(
-            name,
-            maxLines = 1,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-        )
+        if (showTitles) {
+            Text(
+                name,
+                maxLines = 1,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            )
+        }
     }
 }
 

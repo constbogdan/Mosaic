@@ -70,6 +70,7 @@ fun DiscoverItemCard(
     useFallbackText: Boolean = false,
     savedToWatchlist: Boolean = false,
     compactLabels: Boolean = false,
+    showTitles: Boolean = true,
     showAvailableIndicator: Boolean = true,
     artworkAlpha: Float = 1f,
     artworkColorFilter: ColorFilter? = null,
@@ -223,32 +224,34 @@ fun DiscoverItemCard(
                 }
             }
         }
-        SlidingCardText(focused) {
-            Text(
-                text = item?.title ?: "",
-                maxLines = if (compactLabels) 2 else 1,
-                textAlign = TextAlign.Center,
-                overflow = TextOverflow.Ellipsis,
-                style = if (compactLabels) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp)
-                        .then(if (compactLabels) Modifier.height(32.dp) else Modifier.enableMarquee(focusedAfterDelay)),
-            )
-            Text(
-                text = item?.releaseDate?.year?.toString() ?: "",
-                maxLines = 1,
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Normal,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp)
-                        .enableMarquee(focusedAfterDelay),
-            )
+        if (showTitles) {
+            SlidingCardText(focused) {
+                Text(
+                    text = item?.title ?: "",
+                    maxLines = if (compactLabels) 2 else 1,
+                    textAlign = TextAlign.Center,
+                    overflow = TextOverflow.Ellipsis,
+                    style = if (compactLabels) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp)
+                            .then(if (compactLabels) Modifier.height(32.dp) else Modifier.enableMarquee(focusedAfterDelay)),
+                )
+                Text(
+                    text = item?.releaseDate?.year?.toString() ?: "",
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Normal,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp)
+                            .enableMarquee(focusedAfterDelay),
+                )
+            }
         }
     }
 }

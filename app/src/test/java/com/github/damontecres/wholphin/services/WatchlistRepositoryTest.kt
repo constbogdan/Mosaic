@@ -14,10 +14,13 @@ import com.github.damontecres.wholphin.data.model.WatchlistMembership
 import com.github.damontecres.wholphin.data.model.WatchlistPage
 import com.github.damontecres.wholphin.data.model.watchlistFocusAfterRemoval
 import com.github.damontecres.wholphin.preferences.AppPreferences
+import com.github.damontecres.wholphin.ui.components.ViewOptions
 import com.github.damontecres.wholphin.ui.detail.gridLeadingSlots
 import com.github.damontecres.wholphin.ui.watchlist.WatchlistViewModel
 import com.github.damontecres.wholphin.ui.watchlist.watchlistRandomTarget
+import com.github.damontecres.wholphin.ui.watchlist.watchlistViewOptions
 import com.github.damontecres.wholphin.util.WholphinDispatchers
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
@@ -131,6 +134,7 @@ class WatchlistRepositoryTest {
     private fun screenTest(
         preferences: Store = Store(),
         sessions: MutableStateFlow<WatchlistSession?>? = null,
+        backdropService: BackdropService = mockk(relaxed = true),
         block: suspend TestScope.(Backend, WatchlistRepository, WatchlistViewModel) -> Unit,
     ) = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
@@ -151,13 +155,24 @@ class WatchlistRepositoryTest {
                 }
                 arg<(() -> Unit)?>(4)?.invoke()
             }
-            val viewModel = WatchlistViewModel(repository, navigation, preferences)
+            val viewModel = WatchlistViewModel(repository, navigation, preferences, backdropService)
             store.put("watchlist", viewModel)
             block(backend, repository, viewModel)
         } finally {
             store.clear()
             Dispatchers.resetMain()
             WholphinDispatchers.IO = previousIo
+        }
+    }
+
+    @Test fun watchlistBackdropUsesSharedServiceAndClearsMissingArtwork() {
+        val backdropService = mockk<BackdropService>(relaxed = true)
+        screenTest(backdropService = backdropService) { _, _, viewModel ->
+            val member = entry(1).let { it.copy(item = it.item.copy(backDropUrl = "https://example.test/backdrop.jpg")) }
+            viewModel.updateBackdrop(member)
+            coVerify(exactly = 1) { backdropService.submit(member.gridId, member.item.backDropUrl) }
+            viewModel.updateBackdrop(null)
+            coVerify(exactly = 1) { backdropService.clearBackdrop() }
         }
     }
 
@@ -171,6 +186,41 @@ class WatchlistRepositoryTest {
         assertEquals(WatchlistFilters(), WatchlistFilters.decode(null))
         assertEquals(WatchlistFilters(watched = WatchlistFilter.NO), WatchlistFilters.decode("obsolete:NO"))
         assertEquals(WatchlistFilters(owned = WatchlistFilter.YES), WatchlistFilters.decode("YES:obsolete"))
+    }
+
+    @Test fun viewOptionsPersistPerWatchlistOwnerWithoutChangingLibrarySettings() {
+        val preferences = Store()
+        val sessions = MutableStateFlow<WatchlistSession?>(null)
+        val first = "seerrA:7:jellyfinA:user1"
+        val second = "seerrB:7:jellyfinB:user1"
+        screenTest(preferences, sessions) { backend, _, viewModel ->
+            sessions.value = WatchlistSession(first, backend) { true }
+            runCurrent()
+            viewModel.saveViewOptions(ViewOptions(columns = 4, spacing = 8, showBackdrop = true, showTitles = false))
+            runCurrent()
+            assertEquals(ViewOptions(columns = 4, spacing = 8, showBackdrop = true, showTitles = false), viewModel.state.value.viewOptions)
+            assertEquals(setOf(first), preferences.data.value.watchlistViewOptionsMap.keys)
+            assertTrue(
+                preferences.data.value.watchlistFiltersMap
+                    .isEmpty(),
+            )
+            sessions.value = WatchlistSession(second, backend) { true }
+            runCurrent()
+            assertEquals(ViewOptions(), viewModel.state.value.viewOptions)
+            sessions.value = WatchlistSession(first, backend) { true }
+            runCurrent()
+            assertEquals(ViewOptions(columns = 4, spacing = 8, showBackdrop = true, showTitles = false), viewModel.state.value.viewOptions)
+        }
+        val restored = Store(AppPreferences.parseFrom(preferences.data.value.toByteArray()))
+        val restoredSessions = MutableStateFlow<WatchlistSession?>(null)
+        screenTest(restored, restoredSessions) { backend, _, viewModel ->
+            restoredSessions.value = WatchlistSession(first, backend) { true }
+            runCurrent()
+            assertEquals(ViewOptions(columns = 4, spacing = 8, showBackdrop = true, showTitles = false), viewModel.state.value.viewOptions)
+        }
+        assertEquals(ViewOptions(), watchlistViewOptions("not-json"))
+        assertEquals(ViewOptions(), watchlistViewOptions(null))
+        assertEquals(ViewOptions(columns = 12, spacing = 0), watchlistViewOptions("{\"columns\":99,\"spacing\":-4}"))
     }
 
     @Test fun filtersPersistAcrossCategoriesAndScreenRecreationWithAuthoritativeTotals() {
@@ -699,7 +749,7 @@ class WatchlistRepositoryTest {
                 backend.members.addAll((1..45).map { key(it) })
                 val repository =
                     WatchlistRepository(MutableStateFlow(WatchlistSession("A", backend) { true }), backgroundScope, { 100_000 })
-                val viewModel = WatchlistViewModel(repository, mockk(relaxed = true), Store())
+                val viewModel = WatchlistViewModel(repository, mockk(relaxed = true), Store(), mockk(relaxed = true))
                 store.put("watchlist", viewModel)
                 runCurrent()
                 assertEquals(20, viewModel.state.value.entries.size)
@@ -740,6 +790,44 @@ class WatchlistRepositoryTest {
             }
         }
 
+    @Test fun savedColumnsFillWatchlistBeforeGridMeasurementAndKeepViewportLead() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val previousIo = WholphinDispatchers.IO
+            Dispatchers.setMain(dispatcher)
+            WholphinDispatchers.IO = dispatcher
+            val store = androidx.lifecycle.ViewModelStore()
+            try {
+                val firstPage = CompletableDeferred<Unit>()
+                val backend = Backend()
+                backend.members.addAll((1..45).map(::key))
+                backend.pageResult = { _, page ->
+                    if (page == 1) firstPage.await()
+                    WatchlistPage(page, 3, 45, ((page - 1) * 20 + 1..minOf(page * 20, 45)).map(::entry))
+                }
+                val preferences = Store(AppPreferences.newBuilder().putWatchlistViewOptions("A", """{"columns":10}""").build())
+                val repository =
+                    WatchlistRepository(MutableStateFlow(WatchlistSession("A", backend) { true }), backgroundScope, { 100_000 })
+                val viewModel = WatchlistViewModel(repository, mockk(relaxed = true), preferences, mockk(relaxed = true))
+                store.put("watchlist", viewModel)
+                runCurrent()
+                assertEquals(listOf(1), backend.reads.map { it.second })
+                firstPage.complete(Unit)
+                runCurrent()
+                assertEquals(listOf(1, 2), backend.reads.map { it.second })
+                assertEquals(40, viewModel.state.value.entries.size)
+
+                viewModel.viewportRows(columns = 10, rows = 4)
+                runCurrent()
+                assertEquals(listOf(1, 2, 3), backend.reads.map { it.second })
+                assertEquals(45, viewModel.state.value.entries.size)
+            } finally {
+                store.clear()
+                Dispatchers.resetMain()
+                WholphinDispatchers.IO = previousIo
+            }
+        }
+
     @Test fun removingTheFocusedFinalItemLeavesATruthfulEmptyPage() =
         runTest {
             val dispatcher = StandardTestDispatcher(testScheduler)
@@ -759,7 +847,7 @@ class WatchlistRepositoryTest {
                         backgroundScope,
                         { 100_000 },
                     )
-                val viewModel = WatchlistViewModel(repository, mockk(relaxed = true), Store())
+                val viewModel = WatchlistViewModel(repository, mockk(relaxed = true), Store(), mockk(relaxed = true))
                 store.put("watchlist", viewModel)
                 runCurrent()
                 viewModel.position(0, 6)
@@ -800,7 +888,7 @@ class WatchlistRepositoryTest {
                 }
                 val repository =
                     WatchlistRepository(MutableStateFlow(WatchlistSession("A", backend) { true }), backgroundScope, { 100_000 })
-                val viewModel = WatchlistViewModel(repository, mockk(relaxed = true), Store())
+                val viewModel = WatchlistViewModel(repository, mockk(relaxed = true), Store(), mockk(relaxed = true))
                 store.put("watchlist", viewModel)
                 runCurrent()
                 viewModel.position(19, 6)
@@ -857,6 +945,29 @@ class WatchlistRepositoryTest {
             }
         }
     }
+
+    @Test fun viewportDemandFillsWideGridAndKeepsThreeRowsAheadWithoutDpadMovement() =
+        screenTest { backend, _, viewModel ->
+            backend.pageResult = { _, page ->
+                WatchlistPage(page, 10, 200, ((page - 1) * 20 + 1..page * 20).map(::entry))
+            }
+            runCurrent()
+            assertEquals(listOf(1), backend.reads.map { it.second })
+            // A ten-column TV viewport showing four rows needs 70 entries including
+            // the three-row lead. The fixed 20-item API pages are fetched sequentially.
+            viewModel.viewportRows(columns = 10, rows = 4)
+            runCurrent()
+            assertEquals(listOf(1, 2, 3, 4), backend.reads.map { it.second })
+            assertEquals(80, viewModel.state.value.entries.size)
+            repeat(5) { viewModel.viewportRows(columns = 10, rows = 4) }
+            runCurrent()
+            assertEquals(4, backend.reads.size)
+            // A wider selection grows the demand without changing page identity.
+            viewModel.viewportRows(columns = 12, rows = 5)
+            runCurrent()
+            assertEquals((1..5).toList(), backend.reads.map { it.second })
+            assertEquals(100, viewModel.state.value.entries.size)
+        }
 
     @Test fun randomTargetUsesTheWholeFilteredCountAndExactPageOffsets() {
         for (total in listOf(1, 19, 20, 21, 990)) {
