@@ -39,6 +39,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +78,7 @@ import com.github.damontecres.wholphin.ui.playback.isPlayKeyUp
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 import com.github.damontecres.wholphin.util.ExceptionHandler
 import com.github.damontecres.wholphin.util.WholphinDispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -137,8 +139,10 @@ fun <T : CardGridItem> CardGrid(
     focusAnchorKey: Any? = null,
     focusRequestEpoch: Long = 0,
     onGridFocusChanged: ((Boolean) -> Unit)? = null,
+    onViewportRowsChanged: ((columns: Int, rows: Int) -> Unit)? = null,
     onFirstRowUp: (() -> Boolean)? = null,
     backToTopOnBack: Boolean = true,
+    backToTopRequestEpoch: Long = 0,
     footerContent: (@Composable () -> Unit)? = null,
     footerFocusRequester: FocusRequester? = null,
     autoScrollToFooterOnRequester: Boolean = true,
@@ -159,6 +163,26 @@ fun <T : CardGridItem> CardGrid(
             cacheWindow = LazyLayoutCacheWindow(aheadFraction = 2f, behindFraction = 0.5f),
             initialFirstVisibleItemIndex = focusedIndex + leadingEmptySlots,
         )
+    val currentViewportCallback by rememberUpdatedState(onViewportRowsChanged)
+    if (onViewportRowsChanged != null) {
+        LaunchedEffect(gridState, columns, leadingEmptySlots) {
+            snapshotFlow {
+                val layout = gridState.layoutInfo
+                val rowHeight =
+                    layout.visibleItemsInfo
+                        .firstOrNull { it.index >= leadingEmptySlots }
+                        ?.size
+                        ?.height ?: 0
+                if (rowHeight > 0 && layout.viewportSize.height > 0) {
+                    ceil(layout.viewportSize.height.toDouble() / rowHeight).toInt().coerceIn(1, 20)
+                } else {
+                    0
+                }
+            }.distinctUntilChanged().collect { rows ->
+                if (rows > 0) currentViewportCallback?.invoke(columns, rows)
+            }
+        }
+    }
     LaunchedEffect(footerFocusRequester, pager.size, footerContent != null, autoScrollToFooterOnRequester) {
         if (autoScrollToFooterOnRequester && footerFocusRequester != null && footerContent != null) {
             gridState.scrollToItem(pager.size + leadingEmptySlots)
@@ -190,7 +214,13 @@ fun <T : CardGridItem> CardGrid(
     LaunchedEffect(focusRequestEpoch) {
         if (focusRequestEpoch > 0 && anchoredIndex != null) {
             focusedIndex = anchoredIndex
-            gridState.scrollToItem(anchoredIndex + leadingEmptySlots)
+            // A restored grid can already have the card in view. Scrolling it to the
+            // first visible row here loses the position the user left behind.
+            withFrameNanos { }
+            val targetIndex = anchoredIndex + leadingEmptySlots
+            if (gridState.layoutInfo.visibleItemsInfo.none { it.index == targetIndex }) {
+                gridState.scrollToItem(targetIndex)
+            }
             withFrameNanos { }
             gridFocusRequester.tryRequestFocus()
         }
@@ -273,6 +303,10 @@ fun <T : CardGridItem> CardGrid(
                 }
             }
         }
+
+    LaunchedEffect(backToTopRequestEpoch) {
+        if (backToTopRequestEpoch > 0) jumpToTop()
+    }
 
     val jumpToLetter: (Char) -> Unit =
         remember(leadingEmptySlots) {

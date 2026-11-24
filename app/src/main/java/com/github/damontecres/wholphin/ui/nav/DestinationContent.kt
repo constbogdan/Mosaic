@@ -387,13 +387,11 @@ fun DestinationContent(
         }
 
         Destination.Watchlist -> {
-            LaunchedEffect(Unit) { onClearBackdrop.invoke() }
             com.github.damontecres.wholphin.ui.watchlist
                 .WatchlistPage(modifier)
         }
 
         Destination.Fresh -> {
-            LaunchedEffect(Unit) { onClearBackdrop.invoke() }
             com.github.damontecres.wholphin.ui.fresh
                 .FreshPage(modifier)
         }

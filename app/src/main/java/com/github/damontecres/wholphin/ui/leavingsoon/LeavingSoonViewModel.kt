@@ -1,7 +1,9 @@
 package com.github.damontecres.wholphin.ui.leavingsoon
 
+import androidx.datastore.core.DataStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.services.LEAVING_SOON_PAGE_SIZE
 import com.github.damontecres.wholphin.services.LeavingSoonCategory
 import com.github.damontecres.wholphin.services.LeavingSoonEntry
@@ -9,11 +11,16 @@ import com.github.damontecres.wholphin.services.LeavingSoonPageData
 import com.github.damontecres.wholphin.services.LeavingSoonSession
 import com.github.damontecres.wholphin.services.LeavingSoonSessionSource
 import com.github.damontecres.wholphin.services.NavigationManager
+import com.github.damontecres.wholphin.ui.components.ViewOptions
+import com.github.damontecres.wholphin.ui.nav.Destination
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
 private const val MAX_WINDOW_PAGES = 5
@@ -34,7 +41,19 @@ internal data class LeavingSoonScreenState(
     val focusedIndex: Int = 0,
     val focusedKey: String? = null,
     val gridEpoch: Long = 0,
+    val viewOptions: ViewOptions = ViewOptions(),
 )
+
+internal fun leavingSoonViewOptions(value: String?): ViewOptions =
+    runCatching { value?.let { Json.decodeFromString<ViewOptions>(it) } }
+        .getOrNull()
+        ?.let {
+            ViewOptions(
+                columns = it.columns.coerceIn(1, 12),
+                spacing = it.spacing.coerceIn(0, 32),
+                showTitles = it.showTitles,
+            )
+        } ?: ViewOptions()
 
 internal fun validateLeavingSoonPage(
     result: LeavingSoonPageData,
@@ -59,12 +78,14 @@ internal class LeavingSoonViewModel
     constructor(
         source: LeavingSoonSessionSource,
         private val navigation: NavigationManager,
+        private val preferences: DataStore<AppPreferences>,
     ) : ViewModel() {
         val state = MutableStateFlow(LeavingSoonScreenState())
         private var session: LeavingSoonSession? = null
         private var load: Job? = null
         private var generation = 0L
         private var columns = 6
+        private var viewportRows: Int? = null
         private var lastRefresh = 0L
         private var shiftedOnce = false
 
@@ -78,7 +99,31 @@ internal class LeavingSoonViewModel
                     state.value = LeavingSoonScreenState(owner = next?.owner)
                     lastRefresh = 0L
                     shiftedOnce = false
-                    if (next != null) request(1)
+                    viewportRows = null
+                    if (next != null) {
+                        val saved = preferences.data.first()
+                        if (session !== next || !next.isCurrent()) return@collect
+                        val options = leavingSoonViewOptions(saved.leavingSoonViewOptionsMap[next.owner])
+                        state.value = LeavingSoonScreenState(owner = next.owner, viewOptions = options)
+                        columns = options.columns
+                        request(1, eagerInitialFill = true)
+                    }
+                }
+            }
+        }
+
+        fun isLeavingSoonTop() = navigation.backStack.lastOrNull() == Destination.LeavingSoon
+
+        fun saveViewOptions(value: ViewOptions) {
+            val owner = state.value.owner ?: return
+            val options = leavingSoonViewOptions(Json.encodeToString(value))
+            if (options == state.value.viewOptions) return
+            state.value = state.value.copy(viewOptions = options)
+            columns = options.columns
+            prefetch()
+            viewModelScope.launch {
+                preferences.updateData { current ->
+                    current.toBuilder().putLeavingSoonViewOptions(owner, Json.encodeToString(options)).build()
                 }
             }
         }
@@ -89,8 +134,14 @@ internal class LeavingSoonViewModel
             generation++
             shiftedOnce = false
             val before = state.value
-            state.value = LeavingSoonScreenState(owner = before.owner, category = value, gridEpoch = before.gridEpoch + 1)
-            request(1)
+            state.value =
+                LeavingSoonScreenState(
+                    owner = before.owner,
+                    category = value,
+                    gridEpoch = before.gridEpoch + 1,
+                    viewOptions = before.viewOptions,
+                )
+            request(1, eagerInitialFill = true)
         }
 
         fun refresh() {
@@ -124,8 +175,9 @@ internal class LeavingSoonViewModel
                     category = current.category,
                     focusedKey = current.focusedKey,
                     gridEpoch = current.gridEpoch + 1,
+                    viewOptions = current.viewOptions,
                 )
-            request(1)
+            request(1, eagerInitialFill = true)
         }
 
         fun position(
@@ -139,6 +191,15 @@ internal class LeavingSoonViewModel
             prefetch()
         }
 
+        fun viewportRows(
+            columns: Int,
+            rows: Int,
+        ) {
+            this.columns = columns.coerceAtLeast(1)
+            viewportRows = rows.coerceAtLeast(1)
+            prefetch()
+        }
+
         private fun prefetch() {
             val current = state.value
             if (current.loading || current.error != null || current.entries.isEmpty()) return
@@ -147,7 +208,14 @@ internal class LeavingSoonViewModel
                     request(current.firstPage - 1)
                 }
 
-                current.lastPage < current.totalPages && current.focusedIndex >= current.entries.size - columns * 3 -> {
+                current.lastPage < current.totalPages &&
+                    (
+                        current.entries.size <
+                            (current.focusedIndex + ((viewportRows ?: 0) + 3) * columns).coerceAtMost(
+                                current.totalResults,
+                            ) ||
+                            current.focusedIndex >= current.entries.size - columns * 3
+                    ) -> {
                     request(current.lastPage + 1)
                 }
             }
@@ -162,7 +230,10 @@ internal class LeavingSoonViewModel
             navigation.navigateToSeerrItem(entry.item)
         }
 
-        private fun request(page: Int) {
+        private fun request(
+            page: Int,
+            eagerInitialFill: Boolean = false,
+        ) {
             val active = session ?: return
             if (!active.isCurrent()) return
             val before = state.value
@@ -229,7 +300,7 @@ internal class LeavingSoonViewModel
                                 gridEpoch = if (before.lastPage == 0) before.gridEpoch + 1 else before.gridEpoch,
                             )
                         lastRefresh = System.currentTimeMillis()
-                        if (page > 1 || prepend) prefetch()
+                        if (page > 1 || prepend || eagerInitialFill) prefetch()
                     } catch (cancel: CancellationException) {
                         throw cancel
                     } catch (error: Exception) {

@@ -63,6 +63,7 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.Text
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionItem
+import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionsResponse
 import com.github.damontecres.wholphin.api.seerr.model.Season
 import com.github.damontecres.wholphin.data.model.CatalogMediaType
 import com.github.damontecres.wholphin.data.model.DiscoverItem
@@ -78,6 +79,8 @@ import com.github.damontecres.wholphin.data.model.WatchlistMembership
 import com.github.damontecres.wholphin.services.CollectionDetailsData
 import com.github.damontecres.wholphin.services.CollectionMovieLink
 import com.github.damontecres.wholphin.services.CollectionsEntry
+import com.github.damontecres.wholphin.services.FreshCategory
+import com.github.damontecres.wholphin.services.FreshEntry
 import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.services.ScreensaverService
 import com.github.damontecres.wholphin.services.ScreensaverState
@@ -113,6 +116,9 @@ import com.github.damontecres.wholphin.ui.detail.discover.SeerrProfile
 import com.github.damontecres.wholphin.ui.detail.discover.SeerrRequestData
 import com.github.damontecres.wholphin.ui.detail.discover.originalLanguageName
 import com.github.damontecres.wholphin.ui.discover.QuickMovieConfirmGate
+import com.github.damontecres.wholphin.ui.fresh.FreshPage
+import com.github.damontecres.wholphin.ui.fresh.FreshScreenState
+import com.github.damontecres.wholphin.ui.fresh.FreshViewModel
 import com.github.damontecres.wholphin.ui.nav.Destination
 import com.github.damontecres.wholphin.ui.setup.SwitchServerContent
 import com.github.damontecres.wholphin.ui.setup.SwitchServerViewModel
@@ -1065,6 +1071,40 @@ class BasicUiTests {
     }
 
     @Test
+    fun watchlist_card_can_hide_title_and_year_without_disabling_poster_action() {
+        var openings = 0
+        composeTestRule.setContent {
+            WholphinTheme {
+                DiscoverItemCard(
+                    item =
+                        DiscoverItem(
+                            7,
+                            SeerrItemType.MOVIE,
+                            "Saved movie",
+                            null,
+                            null,
+                            SeerrAvailability.UNKNOWN,
+                            LocalDate.of(2024, 1, 1),
+                            null,
+                            null,
+                            null,
+                            null,
+                        ),
+                    onClick = { openings++ },
+                    onLongClick = {},
+                    width = 120.dp,
+                    showTitles = false,
+                    useFallbackText = false,
+                )
+            }
+        }
+        composeTestRule.onAllNodesWithText("Saved movie").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("2024").assertCountEquals(0)
+        composeTestRule.onNode(hasClickAction()).requestFocus().performClickEnter()
+        Assert.assertEquals(1, openings)
+    }
+
+    @Test
     fun saved_badge_stays_inside_poster_and_scales_with_focus_without_an_extra_control() {
         composeTestRule.setContent {
             WholphinTheme {
@@ -1261,6 +1301,49 @@ class BasicUiTests {
         composeTestRule.onNodeWithText("Row 7").assertIsFocused()
         composeTestRule.onNodeWithText("7 / 989").assertIsDisplayed()
         composeTestRule.onAllNodesWithText("7 / 40").assertCountEquals(0)
+    }
+
+    @Test
+    fun grid_focus_restore_keeps_visible_anchor_at_its_previous_row() {
+        val rows =
+            (1..24).map { id ->
+                CollectionsEntry(
+                    LibraryCollectionItem(id, "Collection $id", null, null, null, 1, 2, LibraryCollectionItem.Completeness.INCOMPLETE),
+                    null,
+                    null,
+                )
+            }
+        var focusEpoch by mutableStateOf(0L)
+        composeTestRule.setContent {
+            WholphinTheme {
+                CardGrid(
+                    pager = rows,
+                    itemKey = { rows[it].gridId },
+                    focusAnchorKey = rows[9].gridId,
+                    focusRequestEpoch = focusEpoch,
+                    onClickItem = { _, _ -> },
+                    onLongClickItem = { _, _ -> },
+                    onClickPlay = { _, _ -> },
+                    letterPosition = { 0 },
+                    gridFocusRequester = FocusRequester(),
+                    showJumpButtons = false,
+                    showLetterButtons = false,
+                    columns = 3,
+                    modifier = Modifier.height(260.dp),
+                    cardContent = { details ->
+                        Button(onClick = details.onClick, modifier = details.mod.height(100.dp)) {
+                            Text("Collection ${details.item?.summary?.id}")
+                        }
+                    },
+                )
+            }
+        }
+        composeTestRule.onAllNodes(hasScrollToIndexAction())[0].performScrollToIndex(6)
+        composeTestRule.onNodeWithText("Collection 10").requestFocus().assertIsFocused()
+        composeTestRule.onNodeWithText("Collection 7").assertIsDisplayed()
+        composeTestRule.runOnIdle { focusEpoch++ }
+        composeTestRule.onNodeWithText("Collection 10").assertIsFocused()
+        composeTestRule.onNodeWithText("Collection 7").assertIsDisplayed()
     }
 
     private fun assert_paged_grid_keeps_column_and_focus_after_prepend(columns: Int) {
@@ -1648,6 +1731,32 @@ class BasicUiTests {
     }
 
     @Test
+    fun collections_pending_entry_focuses_first_card_when_index_becomes_ready() {
+        val entry =
+            CollectionsEntry(
+                LibraryCollectionItem(7, "Alien Collection", null, null, null, 1, 4, LibraryCollectionItem.Completeness.INCOMPLETE),
+                null,
+                null,
+            )
+        val state = MutableStateFlow(CollectionsScreenState(owner = "viewer"))
+        val vm = mockk<CollectionsViewModel>(relaxed = true)
+        every { vm.state } returns state
+        every { vm.isCollectionsTop() } returns true
+        composeTestRule.setContent { WholphinTheme { CollectionsPage(viewModel = vm) } }
+        composeTestRule.runOnIdle { state.value = state.value.copy(status = LibraryCollectionsResponse.Status.PENDING) }
+        composeTestRule.runOnIdle {
+            state.value =
+                state.value.copy(
+                    entries = listOf(entry),
+                    total = 1,
+                    status = LibraryCollectionsResponse.Status.COMPLETE,
+                    focusedKey = entry.gridId,
+                )
+        }
+        composeTestRule.onAllNodes(hasText("Alien Collection") and hasClickAction())[0].assertIsFocused()
+    }
+
+    @Test
     fun collections_stale_last_good_remains_visible_without_technical_notice() {
         val entry =
             CollectionsEntry(
@@ -1662,6 +1771,66 @@ class BasicUiTests {
         composeTestRule.onAllNodesWithText("Alien Collection")[0].assertExists()
         composeTestRule.onAllNodesWithText("1/4").assertCountEquals(1)
         composeTestRule.onAllNodesWithText("Showing an older Collections snapshot.").assertCountEquals(0)
+    }
+
+    @Test
+    fun collection_details_loaded_during_navigation_focuses_member_after_entry_resumes() {
+        class Owner : LifecycleOwner {
+            val registry = LifecycleRegistry(this)
+            override val lifecycle: Lifecycle = registry
+        }
+
+        val owner = Owner()
+        owner.registry.currentState = Lifecycle.State.STARTED
+        val destination = Destination.SeerrCollection(8, null, null, "viewer", "nested-entry")
+        val state = MutableStateFlow(CollectionDetailsState(owner = "viewer", collectionId = 8, loading = true))
+        val vm = mockk<SeerrCollectionDetailsViewModel>(relaxed = true)
+        every { vm.state } returns state
+        val avatarFocus = FocusRequester()
+        composeTestRule.setContent {
+            WholphinTheme {
+                CompositionLocalProvider(LocalLifecycleOwner provides owner) {
+                    Box {
+                        SeerrCollectionDetails(destination, viewModel = vm)
+                        Button(onClick = {}, modifier = Modifier.focusRequester(avatarFocus)) { Text("Avatar") }
+                    }
+                }
+            }
+        }
+        composeTestRule.runOnIdle { avatarFocus.requestFocus() }
+        composeTestRule.onNodeWithText("Avatar").assertIsFocused()
+        composeTestRule.runOnIdle {
+            state.value =
+                state.value.copy(
+                    loading = false,
+                    details =
+                        CollectionDetailsData(
+                            8,
+                            "Nested Collection",
+                            null,
+                            null,
+                            null,
+                            listOf(
+                                DiscoverItem(
+                                    42,
+                                    SeerrItemType.MOVIE,
+                                    "Nested Movie",
+                                    null,
+                                    null,
+                                    SeerrAvailability.AVAILABLE,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                ),
+                            ),
+                        ),
+                )
+        }
+        composeTestRule.onNodeWithText("Avatar").assertIsFocused()
+        composeTestRule.runOnIdle { owner.registry.currentState = Lifecycle.State.RESUMED }
+        composeTestRule.onAllNodes(hasText("Nested Movie") and hasClickAction())[0].assertIsFocused()
     }
 
     @Test
@@ -2331,6 +2500,38 @@ class BasicUiTests {
     }
 
     @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
+    fun fresh_ribbon_reaches_categories_sort_and_grid_options() {
+        val rows =
+            (1..20).map { id ->
+                FreshEntry(
+                    DiscoverItem(id, SeerrItemType.MOVIE, "Fresh $id", null, null, SeerrAvailability.UNKNOWN, null, null, null, null, null),
+                )
+            }
+        val screen = MutableStateFlow(FreshScreenState(owner = "viewer", entries = rows, page = 1, totalPages = 1, totalResults = 20))
+        val viewModel = mockk<FreshViewModel>(relaxed = true)
+        every { viewModel.state } returns screen
+        every { viewModel.isFreshTop() } returns true
+        every { viewModel.category(any()) } answers { screen.value = screen.value.copy(category = firstArg()) }
+        composeTestRule.setContent { WholphinTheme { FreshPage(viewModel = viewModel) } }
+        composeTestRule.onNode(hasText("Fresh 1") and hasClickAction()).assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
+        composeTestRule.onNodeWithContentDescription("All").assertIsFocused()
+        composeTestRule.onNodeWithContentDescription("Documentary").assertExists()
+        composeTestRule.onNodeWithContentDescription("All").performKeyInput { pressKey(Key.DirectionDown) }
+        composeTestRule.onNode(hasText("Fresh 1") and hasClickAction()).assertIsFocused()
+        composeTestRule.onAllNodesWithContentDescription("All").assertCountEquals(0)
+        composeTestRule.onNode(hasText("Fresh 1") and hasClickAction()).performKeyInput { pressKey(Key.DirectionUp) }
+        composeTestRule.onNodeWithContentDescription("All").assertIsFocused()
+        composeTestRule.onNodeWithContentDescription("View options").requestFocus().performClickEnter()
+        composeTestRule.onNodeWithText("Columns").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Spacing").assertExists()
+        composeTestRule.onNodeWithText("Show titles").assertExists()
+        composeTestRule.onNodeWithText("Show backdrop").assertExists()
+        verify { viewModel.viewportRows(any(), any()) }
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
     fun watchlist_toolbar_cycles_compact_actions_and_preserves_focus_during_query_resets() {
         Assert.assertEquals(androidx.compose.ui.graphics.Color.Unspecified, watchlistFilterIconColor(WatchlistFilter.ALL))
         Assert.assertEquals(AppColors.Discover.Blue, watchlistFilterIconColor(WatchlistFilter.YES))
@@ -2372,6 +2573,11 @@ class BasicUiTests {
                 )
         }
         composeTestRule.setContent { WholphinTheme { WatchlistPage(viewModel = viewModel) } }
+        composeTestRule.onAllNodesWithContentDescription("Owned: All").assertCountEquals(0)
+        composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).assertIsFocused().performKeyInput {
+            pressKey(Key.DirectionUp)
+        }
+        composeTestRule.onNodeWithContentDescription("All").assertIsFocused()
         composeTestRule.onAllNodesWithText("Owned: All").assertCountEquals(0)
         composeTestRule.onAllNodesWithText("Watched: All").assertCountEquals(0)
         val owned =
@@ -2407,7 +2613,13 @@ class BasicUiTests {
             )
         }
         val context = ApplicationProvider.getApplicationContext<Application>()
-        composeTestRule.onAllNodesWithText(context.getString(R.string.fa_film), useUnmergedTree = true).assertCountEquals(1)
+        for (category in listOf("All", "Movies", "Shows", "Animation")) {
+            composeTestRule.onNodeWithContentDescription(category).assertExists()
+        }
+        composeTestRule.onNodeWithContentDescription("View options").assertExists()
+        composeTestRule.onAllNodesWithText("Sort By").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText("Filter By").assertCountEquals(0)
+        composeTestRule.onAllNodesWithText(context.getString(R.string.fa_film), useUnmergedTree = true).assertCountEquals(2)
         composeTestRule.onAllNodesWithText(context.getString(R.string.fa_check), useUnmergedTree = true).assertCountEquals(1)
         composeTestRule.onAllNodesWithText(context.getString(R.string.fa_dice), useUnmergedTree = true).assertCountEquals(1)
 
@@ -2465,6 +2677,7 @@ class BasicUiTests {
     }
 
     @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
     fun watchlist_category_reset_keeps_outgoing_grid_keys_bound_to_its_rows() {
         val rows =
             (1..20).map { id ->
@@ -2500,6 +2713,8 @@ class BasicUiTests {
         }
         composeTestRule.onNodeWithText("1 / 25").assertIsDisplayed()
         composeTestRule.onAllNodesWithText("Watchlist (25)").assertCountEquals(0)
+        composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).performKeyInput { pressKey(Key.DirectionUp) }
+        composeTestRule.onNodeWithContentDescription("All").assertIsFocused()
 
         repeat(2) {
             for (category in listOf(
@@ -2515,12 +2730,12 @@ class BasicUiTests {
                         WatchlistCategory.SHOWS -> "Shows"
                         WatchlistCategory.ANIMATION -> "Animation"
                     }
-                composeTestRule.onNodeWithText(label).performClick()
+                composeTestRule.onNodeWithContentDescription(label).requestFocus().performClickEnter()
                 // Compose invalidates the old key map while it still owns 20 rows.
                 composeTestRule.waitForIdle()
-                composeTestRule.onAllNodesWithText("Saved 1").assertCountEquals(0)
                 Assert.assertEquals(category, screen.value.category)
                 Assert.assertTrue(screen.value.entries.isEmpty())
+                composeTestRule.onAllNodesWithText("Saved 1").assertCountEquals(0)
                 Assert.assertEquals(0, screen.value.page)
                 Assert.assertEquals(20, membership.value.membership.size)
                 composeTestRule.runOnIdle {
@@ -2532,6 +2747,159 @@ class BasicUiTests {
     }
 
     @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
+    fun watchlist_grid_back_returns_to_first_card_then_exits_and_ribbon_back_exits() {
+        val rows =
+            (1..20).map { id ->
+                WatchlistEntry(
+                    MediaKey.Catalog(CatalogMediaType.MOVIE, id),
+                    "Saved $id",
+                    Instant.EPOCH,
+                    null,
+                    null,
+                    null,
+                    DiscoverItem(id, SeerrItemType.MOVIE, "Saved $id", null, null, SeerrAvailability.UNKNOWN, null, null, null, null, null),
+                )
+            }
+        val screen = MutableStateFlow(WatchlistScreenState(owner = "viewer", entries = rows, page = 1, totalPages = 1, totalResults = 20))
+        val repository = mockk<WatchlistRepository>()
+        every { repository.state } returns MutableStateFlow(WatchlistSnapshot(owner = "viewer"))
+        val viewModel = mockk<WatchlistViewModel>(relaxed = true)
+        every { viewModel.state } returns screen
+        every { viewModel.repository } returns repository
+        every { viewModel.isWatchlistTop() } returns true
+        every { viewModel.position(any(), any()) } answers { screen.value = screen.value.copy(focusedIndex = firstArg()) }
+        var exits = 0
+        composeTestRule.setContent {
+            WholphinTheme {
+                BackHandler { exits++ }
+                WatchlistPage(viewModel = viewModel)
+            }
+        }
+        composeTestRule.onNode(hasText("Saved 8") and hasClickAction()).requestFocus()
+        composeTestRule.waitForIdle()
+        Assert.assertEquals(7, screen.value.focusedIndex)
+        composeTestRule.runOnUiThread { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
+        composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).assertIsFocused()
+        composeTestRule.onNodeWithContentDescription("All").assertExists()
+        Assert.assertEquals(0, exits)
+        composeTestRule.runOnUiThread { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
+        Assert.assertEquals(1, exits)
+        composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).performKeyInput { pressKey(Key.DirectionUp) }
+        composeTestRule.onNodeWithContentDescription("All").assertIsFocused()
+        composeTestRule.onNodeWithContentDescription("All").performKeyInput { pressKey(Key.DirectionDown) }
+        composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).assertIsFocused()
+        composeTestRule.onNodeWithContentDescription("All").assertDoesNotExist()
+        composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).performKeyInput { pressKey(Key.DirectionUp) }
+        composeTestRule.onNodeWithContentDescription("All").assertIsFocused()
+        composeTestRule.runOnUiThread { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
+        Assert.assertEquals(2, exits)
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
+    fun watchlist_view_options_show_only_connected_grid_controls_and_restore_ribbon_focus() {
+        val entry =
+            WatchlistEntry(
+                MediaKey.Catalog(CatalogMediaType.MOVIE, 1),
+                "Saved 1",
+                Instant.EPOCH,
+                null,
+                null,
+                null,
+                DiscoverItem(
+                    1,
+                    SeerrItemType.MOVIE,
+                    "Saved 1",
+                    null,
+                    null,
+                    SeerrAvailability.UNKNOWN,
+                    null,
+                    null,
+                    "https://example.test/backdrop1.jpg",
+                    null,
+                    null,
+                ),
+            )
+        val second =
+            WatchlistEntry(
+                MediaKey.Catalog(CatalogMediaType.MOVIE, 2),
+                "Saved 2",
+                Instant.EPOCH,
+                null,
+                null,
+                null,
+                DiscoverItem(2, SeerrItemType.MOVIE, "Saved 2", null, null, SeerrAvailability.UNKNOWN, null, null, null, null, null),
+            )
+        val screen = MutableStateFlow(WatchlistScreenState(owner = "viewer", entries = listOf(entry, second), page = 1, totalResults = 2))
+        val repository = mockk<WatchlistRepository>()
+        every { repository.state } returns MutableStateFlow(WatchlistSnapshot(owner = "viewer"))
+        val viewModel = mockk<WatchlistViewModel>(relaxed = true)
+        every { viewModel.state } returns screen
+        every { viewModel.repository } returns repository
+        every { viewModel.isWatchlistTop() } returns true
+        var exits = 0
+        composeTestRule.setContent {
+            WholphinTheme {
+                BackHandler { exits++ }
+                WatchlistPage(viewModel = viewModel)
+            }
+        }
+        composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).performKeyInput { pressKey(Key.DirectionUp) }
+        composeTestRule.onNodeWithContentDescription("View options").requestFocus().performClickEnter()
+        composeTestRule.onNodeWithText("Columns").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Spacing").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Show titles").assertIsDisplayed()
+        composeTestRule.onAllNodes(hasScrollToIndexAction())[1].performScrollToIndex(4)
+        composeTestRule.onNodeWithText("Reset").assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("Aspect ratio").assertCountEquals(0)
+        composeTestRule.onNodeWithText("Show backdrop").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Reset").performKeyInput { pressKey(Key.Back) }
+        composeTestRule.onNodeWithContentDescription("View options").assertIsFocused()
+        Assert.assertEquals(0, exits)
+        val firstBefore = composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).getUnclippedBoundsInRoot()
+        val secondBefore = composeTestRule.onNode(hasText("Saved 2") and hasClickAction()).getUnclippedBoundsInRoot()
+        composeTestRule.runOnIdle {
+            screen.value =
+                screen.value.copy(
+                    viewOptions =
+                        com.github.damontecres.wholphin.ui.components
+                            .ViewOptions(columns = 4, spacing = 8),
+                )
+        }
+        val firstAfter = composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).getUnclippedBoundsInRoot()
+        val secondAfter = composeTestRule.onNode(hasText("Saved 2") and hasClickAction()).getUnclippedBoundsInRoot()
+        Assert.assertTrue(firstAfter.right - firstAfter.left > firstBefore.right - firstBefore.left)
+        Assert.assertTrue(secondAfter.left - firstAfter.right < secondBefore.left - firstBefore.right)
+        composeTestRule.runOnIdle {
+            screen.value = screen.value.copy(viewOptions = screen.value.viewOptions.copy(showBackdrop = true, showTitles = false))
+        }
+        composeTestRule.waitForIdle()
+        coVerify { viewModel.updateBackdrop(entry) }
+        composeTestRule.runOnIdle {
+            screen.value = screen.value.copy(viewOptions = screen.value.viewOptions.copy(showBackdrop = false, showTitles = true))
+        }
+        composeTestRule.waitForIdle()
+        coVerify { viewModel.updateBackdrop(null) }
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
+    fun watchlist_error_keeps_retry_reachable_when_no_cards_exist() {
+        val screen = MutableStateFlow(WatchlistScreenState(owner = "viewer", error = "Unavailable"))
+        val repository = mockk<WatchlistRepository>()
+        every { repository.state } returns MutableStateFlow(WatchlistSnapshot(owner = "viewer"))
+        val viewModel = mockk<WatchlistViewModel>(relaxed = true)
+        every { viewModel.state } returns screen
+        every { viewModel.repository } returns repository
+        composeTestRule.setContent { WholphinTheme { WatchlistPage(viewModel = viewModel) } }
+        composeTestRule.onNodeWithText("Unavailable").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Retry").assertIsFocused().performClickEnter()
+        verify(exactly = 1) { viewModel.retry() }
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
     fun watchlist_random_back_restores_random_button_without_replacing_grid() {
         fun row(id: Int) =
             WatchlistEntry(
@@ -2570,7 +2938,7 @@ class BasicUiTests {
         composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).requestFocus().performKeyInput {
             pressKey(Key.DirectionUp)
         }
-        composeTestRule.onNodeWithContentDescription("Random").assertIsFocused()
+        composeTestRule.onNodeWithContentDescription("All").assertIsFocused()
         composeTestRule.onNodeWithContentDescription("Random").requestFocus().performClickEnter()
         composeTestRule.waitForIdle()
         Assert.assertEquals(initial, screen.value.entries)
@@ -2584,9 +2952,6 @@ class BasicUiTests {
         Assert.assertEquals(false, screen.value.restoreRandomFocus)
         composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).requestFocus().performClickEnter()
         io.mockk.verify(exactly = 1) { viewModel.open(initial.first()) }
-        composeTestRule.runOnUiThread { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
-        composeTestRule.onNodeWithContentDescription("Random").assertIsFocused()
-        Assert.assertEquals(0, exitCount)
         composeTestRule.runOnUiThread { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
         Assert.assertEquals(1, exitCount)
     }

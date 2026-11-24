@@ -790,11 +790,11 @@ fun NavigationDrawerScope.NavItem(
                 }
 
                 NavDrawerItem.Watchlist -> {
-                    R.string.fa_list_ul
+                    R.string.fa_bookmark
                 }
 
                 NavDrawerItem.Fresh -> {
-                    R.string.fa_clock
+                    R.string.fa_fire
                 }
 
                 NavDrawerItem.LeavingSoon -> {

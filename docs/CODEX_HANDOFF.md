@@ -82,7 +82,8 @@ not current instruction.
   `absent` (never physical, excluding archived/deleted history), per operator approval; Yes uses
   shared physical `active`, not Jellyfin access/playability. Watched No deliberately includes Unknown.
   Filter query keys include both selections; changes cancel/reset paging without clearing membership.
-  The right-aligned Watchlist toolbar reuses Library's ExpandableFaButton dimensions and spacing,
+  Before the cross-page alignment candidate below, the right-aligned Watchlist toolbar reused
+  Library's ExpandableFaButton dimensions and spacing,
   with film/check icons, neutral/blue/red tint and focus-only labels. OK cycles All/Yes/No;
   query completion must not steal focus from the toolbar while a filter is being cycled.
   Optional artwork.releaseDate (movies) / firstAirDate (series) feeds the existing shared card year
@@ -115,6 +116,55 @@ not current instruction.
   and above the progress rail. The optional presentation flag stays off outside Watchlist (Phase 3).
   Detail bookmarks belong inside the existing native/Discover action rows and reuse ExpandablePlayButton,
   including focus expansion and row focus callbacks. Unknown membership is disabled, not an inferred add.
+
+- Watchlist Library-style ribbon alignment is a local candidate on
+  `feat/watchlist-library-alignment` from `28b0ce05`. It replaces the Watchlist tab row and
+  separate toolbar with one ribbon: All, Movies, Shows, Animation on the left; View options,
+  Owned, Watched, Random on the right. The normal populated entry hides the ribbon and focuses
+  the first card; Up reveals it and focuses the selected category. Grid Back below the first
+  visual row jumps to the first card and reveals the ribbon; first-row and ribbon Back use the
+  normal navigation stack. Absolute-page leading slots matter for the first-row boundary.
+  B11 Random's details return is separate: preserve the original grid and reveal/focus Random.
+  Watchlist View options expose columns, spacing, title/year, backdrop and reset. Title/year
+  controls the text beneath its shared poster; the backdrop uses the already-loaded selected
+  Watchlist row artwork without another API request. The selected-item description option is
+  deferred by operator decision: the Watchlist response contains no overview, and per-focus
+  details lookups were declined. Image type and list layout remain inapplicable. Options are
+  persisted per complete personal Watchlist owner in AppPreferences, independent of Jellyfin
+  Library's Room-backed settings. The fixed 20-item API page is not a visual page: CardGrid
+  measures the visible row demand and Watchlist sequentially loads enough pages to fill the
+  selected column layout plus a three-row lead, even when the ribbon owns focus. Saved columns
+  also start a bounded three-row minimum fill after the first page, before grid measurement;
+  the measured-viewport lead remains authoritative afterward. Returning grid focus from the
+  ribbon hides it immediately, including on the first row. Emulator and physical-TV acceptance
+  are separate.
+
+- Fresh ribbon alignment is part of the same candidate. It keeps Seerr's existing
+  category, sort, 20-item page, quick-request, and page-shift recovery contracts while reusing
+  CardGrid and View options for columns, spacing, title/year, backdrop, and reset. Its options are
+  stored separately per Fresh session owner. Viewport-based prefetch fills wider grids without a
+  D-pad move; the optional backdrop uses the focused Fresh row already in memory, with no detail
+  request. The saved column count now starts a three-row minimum fill as soon as the first page
+  confirms more results, before grid measurement; this eager trigger applies to initial entry and
+  category/sort resets, not page-shift recovery or manual retry. The measured-viewport scroll-ahead
+  path remains unchanged. Returning focus from the ribbon to any Fresh card hides the ribbon so
+  the first row cannot remain clipped beneath it. Fresh synopsis is available in its existing item
+  payload but no new synopsis header
+  has been added. Android TV operator validation of the new presentation remains pending.
+
+- Collections and Leaving Soon follow that same ribbon/grid presentation candidate.
+  Collection completeness is a set of explicit category buttons; its existing server sort remains
+  the right-hand action. Leaving Soon replaces its old tab wrapper with All/Movies/Shows buttons
+  and retains Refresh. Both use the first-visual-row Up and deeper-grid Back handoff, and independently
+  persisted columns/spacing/title settings. Collections index entries already carry a backdrop URL,
+  so its optional selected-item backdrop needs no new request. Leaving Soon maps each response row
+  to `DiscoverItem` with `backDropUrl = null`; therefore no backdrop toggle is exposed there. Adding
+  one would require a separately reviewed Seerr data-contract change. The fixed 20-item API pages
+  remain distinct from the visual grid; saved wide columns start a bounded three-row initial fill,
+  measured viewport rows extend the lead, and Leaving Soon keeps its absolute-row window alignment
+  and scroll-ahead loading. Neither the
+  Collections ADMIN boundary nor Leaving Soon item navigation has changed. Emulator/TV acceptance
+  of these two new layouts remains pending.
 
 - Public guidance is versioned in the repository. Optional Wiki publication remains a separate
   operator action and cannot replace engineering authority.
@@ -293,6 +343,19 @@ not current instruction.
   separate work ownership. Never treat acquisition progress as proof of availability. Movie,
   people, trailer, rating and related-result publication must all remain fenced by the current
   Seerr client/account and entry generation. The diagnostic register owns operator acceptance.
+
+- Collections focus follow-up (2026-11-24): a saved `CardGrid` scroll position
+  must not be replaced by `scrollToItem(focusAnchor)` when that card is already visible;
+  doing so pins a formerly middle row to the top after Details Back. A known owner with
+  a null or `PENDING` index response is still loading, not an empty-state ribbon focus
+  target. Initial grid focus and nested Collection Details focus must be confirmed from
+  observed focus state, not the boolean return of `tryRequestFocus`; the latter only
+  reports that a request was issued. The nested entry waits for its navigation lifecycle
+  to resume, then makes bounded focus attempts. The partial-count warning is distinct
+  from the removed technical older-snapshot notice and still reflects backend status.
+  Separate observed avatar-first entry handoffs and Left-edge navigation from Fresh,
+  Watchlist, Collections, Leaving Soon, and Similar Collections remain deferred; this
+  candidate does not claim to correct those focus paths.
 
 - Collection Details B06 passed the operator's final 2026-11-18 emulator acceptance for
   R1/R2/R3 and two-stage Back-to-Request; the earlier failed pass remains historical evidence.

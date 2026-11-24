@@ -1,8 +1,11 @@
 package com.github.damontecres.wholphin.ui.fresh
 
+import androidx.datastore.core.DataStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.damontecres.wholphin.api.seerr.model.FreshStatus
+import com.github.damontecres.wholphin.preferences.AppPreferences
+import com.github.damontecres.wholphin.services.BackdropService
 import com.github.damontecres.wholphin.services.FRESH_PAGE_SIZE
 import com.github.damontecres.wholphin.services.FreshCategory
 import com.github.damontecres.wholphin.services.FreshEntry
@@ -11,11 +14,16 @@ import com.github.damontecres.wholphin.services.FreshSession
 import com.github.damontecres.wholphin.services.FreshSessionSource
 import com.github.damontecres.wholphin.services.FreshSort
 import com.github.damontecres.wholphin.services.NavigationManager
+import com.github.damontecres.wholphin.ui.components.ViewOptions
+import com.github.damontecres.wholphin.ui.nav.Destination
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
 internal data class FreshScreenState(
@@ -33,7 +41,21 @@ internal data class FreshScreenState(
     val focusedIndex: Int = 0,
     val focusedKey: String? = null,
     val gridEpoch: Long = 0,
+    val viewOptions: ViewOptions = ViewOptions(),
 )
+
+internal fun freshViewOptions(value: String?): ViewOptions =
+    runCatching { value?.let { Json.decodeFromString<ViewOptions>(it) } }
+        .getOrNull()
+        ?.let {
+            ViewOptions(
+                columns = it.columns.coerceIn(1, 12),
+                spacing = it.spacing.coerceIn(0, 32),
+                showBackdrop = it.showBackdrop,
+                showTitles = it.showTitles,
+            )
+        }
+        ?: ViewOptions()
 
 private class FreshPageShifted : IllegalStateException()
 
@@ -61,12 +83,15 @@ internal class FreshViewModel
     constructor(
         source: FreshSessionSource,
         private val navigation: NavigationManager,
+        private val preferences: DataStore<AppPreferences>,
+        private val backdropService: BackdropService,
     ) : ViewModel() {
         val state = MutableStateFlow(FreshScreenState())
         private var session: FreshSession? = null
         private var load: Job? = null
         private var generation = 0L
         private var columns = 6
+        private var viewportRows: Int? = null
         private var lastRefresh = 0L
         private var shiftedOnce = false
 
@@ -77,10 +102,42 @@ internal class FreshViewModel
                     load?.cancel()
                     generation++
                     session = next
-                    state.value = FreshScreenState(owner = next?.owner)
+                    state.value = FreshScreenState(owner = next?.owner, loading = next != null)
+                    viewportRows = null
                     lastRefresh = 0
                     shiftedOnce = false
-                    if (next != null) request(1)
+                    if (next != null) {
+                        val saved = preferences.data.first()
+                        if (session !== next || !next.isCurrent()) return@collect
+                        state.value =
+                            FreshScreenState(
+                                owner = next.owner,
+                                viewOptions = freshViewOptions(saved.freshViewOptionsMap[next.owner]),
+                                loading = true,
+                            )
+                        columns = state.value.viewOptions.columns
+                        request(1, eagerInitialFill = true)
+                    }
+                }
+            }
+        }
+
+        fun isFreshTop() = navigation.backStack.lastOrNull() == Destination.Fresh
+
+        suspend fun updateBackdrop(entry: FreshEntry?) {
+            val url = entry?.item?.backDropUrl
+            if (url.isNullOrBlank()) backdropService.clearBackdrop() else backdropService.submit(entry.key, url)
+        }
+
+        fun saveViewOptions(value: ViewOptions) {
+            val owner = state.value.owner ?: return
+            val options = freshViewOptions(Json.encodeToString(value))
+            if (options == state.value.viewOptions) return
+            state.value = state.value.copy(viewOptions = options)
+            columns = options.columns
+            viewModelScope.launch {
+                preferences.updateData { current ->
+                    current.toBuilder().putFreshViewOptions(owner, Json.encodeToString(options)).build()
                 }
             }
         }
@@ -100,8 +157,14 @@ internal class FreshViewModel
             generation++
             shiftedOnce = false
             state.value =
-                FreshScreenState(owner = current.owner, category = current.category, sort = current.sort, gridEpoch = current.gridEpoch + 1)
-            request(1)
+                FreshScreenState(
+                    owner = current.owner,
+                    category = current.category,
+                    sort = current.sort,
+                    gridEpoch = current.gridEpoch + 1,
+                    viewOptions = current.viewOptions,
+                )
+            request(1, eagerInitialFill = true)
         }
 
         fun refresh() {
@@ -152,11 +215,23 @@ internal class FreshViewModel
             val current = state.value
             val key = current.entries.getOrNull(index)?.key ?: return
             state.value = current.copy(focusedIndex = index, focusedKey = key)
-            if (!current.loading && current.error == null && current.page < current.totalPages &&
-                index >= current.entries.size - this.columns * 3
-            ) {
-                request(current.page + 1)
-            }
+            prefetch()
+        }
+
+        fun viewportRows(
+            columns: Int,
+            rows: Int,
+        ) {
+            this.columns = columns.coerceAtLeast(1)
+            viewportRows = rows.coerceAtLeast(1)
+            prefetch()
+        }
+
+        private fun prefetch() {
+            val current = state.value
+            if (current.loading || current.error != null || current.entries.isEmpty() || current.page >= current.totalPages) return
+            val ahead = (current.focusedIndex + ((viewportRows ?: 0) + 3) * columns).coerceAtMost(current.totalResults)
+            if (current.entries.size < ahead || current.focusedIndex >= current.entries.size - columns * 3) request(current.page + 1)
         }
 
         fun open(entry: FreshEntry) {
@@ -166,7 +241,10 @@ internal class FreshViewModel
             navigation.navigateToSeerrItem(entry.item)
         }
 
-        private fun request(page: Int) {
+        private fun request(
+            page: Int,
+            eagerInitialFill: Boolean = false,
+        ) {
             val active = session ?: return
             if (!active.isCurrent()) return
             val token = ++generation
@@ -201,7 +279,7 @@ internal class FreshViewModel
                                 gridEpoch = if (append) before.gridEpoch else before.gridEpoch + 1,
                             )
                         lastRefresh = System.currentTimeMillis()
-                        if (append) position(focusedIndex, columns)
+                        if (viewportRows != null || eagerInitialFill) prefetch()
                     } catch (cancel: CancellationException) {
                         throw cancel
                     } catch (error: Exception) {

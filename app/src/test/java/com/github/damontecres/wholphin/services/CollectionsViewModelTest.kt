@@ -1,10 +1,14 @@
 package com.github.damontecres.wholphin.services
 
+import androidx.datastore.core.DataStore
 import com.github.damontecres.wholphin.api.seerr.SeerrApiClient
 import com.github.damontecres.wholphin.api.seerr.infrastructure.ClientException
 import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionItem
 import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionsResponse
+import com.github.damontecres.wholphin.preferences.AppPreferences
 import com.github.damontecres.wholphin.ui.collections.CollectionsViewModel
+import com.github.damontecres.wholphin.ui.collections.collectionsViewOptions
+import com.github.damontecres.wholphin.ui.components.ViewOptions
 import com.github.damontecres.wholphin.ui.nav.Destination
 import io.mockk.every
 import io.mockk.mockk
@@ -12,6 +16,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -27,6 +32,26 @@ import java.util.UUID
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CollectionsViewModelTest {
+    private fun preferences(savedColumns: Int? = null): DataStore<AppPreferences> =
+        mockk<DataStore<AppPreferences>>(relaxed = true).also {
+            val saved =
+                AppPreferences
+                    .newBuilder()
+                    .apply { if (savedColumns != null) putCollectionsViewOptions("one", """{"columns":$savedColumns}""") }
+                    .build()
+            every { it.data } returns flowOf(saved)
+        }
+
+    @Test fun collectionsViewOptionsAreIndependentAndBounded() {
+        assertEquals(ViewOptions(), collectionsViewOptions(null))
+        assertEquals(ViewOptions(), collectionsViewOptions("invalid"))
+        val decoded = collectionsViewOptions("""{"columns":30,"spacing":-4,"showBackdrop":true,"showTitles":false}""")
+        assertEquals(12, decoded.columns)
+        assertEquals(0, decoded.spacing)
+        assertTrue(decoded.showBackdrop)
+        assertFalse(decoded.showTitles)
+    }
+
     private fun entry(id: Int) =
         CollectionsEntry(
             LibraryCollectionItem(id, "Collection $id", null, null, null, 1, 4, LibraryCollectionItem.Completeness.INCOMPLETE),
@@ -50,11 +75,70 @@ class CollectionsViewModelTest {
     private fun model(
         backend: CollectionsBackend,
         source: MutableStateFlow<CollectionsSession?>,
+        savedColumns: Int? = null,
     ): CollectionsViewModel {
         val sessionSource = mockk<CollectionsSessionSource>()
         every { sessionSource.sessions } returns source
-        return CollectionsViewModel(sessionSource, mockk(relaxed = true))
+        return CollectionsViewModel(sessionSource, mockk(relaxed = true), preferences(savedColumns), mockk(relaxed = true))
     }
+
+    @Test fun savedWideGridFillsThreeRowsBeforeAnyFocusMove() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val calls = mutableListOf<Int>()
+                val backend =
+                    object : CollectionsBackend {
+                        override suspend fun page(
+                            skip: Int,
+                            filter: CollectionsFilter,
+                            sort: CollectionsSort,
+                        ): CollectionsPageData {
+                            calls += skip
+                            return page(skip)
+                        }
+
+                        override suspend fun detail(id: Int) = CollectionDetailsData(id, "Collection $id", null, null, null, emptyList())
+                    }
+                val vm = model(backend, MutableStateFlow(session(backend)), savedColumns = 10)
+                runCurrent()
+                assertEquals(listOf(0, 20), calls)
+                assertEquals(40, vm.state.value.entries.size)
+                assertEquals(10, vm.state.value.viewOptions.columns)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun measuredViewportContinuesFillingWithoutFocusMovement() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val calls = mutableListOf<Int>()
+                val backend =
+                    object : CollectionsBackend {
+                        override suspend fun page(
+                            skip: Int,
+                            filter: CollectionsFilter,
+                            sort: CollectionsSort,
+                        ): CollectionsPageData {
+                            calls += skip
+                            return page(skip)
+                        }
+
+                        override suspend fun detail(id: Int) = CollectionDetailsData(id, "Collection $id", null, null, null, emptyList())
+                    }
+                val vm = model(backend, MutableStateFlow(session(backend)))
+                runCurrent()
+                assertEquals(listOf(0), calls)
+                vm.viewportRows(countColumns = 10, rows = 4)
+                runCurrent()
+                assertEquals(listOf(0, 20, 40), calls)
+                assertEquals(45, vm.state.value.entries.size)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
 
     private fun session(
         backend: CollectionsBackend,
@@ -88,7 +172,7 @@ class CollectionsViewModelTest {
                 }
                 val source = mockk<CollectionsSessionSource>()
                 every { source.sessions } returns MutableStateFlow(session(backend))
-                val vm = CollectionsViewModel(source, navigation)
+                val vm = CollectionsViewModel(source, navigation, preferences(), mockk(relaxed = true))
                 runCurrent()
                 vm.position(1, 6)
                 vm.open(entry(2))

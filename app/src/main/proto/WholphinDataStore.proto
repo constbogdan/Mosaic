@@ -282,4 +282,11 @@ message AppPreferences {
   UpdateChannel update_channel = 16;
   // Keyed by the existing personal Watchlist identity (Seerr and Jellyfin user/server).
   map<string, string> watchlist_filters = 17;
+  // Presentation only; isolated from Jellyfin Library display settings.
+  map<string, string> watchlist_view_options = 18;
+  // Fresh presentation is independent of Watchlist and Library options.
+  map<string, string> fresh_view_options = 19;
+  // Collections and Leaving Soon have independent presentation settings.
+  map<string, string> collections_view_options = 20;
+  map<string, string> leaving_soon_view_options = 21;
 }

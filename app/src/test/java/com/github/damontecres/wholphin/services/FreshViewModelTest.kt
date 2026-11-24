@@ -1,12 +1,16 @@
 package com.github.damontecres.wholphin.services
 
+import androidx.datastore.core.DataStore
 import com.github.damontecres.wholphin.api.seerr.SeerrApiClient
 import com.github.damontecres.wholphin.api.seerr.model.FreshStatus
 import com.github.damontecres.wholphin.data.model.DiscoverItem
 import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.data.model.SeerrItemType
+import com.github.damontecres.wholphin.preferences.AppPreferences
+import com.github.damontecres.wholphin.ui.components.ViewOptions
 import com.github.damontecres.wholphin.ui.fresh.FreshViewModel
 import com.github.damontecres.wholphin.ui.fresh.freshGridPositionCallback
+import com.github.damontecres.wholphin.ui.fresh.freshViewOptions
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -15,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -30,6 +35,160 @@ import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FreshViewModelTest {
+    @Test fun freshViewOptionsAreIndependentAndBounded() {
+        assertEquals(ViewOptions(), freshViewOptions(null))
+        assertEquals(ViewOptions(), freshViewOptions("invalid"))
+        val decoded = freshViewOptions("""{"columns":30,"spacing":-4,"showBackdrop":true,"showTitles":false}""")
+        assertEquals(12, decoded.columns)
+        assertEquals(0, decoded.spacing)
+        assertTrue(decoded.showBackdrop)
+        assertFalse(decoded.showTitles)
+    }
+
+    @Test fun viewportPrefetchFillsWideGridWithoutWaitingForFocus() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val calls = mutableListOf<Int>()
+                val vm =
+                    model(
+                        object : FreshBackend {
+                            override suspend fun page(
+                                category: FreshCategory,
+                                sort: FreshSort,
+                                page: Int,
+                            ): FreshPageData {
+                                calls += page
+                                return this@FreshViewModelTest.page(page)
+                            }
+                        },
+                    )
+                runCurrent()
+                assertEquals(listOf(1), calls)
+                vm.viewportRows(columns = 10, rows = 4)
+                runCurrent()
+                assertEquals(listOf(1, 2, 3), calls)
+                assertEquals(45, vm.state.value.entries.size)
+                vm.viewportRows(columns = 10, rows = 4)
+                runCurrent()
+                assertEquals(listOf(1, 2, 3), calls)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun savedColumnsStartMinimumFillBeforeGridMeasurement() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val firstPage = CompletableDeferred<FreshPageData>()
+                val calls = mutableListOf<Int>()
+                val vm =
+                    model(
+                        object : FreshBackend {
+                            override suspend fun page(
+                                category: FreshCategory,
+                                sort: FreshSort,
+                                page: Int,
+                            ): FreshPageData {
+                                calls += page
+                                return if (page == 1) firstPage.await() else this@FreshViewModelTest.page(page)
+                            }
+                        },
+                        savedColumns = 10,
+                    )
+                runCurrent()
+                assertEquals(listOf(1), calls)
+                firstPage.complete(page(1))
+                runCurrent()
+                assertEquals(listOf(1, 2), calls)
+                assertEquals(40, vm.state.value.entries.size)
+
+                // The existing measured-viewport lead remains active after initial fill.
+                vm.viewportRows(columns = 10, rows = 4)
+                runCurrent()
+                assertEquals(listOf(1, 2, 3), calls)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun savedColumnsDoNotRequestAPageBeyondTheFirstPage() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val calls = mutableListOf<Int>()
+                val vm =
+                    model(
+                        object : FreshBackend {
+                            override suspend fun page(
+                                category: FreshCategory,
+                                sort: FreshSort,
+                                page: Int,
+                            ): FreshPageData {
+                                calls += page
+                                return this@FreshViewModelTest.page(1, total = 20).copy(totalPages = 1)
+                            }
+                        },
+                        savedColumns = 10,
+                    )
+                runCurrent()
+                assertEquals(listOf(1), calls)
+                assertEquals(20, vm.state.value.entries.size)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test fun freshOwnerStaysLoadingUntilFirstPageIsReady() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val pending = CompletableDeferred<FreshPageData>()
+                val vm =
+                    model(
+                        object : FreshBackend {
+                            override suspend fun page(
+                                category: FreshCategory,
+                                sort: FreshSort,
+                                page: Int,
+                            ): FreshPageData = pending.await()
+                        },
+                    )
+                runCurrent()
+                assertEquals("owner", vm.state.value.owner)
+                assertTrue(vm.state.value.loading)
+                assertTrue(
+                    vm.state.value.entries
+                        .isEmpty(),
+                )
+                pending.complete(page(1))
+                runCurrent()
+                assertFalse(vm.state.value.loading)
+                assertEquals(20, vm.state.value.entries.size)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    private fun preferences(savedColumns: Int? = null): DataStore<AppPreferences> =
+        mockk<DataStore<AppPreferences>>(relaxed = true).also {
+            val saved =
+                AppPreferences
+                    .newBuilder()
+                    .apply {
+                        if (savedColumns != null) {
+                            putFreshViewOptions("owner", """{"columns":$savedColumns}""")
+                        }
+                    }.build()
+            every { it.data } returns flowOf(saved)
+        }
+
+    private fun model(
+        source: FreshSessionSource,
+        navigation: NavigationManager = mockk(relaxed = true),
+    ) = FreshViewModel(source, navigation, preferences(), mockk(relaxed = true))
+
     private fun entries(
         start: Int,
         count: Int,
@@ -48,11 +207,14 @@ class FreshViewModelTest {
         entries((number - 1) * 20, (total - (number - 1) * 20).coerceIn(0, 20)),
     )
 
-    private fun model(backend: FreshBackend): FreshViewModel {
+    private fun model(
+        backend: FreshBackend,
+        savedColumns: Int? = null,
+    ): FreshViewModel {
         val source = mockk<FreshSessionSource>()
         val client = SeerrApiClient("http://seerr.invalid/api/v1", null, OkHttpClient())
         every { source.sessions } returns MutableStateFlow(FreshSession("owner", backend, { true }, client))
-        return FreshViewModel(source, mockk(relaxed = true))
+        return FreshViewModel(source, mockk(relaxed = true), preferences(savedColumns), mockk(relaxed = true))
     }
 
     @Test fun cardGridCallbackPassesActualIndexAndColumnCount() =
@@ -330,7 +492,7 @@ class FreshViewModelTest {
                 val sessions = MutableStateFlow<FreshSession?>(FreshSession("owner", backend, { true }, client))
                 val source = mockk<FreshSessionSource>()
                 every { source.sessions } returns sessions
-                val vm = FreshViewModel(source, mockk(relaxed = true))
+                val vm = model(source)
                 runCurrent()
                 vm.category(FreshCategory.ANIMATION)
                 vm.sort(FreshSort.RATING)
@@ -412,7 +574,7 @@ class FreshViewModelTest {
                 val client = SeerrApiClient("http://seerr.invalid/api/v1", null, OkHttpClient())
                 every { source.sessions } returns MutableStateFlow(FreshSession("owner", backend, { true }, client))
                 val navigation = mockk<NavigationManager>(relaxed = true)
-                val vm = FreshViewModel(source, navigation)
+                val vm = model(source, navigation)
                 runCurrent()
                 vm.position(5, 4)
                 runCurrent()
@@ -459,7 +621,7 @@ class FreshViewModelTest {
                 val sessions = MutableStateFlow<FreshSession?>(FreshSession("owner", backend, { active }, client))
                 val source = mockk<FreshSessionSource>()
                 every { source.sessions } returns sessions
-                val vm = FreshViewModel(source, mockk(relaxed = true))
+                val vm = model(source)
                 runCurrent()
                 active = false
                 sessions.value = null
@@ -496,7 +658,7 @@ class FreshViewModelTest {
                 val source = mockk<FreshSessionSource>()
                 val client = SeerrApiClient("http://seerr.invalid/api/v1", null, OkHttpClient())
                 every { source.sessions } returns MutableStateFlow(FreshSession("owner", backend, { true }, client))
-                val vm = FreshViewModel(source, mockk(relaxed = true))
+                val vm = model(source)
                 runCurrent()
                 vm.position(9, 4)
                 runCurrent()
@@ -528,7 +690,7 @@ class FreshViewModelTest {
                 val source = mockk<FreshSessionSource>()
                 val client = SeerrApiClient("http://seerr.invalid/api/v1", null, OkHttpClient())
                 every { source.sessions } returns MutableStateFlow(FreshSession("owner", backend, { true }, client))
-                val vm = FreshViewModel(source, mockk(relaxed = true))
+                val vm = model(source)
                 runCurrent()
                 assertEquals(FreshStatus.Status.DISABLED, vm.state.value.status)
                 assertTrue(

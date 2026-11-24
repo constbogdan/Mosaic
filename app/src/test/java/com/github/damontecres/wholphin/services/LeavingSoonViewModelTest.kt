@@ -1,10 +1,14 @@
 package com.github.damontecres.wholphin.services
 
+import androidx.datastore.core.DataStore
 import com.github.damontecres.wholphin.api.seerr.SeerrApiClient
 import com.github.damontecres.wholphin.data.model.DiscoverItem
 import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.data.model.SeerrItemType
+import com.github.damontecres.wholphin.preferences.AppPreferences
+import com.github.damontecres.wholphin.ui.components.ViewOptions
 import com.github.damontecres.wholphin.ui.leavingsoon.LeavingSoonViewModel
+import com.github.damontecres.wholphin.ui.leavingsoon.leavingSoonViewOptions
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -13,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -28,6 +33,26 @@ import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LeavingSoonViewModelTest {
+    private fun preferences(savedColumns: Int? = null): DataStore<AppPreferences> =
+        mockk<DataStore<AppPreferences>>(relaxed = true).also {
+            val saved =
+                AppPreferences
+                    .newBuilder()
+                    .apply { if (savedColumns != null) putLeavingSoonViewOptions("one", """{"columns":$savedColumns}""") }
+                    .build()
+            every { it.data } returns flowOf(saved)
+        }
+
+    @Test fun leavingSoonViewOptionsAreBoundedWithoutUnsupportedBackdrop() {
+        assertEquals(ViewOptions(), leavingSoonViewOptions(null))
+        assertEquals(ViewOptions(), leavingSoonViewOptions("invalid"))
+        val decoded = leavingSoonViewOptions("""{"columns":30,"spacing":-4,"showBackdrop":true,"showTitles":false}""")
+        assertEquals(12, decoded.columns)
+        assertEquals(0, decoded.spacing)
+        assertFalse(decoded.showBackdrop)
+        assertFalse(decoded.showTitles)
+    }
+
     private fun entry(id: Int): LeavingSoonEntry =
         LeavingSoonEntry(
             canonicalMediaId = id,
@@ -64,13 +89,43 @@ class LeavingSoonViewModelTest {
             (1..(total - (number - 1) * 20).coerceIn(0, 20)).map { entry((number - 1) * 20 + it) },
         )
 
-    private fun model(backend: LeavingSoonBackend): Pair<LeavingSoonViewModel, MutableStateFlow<LeavingSoonSession?>> {
+    private fun model(
+        backend: LeavingSoonBackend,
+        savedColumns: Int? = null,
+    ): Pair<LeavingSoonViewModel, MutableStateFlow<LeavingSoonSession?>> {
         val source = mockk<LeavingSoonSessionSource>()
         val client = SeerrApiClient("http://seerr.invalid/api/v1", null, OkHttpClient())
         val sessions = MutableStateFlow<LeavingSoonSession?>(LeavingSoonSession("one", backend, { true }, client))
         every { source.sessions } returns sessions
-        return LeavingSoonViewModel(source, mockk(relaxed = true)) to sessions
+        return LeavingSoonViewModel(source, mockk(relaxed = true), preferences(savedColumns)) to sessions
     }
+
+    @Test fun savedWideGridFillsThreeRowsBeforeAnyFocusMove() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val calls = mutableListOf<Int>()
+                val (vm, _) =
+                    model(
+                        object : LeavingSoonBackend {
+                            override suspend fun page(
+                                category: LeavingSoonCategory,
+                                page: Int,
+                            ): LeavingSoonPageData {
+                                calls += page
+                                return this@LeavingSoonViewModelTest.page(page)
+                            }
+                        },
+                        savedColumns = 10,
+                    )
+                runCurrent()
+                assertEquals(listOf(1, 2), calls)
+                assertEquals(40, vm.state.value.entries.size)
+                assertEquals(10, vm.state.value.viewOptions.columns)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
 
     @Test fun tabSwitchResetsPagesAndRequestsServerFilter() =
         runTest {
@@ -306,7 +361,7 @@ class LeavingSoonViewModelTest {
                     }
                 every { source.sessions } returns MutableStateFlow(LeavingSoonSession("owner", backend, { true }, client))
                 val navigation = mockk<NavigationManager>(relaxed = true)
-                val vm = LeavingSoonViewModel(source, navigation)
+                val vm = LeavingSoonViewModel(source, navigation, preferences())
                 runCurrent()
                 vm.open(movie)
                 assertEquals(movie.key, vm.state.value.focusedKey)
