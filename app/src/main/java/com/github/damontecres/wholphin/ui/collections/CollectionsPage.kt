@@ -65,7 +65,9 @@ import com.github.damontecres.wholphin.ui.components.ExpandableFaButton
 import com.github.damontecres.wholphin.ui.components.LoadingPage
 import com.github.damontecres.wholphin.ui.components.ViewOptions
 import com.github.damontecres.wholphin.ui.components.ViewOptionsDialog
+import com.github.damontecres.wholphin.ui.components.rememberCustomPageFocusOwner
 import com.github.damontecres.wholphin.ui.detail.CardGrid
+import com.github.damontecres.wholphin.ui.nav.LocalActiveDrawerFocusRequester
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 
 private val collectionsPresentationOptions =
@@ -102,6 +104,19 @@ internal fun CollectionsPage(
     }
     val filterFocusRequesters = remember(state.owner) { CollectionsFilter.entries.associateWith { FocusRequester() } }
     val gridFocusRequester = remember(state.owner, state.filter, state.sort) { FocusRequester() }
+    val drawerFocusRequester = LocalActiveDrawerFocusRequester.current
+    var gridReady by remember(state.owner, state.filter, state.sort, state.gridEpoch, state.viewOptions.columns) {
+        mutableStateOf(false)
+    }
+    val pageFocusModifier =
+        rememberCustomPageFocusOwner(
+            isTop = viewModel.isCollectionsTop(),
+            contentReady = gridReady && state.entries.isNotEmpty(),
+            mayFocusGrid = !ribbonVisible && !showViewOptions,
+            gridFocusRequester = gridFocusRequester,
+            ribbonVisible = ribbonVisible && !showViewOptions,
+            ribbonFocusRequester = filterFocusRequesters[state.filter],
+        )
     val viewOptionsFocusRequester = remember(state.owner) { FocusRequester() }
     val retryFocusRequester = remember(state.owner) { FocusRequester() }
     val isTop = viewModel.isCollectionsTop()
@@ -146,7 +161,7 @@ internal fun CollectionsPage(
             if (viewOptionsFocusRequester.tryRequestFocus()) restoreViewOptionsFocus = false
         }
     }
-    Column(modifier.fillMaxSize()) {
+    Column(modifier.fillMaxSize().then(pageFocusModifier)) {
         AnimatedVisibility(visible = ribbonVisible, enter = expandVertically(), exit = shrinkVertically()) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -211,7 +226,7 @@ internal fun CollectionsPage(
             }
         }
         if (state.loading && state.entries.isEmpty()) {
-            LoadingPage(Modifier.weight(1f), focusEnabled = !ribbonHasFocus)
+            LoadingPage(Modifier.weight(1f), focusEnabled = false)
         } else if (state.entries.isEmpty()) {
             val text =
                 when {
@@ -224,17 +239,6 @@ internal fun CollectionsPage(
             Text(stringResource(text), Modifier.padding(16.dp))
         } else {
             key(state.owner, state.filter, state.sort, state.gridEpoch, state.viewOptions.columns) {
-                LaunchedEffect(Unit) {
-                    if (!ribbonVisible && !showViewOptions) {
-                        repeat(45) {
-                            withFrameNanos { }
-                            if (gridHasFocus || ribbonHasFocus || ribbonVisible || showViewOptions || !viewModel.isCollectionsTop()) {
-                                return@LaunchedEffect
-                            }
-                            gridFocusRequester.tryRequestFocus()
-                        }
-                    }
-                }
                 CardGrid(
                     pager = state.entries,
                     totalItems = state.total,
@@ -258,6 +262,8 @@ internal fun CollectionsPage(
                     onClickPlay = { _, _ -> },
                     letterPosition = { 0 },
                     gridFocusRequester = gridFocusRequester,
+                    leftmostItemFocusRequester = drawerFocusRequester,
+                    onFocusTargetReady = { gridReady = true },
                     initialPosition = state.focusedIndex,
                     positionCallback = { columns, index -> viewModel.position(index, columns) },
                     showJumpButtons = false,

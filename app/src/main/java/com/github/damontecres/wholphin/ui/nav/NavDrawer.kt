@@ -31,9 +31,11 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -325,6 +327,9 @@ private const val HOME_INDEX = -1
 private const val SEARCH_INDEX = -2
 private const val NOW_PLAYING_INDEX = -3
 private const val DOWNLOADS_INDEX = -4
+
+/** The selected drawer destination, scoped to content rather than global focus search. */
+val LocalActiveDrawerFocusRequester = compositionLocalOf<FocusRequester?> { null }
 
 /**
  * Display the left side navigation drawer with [DestinationContent] on the right
@@ -646,17 +651,19 @@ fun NavDrawer(
             modifier = Modifier.fillMaxSize(),
         ) {
             // Drawer content
-            DestinationContent(
-                destination = destination,
-                preferences = preferences,
-                onClearBackdrop = onClearBackdrop,
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .offset {
-                            offset
-                        }.padding(start = closedDrawerWidth + 8.dp, end = 16.dp),
-            )
+            CompositionLocalProvider(LocalActiveDrawerFocusRequester provides focusRequester) {
+                DestinationContent(
+                    destination = destination,
+                    preferences = preferences,
+                    onClearBackdrop = onClearBackdrop,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .offset {
+                                offset
+                            }.padding(start = closedDrawerWidth + 8.dp, end = 16.dp),
+                )
+            }
             if (preferences.appPreferences.interfacePreferences.showClock) {
                 TimeDisplay()
             }

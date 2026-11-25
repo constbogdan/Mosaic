@@ -57,6 +57,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onLayoutRectChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -149,6 +150,8 @@ fun <T : CardGridItem> CardGrid(
     footerFocusRequestEpoch: Long = 0,
     useFooterAsFocusRestorer: Boolean = true,
     prepareFooterFocus: (suspend () -> Unit)? = null,
+    leftmostItemFocusRequester: FocusRequester? = null,
+    onFocusTargetReady: (() -> Unit)? = null,
 ) {
     val leadingEmptySlots = if (alignWindowToAbsoluteRows) gridLeadingSlots(positionOffset, columns) else 0
     val startPosition =
@@ -487,6 +490,15 @@ fun <T : CardGridItem> CardGrid(
                                         mod =
                                             mod
                                                 .ifElse(
+                                                    leftmostItemFocusRequester != null &&
+                                                        (index == 0 || (positionOffset + index) % columns == 0),
+                                                    Modifier.focusProperties {
+                                                        left = leftmostItemFocusRequester ?: FocusRequester.Default
+                                                    },
+                                                ).ifElse(
+                                                    index == focusedIndex && onFocusTargetReady != null,
+                                                    Modifier.onGloballyPositioned { onFocusTargetReady?.invoke() },
+                                                ).ifElse(
                                                     index == 0,
                                                     Modifier.focusRequester(zeroFocus),
                                                 ).onFocusChanged { focusState ->

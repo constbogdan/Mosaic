@@ -353,9 +353,42 @@ not current instruction.
   reports that a request was issued. The nested entry waits for its navigation lifecycle
   to resume, then makes bounded focus attempts. The partial-count warning is distinct
   from the removed technical older-snapshot notice and still reflects backend status.
-  Separate observed avatar-first entry handoffs and Left-edge navigation from Fresh,
-  Watchlist, Collections, Leaving Soon, and Similar Collections remain deferred; this
-  candidate does not claim to correct those focus paths.
+  The nested Similar Collections focus path is separate from the four-page browser
+  correction below; this earlier candidate did not claim to correct either path.
+
+- Four custom catalog pages (Watchlist, Fresh, Collections, Leaving Soon) now have a
+  local shared-focus candidate on `fix/shared-custom-page-focus` from merged main
+  `d2ae71c5`. A persistent page focus boundary owns focus while loading; the grid
+  handoff is tied to a composed target, not a timed retry loop. A currently visible
+  ribbon is an explicit Right-entry target, while Watchlist Random's existing Back
+  restoration keeps priority. `CardGrid` routes Left only from a window's first
+  card or an absolute leftmost column to the active drawer item supplied by
+  `NavDrawer`; native Library callers retain their defaults. Leaving Soon keeps
+  `initializing` distinct from a completed empty result, so preferences suspension
+  does not reveal the ribbon prematurely. Emulator/physical-TV acceptance remains
+  distinct from focused JVM tests. Temporary emulator logging observed a residual
+  7-30 ms avatar-focus event before the page boundary takes focus on each custom
+  destination; the earlier multi-second avatar hold during loading was not seen.
+  Do not claim zero avatar-focus events or generalize this browser contract to
+  the nested Similar Collections row without separate evidence.
+  This is an incremental shared custom-page focus adapter, not universal page
+  orchestration or a replacement for native Movies/Shows focus handling. A future
+  custom browser must keep its page boundary composed through loading, provide a
+  stable readiness key and call the grid-ready callback only after its first
+  focusable target is composed, supply the active drawer item requester for
+  left-edge grid navigation, and identify its ribbon focus target. The page
+  still owns its data loading, Back handling, selected-card/scroll restoration,
+  and nested-detail focus. Leaving Soon also defers empty-state focus until
+  initialization has completed. Bounded emulator checks covered native Movies
+  and Shows Library entry, first/deep-row drawer navigation and Details Back;
+  Watchlist Random opened Details and returned focus to Random. Synthetic UI
+  tests cover a page-5 Watchlist Random return and empty/error focus states.
+  Physical-TV validation remains outstanding; the 7-30 ms avatar callback has
+  not been shown to produce a rendered highlight. The reported
+  boundary-to-first-card intervals
+  (Watchlist 9.542 s, Fresh 5.287 s, Collections 2.491 s, Leaving Soon 2.569 s)
+  are focus-acquisition measurements, not isolated API or rendering timings,
+  and belong to a separate page-initialization investigation.
 
 - Collection Details B06 passed the operator's final 2026-11-18 emulator acceptance for
   R1/R2/R3 and two-stage Back-to-Request; the earlier failed pass remains historical evidence.

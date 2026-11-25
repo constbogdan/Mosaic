@@ -56,8 +56,10 @@ import com.github.damontecres.wholphin.ui.components.ExpandableFaButton
 import com.github.damontecres.wholphin.ui.components.LoadingPage
 import com.github.damontecres.wholphin.ui.components.ViewOptions
 import com.github.damontecres.wholphin.ui.components.ViewOptionsDialog
+import com.github.damontecres.wholphin.ui.components.rememberCustomPageFocusOwner
 import com.github.damontecres.wholphin.ui.detail.CardGrid
 import com.github.damontecres.wholphin.ui.discover.LocalQuickMovieRequest
+import com.github.damontecres.wholphin.ui.nav.LocalActiveDrawerFocusRequester
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 
 private val freshPresentationOptions =
@@ -108,6 +110,19 @@ internal fun FreshPage(
     val viewOptionsFocusRequester = remember(state.owner) { FocusRequester() }
     val retryFocusRequester = remember(state.owner) { FocusRequester() }
     val isTop = viewModel.isFreshTop()
+    val drawerFocusRequester = LocalActiveDrawerFocusRequester.current
+    var gridReady by remember(state.owner, state.category, state.sort, state.gridEpoch, state.viewOptions.columns) {
+        mutableStateOf(false)
+    }
+    val pageFocusModifier =
+        rememberCustomPageFocusOwner(
+            isTop = isTop,
+            contentReady = gridReady && state.entries.isNotEmpty(),
+            mayFocusGrid = !ribbonVisible && !showViewOptions,
+            gridFocusRequester = gridFocusRequester,
+            ribbonVisible = ribbonVisible && !showViewOptions,
+            ribbonFocusRequester = categoryFocusRequesters[state.category],
+        )
     val focused = state.entries.getOrNull(state.focusedIndex)
     LaunchedEffect(isTop, state.viewOptions.showBackdrop, focused?.key, focused?.item?.backDropUrl) {
         if (isTop) viewModel.updateBackdrop(focused.takeIf { state.viewOptions.showBackdrop })
@@ -140,7 +155,7 @@ internal fun FreshPage(
         }
     }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
-    Column(modifier.fillMaxSize()) {
+    Column(modifier.fillMaxSize().then(pageFocusModifier)) {
         AnimatedVisibility(visible = ribbonVisible, enter = expandVertically(), exit = shrinkVertically()) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -207,7 +222,7 @@ internal fun FreshPage(
             ) { Text(stringResource(R.string.retry)) }
         }
         if (state.loading && state.entries.isEmpty()) {
-            LoadingPage(Modifier.fillMaxSize(), focusEnabled = !ribbonHasFocus)
+            LoadingPage(Modifier.fillMaxSize(), focusEnabled = false)
         } else if (state.entries.isEmpty()) {
             val message =
                 when {
@@ -225,14 +240,6 @@ internal fun FreshPage(
             Text(stringResource(message), Modifier.padding(16.dp))
         } else {
             key(state.owner, state.category, state.sort, state.gridEpoch, state.viewOptions.columns) {
-                LaunchedEffect(Unit) {
-                    if (!ribbonVisible && !showViewOptions) {
-                        repeat(5) {
-                            withFrameNanos { }
-                            if (gridFocusRequester.tryRequestFocus()) return@LaunchedEffect
-                        }
-                    }
-                }
                 CardGrid(
                     pager = state.entries,
                     totalItems = state.totalResults,
@@ -259,6 +266,8 @@ internal fun FreshPage(
                     onClickPlay = { _, _ -> },
                     letterPosition = { 0 },
                     gridFocusRequester = gridFocusRequester,
+                    leftmostItemFocusRequester = drawerFocusRequester,
+                    onFocusTargetReady = { gridReady = true },
                     initialPosition = state.focusedIndex,
                     positionCallback = { columns, index ->
                         viewModel.position(index, columns)
