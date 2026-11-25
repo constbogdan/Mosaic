@@ -1,6 +1,5 @@
 package com.github.damontecres.wholphin.ui.leavingsoon
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -17,7 +16,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -56,9 +54,9 @@ import com.github.damontecres.wholphin.ui.components.ExpandableFaButton
 import com.github.damontecres.wholphin.ui.components.LoadingPage
 import com.github.damontecres.wholphin.ui.components.ViewOptions
 import com.github.damontecres.wholphin.ui.components.ViewOptionsDialog
+import com.github.damontecres.wholphin.ui.components.rememberCustomPageDetailsReturnEpoch
 import com.github.damontecres.wholphin.ui.components.rememberCustomPageFocusOwner
 import com.github.damontecres.wholphin.ui.detail.CardGrid
-import com.github.damontecres.wholphin.ui.detail.gridLeadingSlots
 import com.github.damontecres.wholphin.ui.discover.LocalQuickMovieRequest
 import com.github.damontecres.wholphin.ui.nav.LocalActiveDrawerFocusRequester
 import com.github.damontecres.wholphin.ui.tryRequestFocus
@@ -111,28 +109,24 @@ internal fun LeavingSoonPage(
     val gridFocusRequester = remember(state.owner, state.category) { FocusRequester() }
     val categoryFocusRequesters = remember(state.owner) { LeavingSoonCategory.entries.associateWith { FocusRequester() } }
     val drawerFocusRequester = LocalActiveDrawerFocusRequester.current
+    val isTop = viewModel.isLeavingSoonTop()
+    val restoreFocusEpoch =
+        rememberCustomPageDetailsReturnEpoch(
+            isTop = isTop,
+            focusAnchorKey = state.focusedKey,
+            ribbonHasFocus = ribbonHasFocus,
+            scopeKey = state.owner to state.category,
+        )
     var gridReady by remember(state.owner, state.category, state.gridEpoch, state.viewOptions.columns) { mutableStateOf(false) }
     val pageFocusModifier =
         rememberCustomPageFocusOwner(
-            isTop = viewModel.isLeavingSoonTop(),
+            isTop = isTop,
             contentReady = gridReady && state.entries.isNotEmpty(),
             mayFocusGrid = !ribbonVisible && !showViewOptions,
             gridFocusRequester = gridFocusRequester,
             ribbonVisible = ribbonVisible && !showViewOptions,
             ribbonFocusRequester = categoryFocusRequesters[state.category],
         )
-    var gridHasFocus by remember(state.owner, state.category) { mutableStateOf(false) }
-    var backToTopEpoch by remember(state.owner, state.category, state.gridEpoch, state.viewOptions.columns) {
-        mutableLongStateOf(0L)
-    }
-    val firstRowItems =
-        state.viewOptions.columns - gridLeadingSlots((state.firstPage - 1) * LEAVING_SOON_PAGE_SIZE, state.viewOptions.columns)
-    BackHandler(
-        enabled = viewModel.isLeavingSoonTop() && gridHasFocus && state.entries.isNotEmpty() && state.focusedIndex >= firstRowItems,
-    ) {
-        ribbonVisible = true
-        backToTopEpoch++
-    }
     LaunchedEffect(state.owner, state.loading, state.entries.isEmpty(), state.error) {
         if (state.entries.isEmpty() && !state.initializing && !state.loading && (state.owner != null || state.error != null)) {
             ribbonVisible = true
@@ -230,8 +224,8 @@ internal fun LeavingSoonPage(
                     positionOffset = (state.firstPage - 1) * LEAVING_SOON_PAGE_SIZE,
                     alignWindowToAbsoluteRows = true,
                     focusAnchorKey = state.focusedKey,
+                    focusRequestEpoch = restoreFocusEpoch,
                     onGridFocusChanged = { focused ->
-                        gridHasFocus = focused
                         if (focused) ribbonVisible = false
                     },
                     onViewportRowsChanged = viewModel::viewportRows,
@@ -240,8 +234,8 @@ internal fun LeavingSoonPage(
                         requestCategoryFocus = true
                         true
                     },
-                    backToTopOnBack = false,
-                    backToTopRequestEpoch = backToTopEpoch,
+                    onBackToFirstResult = viewModel::backToFirst,
+                    useBackDispatcherFallback = isTop,
                     itemKey = { state.entries[it].key },
                     onClickItem = { _, entry -> viewModel.open(entry) },
                     onLongClickItem = { _, entry ->

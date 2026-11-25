@@ -927,6 +927,31 @@ class WatchlistRepositoryTest {
         }
     }
 
+    @Test fun backFromEvictedWindowLoadsPageOneAndClearsOldFocus() =
+        screenTest { backend, _, viewModel ->
+            backend.pageResult = { _, page ->
+                WatchlistPage(page, 8, 150, ((page - 1) * 20 + 1..page * 20).map(::entry))
+            }
+            runCurrent()
+            val current = viewModel.state.value
+            viewModel.state.value =
+                current.copy(
+                    entries = (81..100).map(::entry),
+                    firstPage = 5,
+                    page = 5,
+                    focusedIndex = 8,
+                    focusedKey = key(89),
+                )
+            viewModel.backToFirst()
+            runCurrent()
+            assertEquals(listOf(1), backend.reads.map { it.second })
+            assertEquals(1, viewModel.state.value.firstPage)
+            assertEquals(1, viewModel.state.value.page)
+            assertEquals(0, viewModel.state.value.focusedIndex)
+            assertEquals(key(1), viewModel.state.value.focusedKey)
+            assertEquals(current.gridEpoch + 1, viewModel.state.value.gridEpoch)
+        }
+
     @Test fun prefetchLeadUsesTheGridReportedColumnCountNotTheApiPageSize() {
         for ((columns, firstPrefetchIndex) in listOf(4 to 8, 7 to 0)) {
             screenTest { backend, _, viewModel ->

@@ -245,6 +245,24 @@ class WatchlistViewModel
             prefetch()
         }
 
+        fun backToFirst() {
+            val current = state.value
+            if (current.owner == null || current.firstPage <= 1) return
+            load?.cancel()
+            generation++
+            state.value =
+                current.copy(
+                    entries = emptyList(),
+                    firstPage = 1,
+                    page = 0,
+                    loading = false,
+                    focusedIndex = 0,
+                    focusedKey = null,
+                    gridEpoch = current.gridEpoch + 1,
+                )
+            request(1, force = false, eagerInitialFill = true)
+        }
+
         fun viewportRows(
             columns: Int,
             rows: Int,

@@ -1,6 +1,5 @@
 package com.github.damontecres.wholphin.ui.fresh
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -17,7 +16,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -56,6 +54,7 @@ import com.github.damontecres.wholphin.ui.components.ExpandableFaButton
 import com.github.damontecres.wholphin.ui.components.LoadingPage
 import com.github.damontecres.wholphin.ui.components.ViewOptions
 import com.github.damontecres.wholphin.ui.components.ViewOptionsDialog
+import com.github.damontecres.wholphin.ui.components.rememberCustomPageDetailsReturnEpoch
 import com.github.damontecres.wholphin.ui.components.rememberCustomPageFocusOwner
 import com.github.damontecres.wholphin.ui.detail.CardGrid
 import com.github.damontecres.wholphin.ui.discover.LocalQuickMovieRequest
@@ -98,18 +97,21 @@ internal fun FreshPage(
     val quickMovieRequest = LocalQuickMovieRequest.current
     var ribbonVisible by remember(state.owner) { mutableStateOf(false) }
     var ribbonHasFocus by remember(state.owner) { mutableStateOf(false) }
-    var gridHasFocus by remember(state.owner, state.category, state.sort) { mutableStateOf(false) }
     var requestCategoryFocus by remember(state.owner) { mutableStateOf(false) }
     var showViewOptions by remember(state.owner) { mutableStateOf(false) }
     var restoreViewOptionsFocus by remember(state.owner) { mutableStateOf(false) }
-    var backToTopEpoch by remember(state.owner, state.category, state.sort, state.gridEpoch, state.viewOptions.columns) {
-        mutableLongStateOf(0L)
-    }
     val categoryFocusRequesters = remember(state.owner) { FreshCategory.entries.associateWith { FocusRequester() } }
     val gridFocusRequester = remember(state.owner, state.category, state.sort) { FocusRequester() }
     val viewOptionsFocusRequester = remember(state.owner) { FocusRequester() }
     val retryFocusRequester = remember(state.owner) { FocusRequester() }
     val isTop = viewModel.isFreshTop()
+    val restoreFocusEpoch =
+        rememberCustomPageDetailsReturnEpoch(
+            isTop = isTop,
+            focusAnchorKey = state.focusedKey,
+            ribbonHasFocus = ribbonHasFocus,
+            scopeKey = Triple(state.owner, state.category, state.sort),
+        )
     val drawerFocusRequester = LocalActiveDrawerFocusRequester.current
     var gridReady by remember(state.owner, state.category, state.sort, state.gridEpoch, state.viewOptions.columns) {
         mutableStateOf(false)
@@ -126,10 +128,6 @@ internal fun FreshPage(
     val focused = state.entries.getOrNull(state.focusedIndex)
     LaunchedEffect(isTop, state.viewOptions.showBackdrop, focused?.key, focused?.item?.backDropUrl) {
         if (isTop) viewModel.updateBackdrop(focused.takeIf { state.viewOptions.showBackdrop })
-    }
-    BackHandler(enabled = isTop && gridHasFocus && state.entries.isNotEmpty() && state.focusedIndex >= state.viewOptions.columns) {
-        ribbonVisible = true
-        backToTopEpoch++
     }
     LaunchedEffect(state.owner, state.loading, state.entries.isEmpty(), state.error) {
         if (state.entries.isEmpty() && !state.loading && (state.owner != null || state.error != null)) {
@@ -244,8 +242,8 @@ internal fun FreshPage(
                     pager = state.entries,
                     totalItems = state.totalResults,
                     focusAnchorKey = state.focusedKey,
+                    focusRequestEpoch = restoreFocusEpoch,
                     onGridFocusChanged = { focused ->
-                        gridHasFocus = focused
                         if (focused) ribbonVisible = false
                     },
                     onViewportRowsChanged = viewModel::viewportRows,
@@ -254,8 +252,7 @@ internal fun FreshPage(
                         requestCategoryFocus = true
                         true
                     },
-                    backToTopOnBack = false,
-                    backToTopRequestEpoch = backToTopEpoch,
+                    useBackDispatcherFallback = isTop,
                     itemKey = { state.entries[it].key },
                     onClickItem = { _, entry -> viewModel.open(entry) },
                     onLongClickItem = { _, entry ->

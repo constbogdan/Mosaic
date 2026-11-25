@@ -20,7 +20,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -62,9 +61,9 @@ import com.github.damontecres.wholphin.ui.components.ExpandableFaButton
 import com.github.damontecres.wholphin.ui.components.LoadingPage
 import com.github.damontecres.wholphin.ui.components.ViewOptions
 import com.github.damontecres.wholphin.ui.components.ViewOptionsDialog
+import com.github.damontecres.wholphin.ui.components.rememberCustomPageDetailsReturnEpoch
 import com.github.damontecres.wholphin.ui.components.rememberCustomPageFocusOwner
 import com.github.damontecres.wholphin.ui.detail.CardGrid
-import com.github.damontecres.wholphin.ui.detail.gridLeadingSlots
 import com.github.damontecres.wholphin.ui.nav.LocalActiveDrawerFocusRequester
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 
@@ -112,19 +111,25 @@ fun WatchlistPage(
     var menu by remember(state.owner, state.category, state.filters) { mutableStateOf<WatchlistEntry?>(null) }
     var ribbonVisible by remember(state.owner) { mutableStateOf(false) }
     var ribbonHasFocus by remember(state.owner) { mutableStateOf(false) }
-    var gridHasFocus by remember(state.owner, state.category, state.filters) { mutableStateOf(false) }
     var requestCategoryFocus by remember(state.owner) { mutableStateOf(false) }
     var restoreViewOptionsFocus by remember(state.owner) { mutableStateOf(false) }
     var showViewOptions by remember(state.owner) { mutableStateOf(false) }
-    var backToTopEpoch by remember(state.owner, state.category, state.filters, state.gridEpoch, state.viewOptions.columns) {
-        mutableLongStateOf(0L)
-    }
     val categoryFocusRequesters = remember(state.owner) { WatchlistCategory.entries.associateWith { FocusRequester() } }
     val gridFocusRequester = remember(state.owner, state.category, state.filters) { FocusRequester() }
     val randomFocusRequester = remember(state.owner) { FocusRequester() }
     val viewOptionsFocusRequester = remember(state.owner) { FocusRequester() }
     val retryFocusRequester = remember(state.owner) { FocusRequester() }
     val watchlistIsTop = viewModel.isWatchlistTop()
+    val restoreFocusEpoch =
+        rememberCustomPageDetailsReturnEpoch(
+            isTop = watchlistIsTop,
+            focusAnchorKey = state.focusedKey?.let { "${it.mediaType}:${it.tmdbId}" },
+            ribbonHasFocus = ribbonHasFocus,
+            // Random may consume its return flag before ON_RESUME; its visible ribbon
+            // still owns focus and must not be replaced by the saved grid card.
+            suppress = state.restoreRandomFocus || ribbonVisible,
+            scopeKey = Triple(state.owner, state.category, state.filters),
+        )
     val drawerFocusRequester = LocalActiveDrawerFocusRequester.current
     var gridReady by remember(state.owner, state.category, state.filters, state.gridEpoch, state.viewOptions.columns) {
         mutableStateOf(false)
@@ -142,15 +147,6 @@ fun WatchlistPage(
     val focused = state.entries.getOrNull(state.focusedIndex)
     LaunchedEffect(watchlistIsTop, state.viewOptions.showBackdrop, focused?.gridId, focused?.item?.backDropUrl) {
         if (watchlistIsTop) viewModel.updateBackdrop(focused.takeIf { state.viewOptions.showBackdrop })
-    }
-    val firstRowItems = state.viewOptions.columns - gridLeadingSlots((state.firstPage - 1) * WATCHLIST_PAGE_SIZE, state.viewOptions.columns)
-    BackHandler(
-        enabled =
-            watchlistIsTop && gridHasFocus && state.entries.isNotEmpty() &&
-                state.focusedIndex >= firstRowItems && menu == null && !state.randomPending,
-    ) {
-        ribbonVisible = true
-        backToTopEpoch++
     }
     BackHandler(enabled = watchlistIsTop && state.randomPending) { viewModel.cancelRandom() }
     LaunchedEffect(state.owner, state.loading, state.entries.isEmpty(), state.error) {
@@ -296,8 +292,8 @@ fun WatchlistPage(
                         positionOffset = (state.firstPage - 1) * WATCHLIST_PAGE_SIZE,
                         alignWindowToAbsoluteRows = true,
                         focusAnchorKey = state.focusedKey?.let { "${it.mediaType}:${it.tmdbId}" },
+                        focusRequestEpoch = restoreFocusEpoch,
                         onGridFocusChanged = { focused ->
-                            gridHasFocus = focused
                             if (focused) ribbonVisible = false
                         },
                         onViewportRowsChanged = viewModel::viewportRows,
@@ -306,8 +302,8 @@ fun WatchlistPage(
                             requestCategoryFocus = true
                             true
                         },
-                        backToTopOnBack = false,
-                        backToTopRequestEpoch = backToTopEpoch,
+                        onBackToFirstResult = viewModel::backToFirst,
+                        useBackDispatcherFallback = watchlistIsTop,
                         itemKey = { state.entries[it].gridId },
                         onClickItem = { _, item -> viewModel.open(item) },
                         onLongClickItem = { _, item ->

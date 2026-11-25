@@ -165,7 +165,15 @@ internal class LeavingSoonViewModel
             if (state.value.owner != null && !state.value.loading) restartPageOne()
         }
 
-        private fun restartPageOne(resetShiftGuard: Boolean = true) {
+        fun backToFirst() {
+            if (state.value.owner == null || state.value.firstPage <= 1) return
+            restartPageOne(restoreFocus = false)
+        }
+
+        private fun restartPageOne(
+            resetShiftGuard: Boolean = true,
+            restoreFocus: Boolean = true,
+        ) {
             load?.cancel()
             generation++
             if (resetShiftGuard) shiftedOnce = false
@@ -174,7 +182,7 @@ internal class LeavingSoonViewModel
                 LeavingSoonScreenState(
                     owner = current.owner,
                     category = current.category,
-                    focusedKey = current.focusedKey,
+                    focusedKey = current.focusedKey.takeIf { restoreFocus },
                     gridEpoch = current.gridEpoch + 1,
                     viewOptions = current.viewOptions,
                 )
