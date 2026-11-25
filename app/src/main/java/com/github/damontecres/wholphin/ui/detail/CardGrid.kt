@@ -1,6 +1,7 @@
 package com.github.damontecres.wholphin.ui.detail
 
 import android.view.KeyEvent
+import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -143,6 +144,10 @@ fun <T : CardGridItem> CardGrid(
     onViewportRowsChanged: ((columns: Int, rows: Int) -> Unit)? = null,
     onFirstRowUp: (() -> Boolean)? = null,
     backToTopOnBack: Boolean = true,
+    // A bounded page window can start after the first result. Let its owner load page one.
+    onBackToFirstResult: (() -> Unit)? = null,
+    // Some Android TV Back events reach the activity dispatcher before the focused grid's key handler.
+    useBackDispatcherFallback: Boolean = false,
     backToTopRequestEpoch: Long = 0,
     footerContent: (@Composable () -> Unit)? = null,
     footerFocusRequester: FocusRequester? = null,
@@ -252,6 +257,9 @@ fun <T : CardGridItem> CardGrid(
     }
 
     val useBackToJump = backToTopOnBack // uiConfig.preferences.interfacePreferences.scrollTopOnBack
+    var gridHasFocus by remember { mutableStateOf(false) }
+    var actualFocusedIndex by remember { mutableIntStateOf(-1) }
+    val currentActualFocusedIndex by rememberUpdatedState(actualFocusedIndex)
     val showFooter = true // uiConfig.preferences.interfacePreferences.showPositionFooter
     val useJumpRemoteButtons = true // uiConfig.preferences.interfacePreferences.pageWithRemoteButtons
     val jump2 =
@@ -295,17 +303,39 @@ fun <T : CardGridItem> CardGrid(
         remember(columns) {
             {
                 scope.launch(ExceptionHandler()) {
-                    if (currentFocusedIndex < (columns * 6)) {
-                        // If close, animate the scroll
-                        gridState.animateScrollToItem(0, 0)
-                    } else {
-                        gridState.scrollToItem(0, 0)
+                    if (!useBackDispatcherFallback || gridState.firstVisibleItemIndex != 0 || gridState.firstVisibleItemScrollOffset != 0) {
+                        if (currentFocusedIndex < (columns * 6)) {
+                            // If close, animate the scroll
+                            gridState.animateScrollToItem(0, 0)
+                        } else {
+                            gridState.scrollToItem(0, 0)
+                        }
                     }
                     focusOn(0)
+                    // Let a dispatcher-driven focus-anchor update compose before requesting
+                    // the first card; a no-distance scroll otherwise returns in the same frame.
+                    if (useBackDispatcherFallback) withFrameNanos { }
                     zeroFocus.tryRequestFocus()
+                    if (useBackDispatcherFallback && currentActualFocusedIndex != 0) {
+                        withFrameNanos { }
+                        zeroFocus.tryRequestFocus()
+                    }
                 }
             }
         }
+
+    val canBackToFirst = focusedIndex > 0 || (positionOffset > 0 && onBackToFirstResult != null)
+    val backToFirst = {
+        if (positionOffset > 0 && onBackToFirstResult != null) {
+            onBackToFirstResult()
+        } else {
+            jumpToTop()
+        }
+    }
+    BackHandler(enabled = useBackDispatcherFallback && useBackToJump && pager.isNotEmpty() && gridHasFocus && canBackToFirst) {
+        if (positionOffset == 0) positionCallback?.invoke(columns, 0)
+        backToFirst()
+    }
 
     LaunchedEffect(backToTopRequestEpoch) {
         if (backToTopRequestEpoch > 0) jumpToTop()
@@ -381,8 +411,8 @@ fun <T : CardGridItem> CardGrid(
                         }
                         if (it.type != KeyEventType.KeyUp) {
                             return@onKeyEvent false
-                        } else if (useBackToJump && it.key == Key.Back && focusedIndex > 0) {
-                            jumpToTop()
+                        } else if (useBackToJump && it.key == Key.Back && canBackToFirst) {
+                            backToFirst()
                             return@onKeyEvent true
                         } else if (isPlayKeyUp(it)) {
                             val item = pager.getOrNull(focusedIndex)
@@ -432,8 +462,10 @@ fun <T : CardGridItem> CardGrid(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .onFocusChanged { onGridFocusChanged?.invoke(it.hasFocus) }
-                                .focusGroup()
+                                .onFocusChanged {
+                                    gridHasFocus = it.hasFocus
+                                    onGridFocusChanged?.invoke(it.hasFocus)
+                                }.focusGroup()
                                 .focusRestorer(if (useFooterAsFocusRestorer) footerFocusRequester ?: firstFocus else firstFocus)
                                 .focusProperties {
                                     onEnter = {
@@ -508,6 +540,7 @@ fun <T : CardGridItem> CardGrid(
                                                         )
                                                     }
                                                     if (focusState.isFocused) {
+                                                        actualFocusedIndex = index
                                                         // Focused, so set that up
                                                         focusOn(index)
                                                         positionCallback?.invoke(columns, index)

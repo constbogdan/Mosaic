@@ -377,7 +377,7 @@ not current instruction.
   stable readiness key and call the grid-ready callback only after its first
   focusable target is composed, supply the active drawer item requester for
   left-edge grid navigation, and identify its ribbon focus target. The page
-  still owns its data loading, Back handling, selected-card/scroll restoration,
+  still owns its data loading, non-grid Back cases, selected-card/scroll restoration,
   and nested-detail focus. Leaving Soon also defers empty-state focus until
   initialization has completed. Bounded emulator checks covered native Movies
   and Shows Library entry, first/deep-row drawer navigation and Details Back;
@@ -389,6 +389,32 @@ not current instruction.
   (Watchlist 9.542 s, Fresh 5.287 s, Collections 2.491 s, Leaving Soon 2.569 s)
   are focus-acquisition measurements, not isolated API or rendering timings,
   and belong to a separate page-initialization investigation.
+
+- Shared CardGrid Back candidate (2026-11-25, uncommitted on
+  `fix/shared-cardgrid-back`): the four custom browsers now use the native
+  grid's absolute-first-card Back rule instead of page-level first-row
+  thresholds and ribbon/epoch jumps. Android TV may dispatch Back after the
+  grid loses focus, so an opt-in `CardGrid` dispatcher fallback handles that
+  path without changing native Library callers. A first request can reenter
+  the grid on its saved card; the custom-page path checks actual card focus
+  and makes one frame-bounded second request only if card zero did not acquire
+  focus. Watchlist and Leaving Soon reload page one when a bounded window has
+  evicted it, clearing the old focus key. A future custom paged browser must
+  provide the absolute window offset and a page-one callback when applicable.
+  This candidate does not change B11 Random return, modal Back, nested
+  Collections Details, or long-press behavior. Emulator checks are not
+  physical-TV acceptance.
+
+- Physical-TV follow-up (2026-11-25): the operator accepted Back-to-first-card
+  on Watchlist, Fresh, Leaving Soon and Collections, and B11 Random return to
+  its button. Ordinary Details return exposed a separate avatar/drawer focus
+  defect on Watchlist, Fresh and Leaving Soon; Collections already restored its
+  card after a brief avatar focus. The uncommitted correction shares the
+  Collections ON_RESUME focus epoch across these browsers, using each saved
+  card key and CardGrid's existing focus anchor. Watchlist suppresses this
+  handoff while Random's ribbon owns return focus. Preserve exact-card/scroll
+  restoration and the accepted Back rule independently. Emulator checks are
+  not physical-TV acceptance of this new correction.
 
 - Collection Details B06 passed the operator's final 2026-11-18 emulator acceptance for
   R1/R2/R3 and two-stage Back-to-Request; the earlier failed pass remains historical evidence.

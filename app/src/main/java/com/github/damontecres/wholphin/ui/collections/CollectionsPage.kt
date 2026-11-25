@@ -1,6 +1,5 @@
 package com.github.damontecres.wholphin.ui.collections
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -21,7 +20,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -45,8 +43,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.tv.material3.Button
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
@@ -65,6 +61,7 @@ import com.github.damontecres.wholphin.ui.components.ExpandableFaButton
 import com.github.damontecres.wholphin.ui.components.LoadingPage
 import com.github.damontecres.wholphin.ui.components.ViewOptions
 import com.github.damontecres.wholphin.ui.components.ViewOptionsDialog
+import com.github.damontecres.wholphin.ui.components.rememberCustomPageDetailsReturnEpoch
 import com.github.damontecres.wholphin.ui.components.rememberCustomPageFocusOwner
 import com.github.damontecres.wholphin.ui.detail.CardGrid
 import com.github.damontecres.wholphin.ui.nav.LocalActiveDrawerFocusRequester
@@ -94,23 +91,26 @@ internal fun CollectionsPage(
     val state = viewModel.state.collectAsState().value
     var ribbonVisible by remember(state.owner) { mutableStateOf(false) }
     var ribbonHasFocus by remember(state.owner) { mutableStateOf(false) }
-    var gridHasFocus by remember(state.owner, state.filter, state.sort) { mutableStateOf(false) }
     var requestFilterFocus by remember(state.owner) { mutableStateOf(false) }
     var showViewOptions by remember(state.owner) { mutableStateOf(false) }
     var restoreViewOptionsFocus by remember(state.owner) { mutableStateOf(false) }
-    var restoreFocusEpoch by remember(state.owner, state.filter, state.sort) { mutableLongStateOf(0L) }
-    var backToTopEpoch by remember(state.owner, state.filter, state.sort, state.gridEpoch, state.viewOptions.columns) {
-        mutableLongStateOf(0L)
-    }
     val filterFocusRequesters = remember(state.owner) { CollectionsFilter.entries.associateWith { FocusRequester() } }
     val gridFocusRequester = remember(state.owner, state.filter, state.sort) { FocusRequester() }
     val drawerFocusRequester = LocalActiveDrawerFocusRequester.current
     var gridReady by remember(state.owner, state.filter, state.sort, state.gridEpoch, state.viewOptions.columns) {
         mutableStateOf(false)
     }
+    val isTop = viewModel.isCollectionsTop()
+    val restoreFocusEpoch =
+        rememberCustomPageDetailsReturnEpoch(
+            isTop = isTop,
+            focusAnchorKey = state.focusedKey,
+            ribbonHasFocus = ribbonHasFocus,
+            scopeKey = Triple(state.owner, state.filter, state.sort),
+        )
     val pageFocusModifier =
         rememberCustomPageFocusOwner(
-            isTop = viewModel.isCollectionsTop(),
+            isTop = isTop,
             contentReady = gridReady && state.entries.isNotEmpty(),
             mayFocusGrid = !ribbonVisible && !showViewOptions,
             gridFocusRequester = gridFocusRequester,
@@ -119,17 +119,9 @@ internal fun CollectionsPage(
         )
     val viewOptionsFocusRequester = remember(state.owner) { FocusRequester() }
     val retryFocusRequester = remember(state.owner) { FocusRequester() }
-    val isTop = viewModel.isCollectionsTop()
     val focused = state.entries.getOrNull(state.focusedIndex)
     LaunchedEffect(isTop, state.viewOptions.showBackdrop, focused?.gridId, focused?.backdropUrl) {
         if (isTop) viewModel.updateBackdrop(focused.takeIf { state.viewOptions.showBackdrop })
-    }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        if (!ribbonHasFocus && state.focusedKey != null) restoreFocusEpoch++
-    }
-    BackHandler(enabled = isTop && gridHasFocus && state.entries.isNotEmpty() && state.focusedIndex >= state.viewOptions.columns) {
-        ribbonVisible = true
-        backToTopEpoch++
     }
     LaunchedEffect(state.owner, state.loading, state.entries.isEmpty(), state.status, state.error) {
         // An uninitialized or PENDING result is transient. Revealing and focusing
@@ -245,7 +237,6 @@ internal fun CollectionsPage(
                     focusAnchorKey = state.focusedKey,
                     focusRequestEpoch = restoreFocusEpoch,
                     onGridFocusChanged = { focused ->
-                        gridHasFocus = focused
                         if (focused) ribbonVisible = false
                     },
                     onViewportRowsChanged = viewModel::viewportRows,
@@ -254,8 +245,7 @@ internal fun CollectionsPage(
                         requestFilterFocus = true
                         true
                     },
-                    backToTopOnBack = false,
-                    backToTopRequestEpoch = backToTopEpoch,
+                    useBackDispatcherFallback = isTop,
                     itemKey = { state.entries[it].gridId },
                     onClickItem = { _, item -> viewModel.open(item) },
                     onLongClickItem = { _, _ -> },

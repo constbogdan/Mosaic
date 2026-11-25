@@ -354,6 +354,42 @@ class LeavingSoonViewModelTest {
             }
         }
 
+    @Test fun backFromEvictedWindowReloadsFirstPageWithoutRestoringOldCard() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val calls = mutableListOf<Int>()
+                val (vm, _) =
+                    model(
+                        object : LeavingSoonBackend {
+                            override suspend fun page(
+                                category: LeavingSoonCategory,
+                                page: Int,
+                            ): LeavingSoonPageData {
+                                calls += page
+                                return this@LeavingSoonViewModelTest.page(page, 120)
+                            }
+                        },
+                    )
+                runCurrent()
+                for (page in 1..5) {
+                    vm.position(vm.state.value.entries.lastIndex, 6)
+                    runCurrent()
+                }
+                assertEquals(2, vm.state.value.firstPage)
+                val epoch = vm.state.value.gridEpoch
+                vm.backToFirst()
+                runCurrent()
+                assertEquals(1, calls.last())
+                assertEquals(1, vm.state.value.firstPage)
+                assertEquals(0, vm.state.value.focusedIndex)
+                assertEquals("canonical:1", vm.state.value.focusedKey)
+                assertTrue(vm.state.value.gridEpoch > epoch)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
     @Test fun sessionSwitchRejectsLateOldPage() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
