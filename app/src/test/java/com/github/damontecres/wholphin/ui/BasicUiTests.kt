@@ -6,13 +6,16 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -21,6 +24,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -81,6 +85,7 @@ import com.github.damontecres.wholphin.services.CollectionMovieLink
 import com.github.damontecres.wholphin.services.CollectionsEntry
 import com.github.damontecres.wholphin.services.FreshCategory
 import com.github.damontecres.wholphin.services.FreshEntry
+import com.github.damontecres.wholphin.services.LeavingSoonEntry
 import com.github.damontecres.wholphin.services.NavigationManager
 import com.github.damontecres.wholphin.services.ScreensaverService
 import com.github.damontecres.wholphin.services.ScreensaverState
@@ -106,6 +111,7 @@ import com.github.damontecres.wholphin.ui.collections.SeerrCollectionDetailsView
 import com.github.damontecres.wholphin.ui.components.BasicDialog
 import com.github.damontecres.wholphin.ui.components.ExpandablePlayButtons
 import com.github.damontecres.wholphin.ui.components.MinButtonSize
+import com.github.damontecres.wholphin.ui.components.rememberCustomPageFocusOwner
 import com.github.damontecres.wholphin.ui.detail.CardGrid
 import com.github.damontecres.wholphin.ui.detail.discover.ExpandableDiscoverButtons
 import com.github.damontecres.wholphin.ui.detail.discover.OriginalLanguageText
@@ -119,7 +125,11 @@ import com.github.damontecres.wholphin.ui.discover.QuickMovieConfirmGate
 import com.github.damontecres.wholphin.ui.fresh.FreshPage
 import com.github.damontecres.wholphin.ui.fresh.FreshScreenState
 import com.github.damontecres.wholphin.ui.fresh.FreshViewModel
+import com.github.damontecres.wholphin.ui.leavingsoon.LeavingSoonPage
+import com.github.damontecres.wholphin.ui.leavingsoon.LeavingSoonScreenState
+import com.github.damontecres.wholphin.ui.leavingsoon.LeavingSoonViewModel
 import com.github.damontecres.wholphin.ui.nav.Destination
+import com.github.damontecres.wholphin.ui.nav.LocalActiveDrawerFocusRequester
 import com.github.damontecres.wholphin.ui.setup.SwitchServerContent
 import com.github.damontecres.wholphin.ui.setup.SwitchServerViewModel
 import com.github.damontecres.wholphin.ui.theme.WholphinTheme
@@ -2501,6 +2511,102 @@ class BasicUiTests {
 
     @Test
     @Config(qualifiers = "w960dp-h540dp-land")
+    fun custom_page_keeps_focus_during_loading_to_card_handoff() {
+        val loading = mutableStateOf(true)
+        val cardReady = mutableStateOf(false)
+        composeTestRule.setContent {
+            val cardFocus = remember { FocusRequester() }
+            WholphinTheme {
+                Row {
+                    Button(onClick = {}) { Text("Avatar") }
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .then(
+                                rememberCustomPageFocusOwner(
+                                    isTop = true,
+                                    contentReady = cardReady.value,
+                                    mayFocusGrid = true,
+                                    gridFocusRequester = cardFocus,
+                                ),
+                            ),
+                    ) {
+                        if (loading.value) {
+                            Text("Loading")
+                        } else {
+                            Button(
+                                onClick = {},
+                                modifier = Modifier.focusRequester(cardFocus).onGloballyPositioned { cardReady.value = true },
+                            ) { Text("First card") }
+                        }
+                    }
+                }
+            }
+        }
+        composeTestRule.onNodeWithText("Avatar").assertIsNotFocused()
+        composeTestRule.runOnIdle { loading.value = false }
+        composeTestRule.onNodeWithText("First card").assertIsFocused()
+        composeTestRule.onNodeWithText("Avatar").assertIsNotFocused()
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
+    fun leaving_soon_initialization_hands_focus_to_first_result_without_avatar() {
+        val entry =
+            LeavingSoonEntry(
+                canonicalMediaId = 17,
+                item =
+                    DiscoverItem(
+                        17,
+                        SeerrItemType.MOVIE,
+                        "Leaving 17",
+                        null,
+                        null,
+                        SeerrAvailability.UNKNOWN,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                    ),
+                hasTmdbIdentity = true,
+                title = "Leaving 17",
+                posterUrl = null,
+                year = null,
+                removeAt = null,
+            )
+        val screen = MutableStateFlow(LeavingSoonScreenState(owner = "viewer", initializing = true))
+        val viewModel = mockk<LeavingSoonViewModel>(relaxed = true)
+        every { viewModel.state } returns screen
+        every { viewModel.isLeavingSoonTop() } returns true
+        composeTestRule.setContent {
+            WholphinTheme {
+                Row {
+                    Button(onClick = {}) { Text("Avatar") }
+                    LeavingSoonPage(modifier = Modifier.weight(1f), viewModel = viewModel)
+                }
+            }
+        }
+        composeTestRule.onNodeWithText("Avatar").assertIsNotFocused()
+        composeTestRule.runOnIdle { screen.value = screen.value.copy(initializing = false, loading = true) }
+        composeTestRule.runOnIdle {
+            screen.value =
+                screen.value.copy(
+                    loading = false,
+                    entries = listOf(entry),
+                    firstPage = 1,
+                    lastPage = 1,
+                    totalPages = 1,
+                    totalResults = 1,
+                    focusedKey = entry.key,
+                )
+        }
+        composeTestRule.onNode(hasText("Leaving 17") and hasClickAction()).assertIsFocused()
+        composeTestRule.onNodeWithText("Avatar").assertIsNotFocused()
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
     fun fresh_ribbon_reaches_categories_sort_and_grid_options() {
         val rows =
             (1..20).map { id ->
@@ -2532,6 +2638,76 @@ class BasicUiTests {
 
     @Test
     @Config(qualifiers = "w960dp-h540dp-land")
+    fun custom_grid_left_routes_to_active_drawer_item_and_right_returns_to_grid() {
+        val rows =
+            (1..20).map { id ->
+                FreshEntry(
+                    DiscoverItem(id, SeerrItemType.MOVIE, "Fresh $id", null, null, SeerrAvailability.UNKNOWN, null, null, null, null, null),
+                )
+            }
+        val screen = MutableStateFlow(FreshScreenState(owner = "viewer", entries = rows, page = 1, totalPages = 1, totalResults = 20))
+        val viewModel = mockk<FreshViewModel>(relaxed = true)
+        every { viewModel.state } returns screen
+        every { viewModel.isFreshTop() } returns true
+        val active = FocusRequester()
+        composeTestRule.setContent {
+            WholphinTheme {
+                CompositionLocalProvider(LocalActiveDrawerFocusRequester provides active) {
+                    Row {
+                        Column(Modifier.width(96.dp)) {
+                            Button(onClick = {}) { Text("Avatar") }
+                            Spacer(Modifier.height(180.dp))
+                            Button(onClick = {}, modifier = Modifier.focusRequester(active)) { Text("Active page") }
+                        }
+                        FreshPage(modifier = Modifier.weight(1f), viewModel = viewModel)
+                    }
+                }
+            }
+        }
+        val first = composeTestRule.onNode(hasText("Fresh 1") and hasClickAction()).assertIsFocused()
+        first.performKeyInput { pressKey(Key.DirectionLeft) }
+        composeTestRule.onNodeWithText("Active page").assertIsFocused()
+        composeTestRule.onNodeWithText("Avatar").assertIsNotFocused()
+        composeTestRule.onNodeWithText("Active page").performKeyInput { pressKey(Key.DirectionRight) }
+        first.assertIsFocused()
+        first.performKeyInput { pressKey(Key.DirectionDown) }
+        composeTestRule.onNode(hasText("Fresh 7") and hasClickAction()).assertIsFocused().performKeyInput {
+            pressKey(Key.DirectionLeft)
+        }
+        composeTestRule.onNodeWithText("Active page").assertIsFocused()
+        composeTestRule.onNodeWithText("Avatar").assertIsNotFocused()
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
+    fun custom_ribbon_left_still_reaches_avatar() {
+        val screen = MutableStateFlow(FreshScreenState(owner = "viewer"))
+        val viewModel = mockk<FreshViewModel>(relaxed = true)
+        every { viewModel.state } returns screen
+        every { viewModel.isFreshTop() } returns true
+        val active = FocusRequester()
+        composeTestRule.setContent {
+            WholphinTheme {
+                CompositionLocalProvider(LocalActiveDrawerFocusRequester provides active) {
+                    Row {
+                        Column(Modifier.width(96.dp)) {
+                            Button(onClick = {}) { Text("Avatar") }
+                            Spacer(Modifier.height(180.dp))
+                            Button(onClick = {}, modifier = Modifier.focusRequester(active)) { Text("Active page") }
+                        }
+                        FreshPage(modifier = Modifier.weight(1f), viewModel = viewModel)
+                    }
+                }
+            }
+        }
+        composeTestRule.onNodeWithContentDescription("All").assertIsFocused().performKeyInput { pressKey(Key.DirectionLeft) }
+        composeTestRule.onNodeWithText("Avatar").assertIsFocused()
+        composeTestRule.onNodeWithText("Avatar").performKeyInput { pressKey(Key.DirectionRight) }
+        composeTestRule.onNodeWithContentDescription("All").assertIsFocused()
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
     fun watchlist_toolbar_cycles_compact_actions_and_preserves_focus_during_query_resets() {
         Assert.assertEquals(androidx.compose.ui.graphics.Color.Unspecified, watchlistFilterIconColor(WatchlistFilter.ALL))
         Assert.assertEquals(AppColors.Discover.Blue, watchlistFilterIconColor(WatchlistFilter.YES))
@@ -2554,6 +2730,7 @@ class BasicUiTests {
         val viewModel = mockk<WatchlistViewModel>(relaxed = true)
         every { viewModel.state } returns screen
         every { viewModel.repository } returns repository
+        every { viewModel.isWatchlistTop() } returns true
         every { viewModel.owned(any()) } answers {
             screen.value =
                 screen.value.copy(
@@ -2704,6 +2881,7 @@ class BasicUiTests {
         val viewModel = mockk<WatchlistViewModel>(relaxed = true)
         every { viewModel.state } returns screen
         every { viewModel.repository } returns repository
+        every { viewModel.isWatchlistTop() } returns true
         every { viewModel.category(any()) } answers {
             // The real ViewModel resets paging/rows before the next category response.
             screen.value = WatchlistScreenState(owner = "viewer", category = firstArg(), loading = true)
@@ -2900,7 +3078,29 @@ class BasicUiTests {
 
     @Test
     @Config(qualifiers = "w960dp-h540dp-land")
-    fun watchlist_random_back_restores_random_button_without_replacing_grid() {
+    fun watchlist_completed_empty_state_focuses_ribbon_without_avatar() {
+        val screen = MutableStateFlow(WatchlistScreenState(owner = "viewer", page = 1))
+        val repository = mockk<WatchlistRepository>()
+        every { repository.state } returns MutableStateFlow(WatchlistSnapshot(owner = "viewer"))
+        val viewModel = mockk<WatchlistViewModel>(relaxed = true)
+        every { viewModel.state } returns screen
+        every { viewModel.repository } returns repository
+        every { viewModel.isWatchlistTop() } returns true
+        composeTestRule.setContent {
+            WholphinTheme {
+                Row {
+                    Button(onClick = {}) { Text("Avatar") }
+                    WatchlistPage(modifier = Modifier.weight(1f), viewModel = viewModel)
+                }
+            }
+        }
+        composeTestRule.onNodeWithContentDescription("All").assertIsFocused()
+        composeTestRule.onNodeWithText("Avatar").assertIsNotFocused()
+    }
+
+    @Test
+    @Config(qualifiers = "w960dp-h540dp-land")
+    fun watchlist_random_back_restores_random_button_without_replacing_deep_grid_window() {
         fun row(id: Int) =
             WatchlistEntry(
                 MediaKey.Catalog(CatalogMediaType.MOVIE, id),
@@ -2911,9 +3111,20 @@ class BasicUiTests {
                 null,
                 DiscoverItem(id, SeerrItemType.MOVIE, "Saved $id", null, null, SeerrAvailability.UNKNOWN, null, null, null, null, null),
             )
-        val initial = (1..20).map(::row)
+        val initial = (81..100).map(::row)
         val screen =
-            MutableStateFlow(WatchlistScreenState(owner = "viewer", entries = initial, page = 1, totalPages = 50, totalResults = 990))
+            MutableStateFlow(
+                WatchlistScreenState(
+                    owner = "viewer",
+                    entries = initial,
+                    firstPage = 5,
+                    page = 5,
+                    totalPages = 50,
+                    totalResults = 990,
+                    focusedIndex = 0,
+                    focusedKey = initial.first().key,
+                ),
+            )
         val repository = mockk<WatchlistRepository>()
         every { repository.state } returns MutableStateFlow(WatchlistSnapshot(owner = "viewer"))
         val viewModel = mockk<WatchlistViewModel>(relaxed = true)
@@ -2935,22 +3146,24 @@ class BasicUiTests {
                 WatchlistPage(viewModel = viewModel)
             }
         }
-        composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).requestFocus().performKeyInput {
+        composeTestRule.onNode(hasText("Saved 81") and hasClickAction()).requestFocus().performKeyInput {
             pressKey(Key.DirectionUp)
         }
         composeTestRule.onNodeWithContentDescription("All").assertIsFocused()
         composeTestRule.onNodeWithContentDescription("Random").requestFocus().performClickEnter()
         composeTestRule.waitForIdle()
         Assert.assertEquals(initial, screen.value.entries)
-        Assert.assertEquals(1, screen.value.firstPage)
-        Assert.assertEquals(1, screen.value.page)
+        Assert.assertEquals(5, screen.value.firstPage)
+        Assert.assertEquals(5, screen.value.page)
+        Assert.assertEquals(0, screen.value.focusedIndex)
+        Assert.assertEquals(initial.first().key, screen.value.focusedKey)
         io.mockk.verify(exactly = 0) { viewModel.open(any()) }
-        composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).requestFocus()
+        composeTestRule.onNode(hasText("Saved 81") and hasClickAction()).requestFocus()
         composeTestRule.runOnIdle { watchlistIsTop = true }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithContentDescription("Random").assertIsFocused()
         Assert.assertEquals(false, screen.value.restoreRandomFocus)
-        composeTestRule.onNode(hasText("Saved 1") and hasClickAction()).requestFocus().performClickEnter()
+        composeTestRule.onNode(hasText("Saved 81") and hasClickAction()).requestFocus().performClickEnter()
         io.mockk.verify(exactly = 1) { viewModel.open(initial.first()) }
         composeTestRule.runOnUiThread { composeTestRule.activity.onBackPressedDispatcher.onBackPressed() }
         Assert.assertEquals(1, exitCount)

@@ -35,6 +35,7 @@ internal data class LeavingSoonScreenState(
     val lastPage: Int = 0,
     val totalPages: Int = 0,
     val totalResults: Int = 0,
+    val initializing: Boolean = false,
     val loading: Boolean = false,
     val error: String? = null,
     val failedPage: Int? = null,
@@ -96,7 +97,7 @@ internal class LeavingSoonViewModel
                     load?.cancel()
                     generation++
                     session = next
-                    state.value = LeavingSoonScreenState(owner = next?.owner)
+                    state.value = LeavingSoonScreenState(owner = next?.owner, initializing = next != null)
                     lastRefresh = 0L
                     shiftedOnce = false
                     viewportRows = null
@@ -104,7 +105,7 @@ internal class LeavingSoonViewModel
                         val saved = preferences.data.first()
                         if (session !== next || !next.isCurrent()) return@collect
                         val options = leavingSoonViewOptions(saved.leavingSoonViewOptionsMap[next.owner])
-                        state.value = LeavingSoonScreenState(owner = next.owner, viewOptions = options)
+                        state.value = LeavingSoonScreenState(owner = next.owner, viewOptions = options, initializing = true)
                         columns = options.columns
                         request(1, eagerInitialFill = true)
                     }
@@ -244,7 +245,7 @@ internal class LeavingSoonViewModel
             }
             val token = ++generation
             load?.cancel()
-            state.value = before.copy(loading = true, error = null, failedPage = null)
+            state.value = before.copy(initializing = false, loading = true, error = null, failedPage = null)
             load =
                 viewModelScope.launch {
                     try {
@@ -293,6 +294,7 @@ internal class LeavingSoonViewModel
                                 lastPage = lastPage,
                                 totalPages = result.totalPages,
                                 totalResults = result.totalResults,
+                                initializing = false,
                                 loading = false,
                                 error = null,
                                 focusedIndex = focusedIndex,

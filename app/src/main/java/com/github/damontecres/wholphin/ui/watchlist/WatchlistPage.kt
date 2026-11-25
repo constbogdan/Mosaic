@@ -62,8 +62,10 @@ import com.github.damontecres.wholphin.ui.components.ExpandableFaButton
 import com.github.damontecres.wholphin.ui.components.LoadingPage
 import com.github.damontecres.wholphin.ui.components.ViewOptions
 import com.github.damontecres.wholphin.ui.components.ViewOptionsDialog
+import com.github.damontecres.wholphin.ui.components.rememberCustomPageFocusOwner
 import com.github.damontecres.wholphin.ui.detail.CardGrid
 import com.github.damontecres.wholphin.ui.detail.gridLeadingSlots
+import com.github.damontecres.wholphin.ui.nav.LocalActiveDrawerFocusRequester
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 
 internal fun watchlistFilterIconColor(selection: WatchlistFilter): Color =
@@ -123,6 +125,20 @@ fun WatchlistPage(
     val viewOptionsFocusRequester = remember(state.owner) { FocusRequester() }
     val retryFocusRequester = remember(state.owner) { FocusRequester() }
     val watchlistIsTop = viewModel.isWatchlistTop()
+    val drawerFocusRequester = LocalActiveDrawerFocusRequester.current
+    var gridReady by remember(state.owner, state.category, state.filters, state.gridEpoch, state.viewOptions.columns) {
+        mutableStateOf(false)
+    }
+    val pageFocusModifier =
+        rememberCustomPageFocusOwner(
+            isTop = watchlistIsTop,
+            contentReady = gridReady && state.entries.isNotEmpty(),
+            mayFocusGrid = !ribbonVisible && !showViewOptions && !state.restoreRandomFocus,
+            gridFocusRequester = gridFocusRequester,
+            ribbonVisible = ribbonVisible && !showViewOptions && !state.restoreRandomFocus,
+            ribbonFocusRequester = categoryFocusRequesters[state.category],
+            claimInitialFocus = !state.restoreRandomFocus,
+        )
     val focused = state.entries.getOrNull(state.focusedIndex)
     LaunchedEffect(watchlistIsTop, state.viewOptions.showBackdrop, focused?.gridId, focused?.item?.backDropUrl) {
         if (watchlistIsTop) viewModel.updateBackdrop(focused.takeIf { state.viewOptions.showBackdrop })
@@ -176,7 +192,7 @@ fun WatchlistPage(
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         if (!viewModel.state.value.restoreRandomFocus) viewModel.refresh()
     }
-    Box(modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize().then(pageFocusModifier)) {
         Column(Modifier.fillMaxSize()) {
             AnimatedVisibility(
                 visible = ribbonVisible,
@@ -269,20 +285,11 @@ fun WatchlistPage(
                 ) { Text(stringResource(R.string.retry)) }
             }
             if ((state.loading || state.owner == null) && state.entries.isEmpty() && state.error == null) {
-                LoadingPage(Modifier.fillMaxSize(), focusEnabled = !ribbonHasFocus)
+                LoadingPage(Modifier.fillMaxSize(), focusEnabled = false)
             } else if (state.entries.isEmpty() && state.error == null) {
                 Text(stringResource(R.string.watchlist_empty), Modifier.padding(16.dp))
             } else if (state.entries.isNotEmpty()) {
                 key(state.owner, state.category, state.filters, state.gridEpoch, state.viewOptions.columns) {
-                    LaunchedEffect(Unit) {
-                        // A query reset must not steal focus from a filter being cycled.
-                        if (!ribbonVisible && !showViewOptions && !state.restoreRandomFocus) {
-                            repeat(5) {
-                                withFrameNanos { }
-                                if (gridFocusRequester.tryRequestFocus()) return@LaunchedEffect
-                            }
-                        }
-                    }
                     CardGrid(
                         pager = state.entries,
                         totalItems = state.totalResults,
@@ -313,6 +320,8 @@ fun WatchlistPage(
                         onClickPlay = { _, _ -> },
                         letterPosition = { 0 },
                         gridFocusRequester = gridFocusRequester,
+                        leftmostItemFocusRequester = drawerFocusRequester,
+                        onFocusTargetReady = { gridReady = true },
                         initialPosition = state.focusedIndex,
                         positionCallback = { columns, index ->
                             viewModel.position(index, columns)

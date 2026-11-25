@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -99,6 +100,57 @@ class LeavingSoonViewModelTest {
         every { source.sessions } returns sessions
         return LeavingSoonViewModel(source, mockk(relaxed = true), preferences(savedColumns)) to sessions
     }
+
+    @Test fun initializationIsNotACompletedEmptyResult() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val preferencesReady = CompletableDeferred<Unit>()
+                val pageReady = CompletableDeferred<LeavingSoonPageData>()
+                val store = mockk<DataStore<AppPreferences>>()
+                every { store.data } returns
+                    flow {
+                        preferencesReady.await()
+                        emit(AppPreferences.getDefaultInstance())
+                    }
+                val backend =
+                    object : LeavingSoonBackend {
+                        override suspend fun page(
+                            category: LeavingSoonCategory,
+                            page: Int,
+                        ): LeavingSoonPageData = pageReady.await()
+                    }
+                val source = mockk<LeavingSoonSessionSource>()
+                val client = SeerrApiClient("http://seerr.invalid/api/v1", null, OkHttpClient())
+                every { source.sessions } returns MutableStateFlow(LeavingSoonSession("one", backend, { true }, client))
+                val vm = LeavingSoonViewModel(source, mockk(relaxed = true), store)
+
+                runCurrent()
+                assertTrue(vm.state.value.initializing)
+                assertFalse(vm.state.value.loading)
+                assertTrue(
+                    vm.state.value.entries
+                        .isEmpty(),
+                )
+
+                preferencesReady.complete(Unit)
+                runCurrent()
+                assertFalse(vm.state.value.initializing)
+                assertTrue(vm.state.value.loading)
+
+                pageReady.complete(page(1, 0))
+                runCurrent()
+                assertFalse(vm.state.value.initializing)
+                assertFalse(vm.state.value.loading)
+                assertEquals(0, vm.state.value.totalResults)
+                assertTrue(
+                    vm.state.value.entries
+                        .isEmpty(),
+                )
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
 
     @Test fun savedWideGridFillsThreeRowsBeforeAnyFocusMove() =
         runTest {

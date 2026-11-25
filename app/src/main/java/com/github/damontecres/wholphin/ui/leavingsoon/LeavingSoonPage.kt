@@ -56,9 +56,11 @@ import com.github.damontecres.wholphin.ui.components.ExpandableFaButton
 import com.github.damontecres.wholphin.ui.components.LoadingPage
 import com.github.damontecres.wholphin.ui.components.ViewOptions
 import com.github.damontecres.wholphin.ui.components.ViewOptionsDialog
+import com.github.damontecres.wholphin.ui.components.rememberCustomPageFocusOwner
 import com.github.damontecres.wholphin.ui.detail.CardGrid
 import com.github.damontecres.wholphin.ui.detail.gridLeadingSlots
 import com.github.damontecres.wholphin.ui.discover.LocalQuickMovieRequest
+import com.github.damontecres.wholphin.ui.nav.LocalActiveDrawerFocusRequester
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
@@ -108,6 +110,17 @@ internal fun LeavingSoonPage(
     val viewOptionsFocusRequester = remember(state.owner) { FocusRequester() }
     val gridFocusRequester = remember(state.owner, state.category) { FocusRequester() }
     val categoryFocusRequesters = remember(state.owner) { LeavingSoonCategory.entries.associateWith { FocusRequester() } }
+    val drawerFocusRequester = LocalActiveDrawerFocusRequester.current
+    var gridReady by remember(state.owner, state.category, state.gridEpoch, state.viewOptions.columns) { mutableStateOf(false) }
+    val pageFocusModifier =
+        rememberCustomPageFocusOwner(
+            isTop = viewModel.isLeavingSoonTop(),
+            contentReady = gridReady && state.entries.isNotEmpty(),
+            mayFocusGrid = !ribbonVisible && !showViewOptions,
+            gridFocusRequester = gridFocusRequester,
+            ribbonVisible = ribbonVisible && !showViewOptions,
+            ribbonFocusRequester = categoryFocusRequesters[state.category],
+        )
     var gridHasFocus by remember(state.owner, state.category) { mutableStateOf(false) }
     var backToTopEpoch by remember(state.owner, state.category, state.gridEpoch, state.viewOptions.columns) {
         mutableLongStateOf(0L)
@@ -121,7 +134,7 @@ internal fun LeavingSoonPage(
         backToTopEpoch++
     }
     LaunchedEffect(state.owner, state.loading, state.entries.isEmpty(), state.error) {
-        if (state.entries.isEmpty() && !state.loading && (state.owner != null || state.error != null)) {
+        if (state.entries.isEmpty() && !state.initializing && !state.loading && (state.owner != null || state.error != null)) {
             ribbonVisible = true
             if (state.error != null && state.owner != null && !ribbonHasFocus) {
                 withFrameNanos { }
@@ -144,7 +157,7 @@ internal fun LeavingSoonPage(
         }
     }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
-    Column(modifier.fillMaxSize()) {
+    Column(modifier.fillMaxSize().then(pageFocusModifier)) {
         AnimatedVisibility(visible = ribbonVisible, enter = expandVertically(), exit = shrinkVertically()) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -204,21 +217,13 @@ internal fun LeavingSoonPage(
                 Text(stringResource(R.string.retry))
             }
         }
-        if (state.loading && state.entries.isEmpty()) {
-            LoadingPage(Modifier.fillMaxSize(), focusEnabled = !ribbonHasFocus)
+        if ((state.initializing || state.loading) && state.entries.isEmpty()) {
+            LoadingPage(Modifier.fillMaxSize(), focusEnabled = false)
         } else if (state.entries.isEmpty()) {
             val message = if (state.owner == null) R.string.leaving_soon_connection_required else R.string.leaving_soon_empty
             if (state.error == null) Text(stringResource(message), Modifier.padding(16.dp))
         } else {
             key(state.owner, state.category, state.gridEpoch, state.viewOptions.columns) {
-                LaunchedEffect(Unit) {
-                    if (!ribbonVisible && !showViewOptions) {
-                        repeat(5) {
-                            withFrameNanos { }
-                            if (gridFocusRequester.tryRequestFocus()) return@LaunchedEffect
-                        }
-                    }
-                }
                 CardGrid(
                     pager = state.entries,
                     totalItems = state.totalResults,
@@ -247,6 +252,8 @@ internal fun LeavingSoonPage(
                     onClickPlay = { _, _ -> },
                     letterPosition = { 0 },
                     gridFocusRequester = gridFocusRequester,
+                    leftmostItemFocusRequester = drawerFocusRequester,
+                    onFocusTargetReady = { gridReady = true },
                     initialPosition = state.focusedIndex,
                     positionCallback = { columns, index -> viewModel.position(index, columns) },
                     showJumpButtons = false,
