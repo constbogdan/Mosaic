@@ -174,6 +174,55 @@ not current instruction.
 
 ## Non-obvious invariants and negative knowledge
 
+- The operator-accepted Collections Details Shows-style redesign (Phases 1-5) separates the
+  collection overview from a focus-driven member/Recommended Collection preview. Both reserve the
+  same header height, keeping the first member row stationary. The overview uses the shared
+  CollectionCard, authoritative availability badge, description, and eligible collection Request;
+  browsing uses loaded member/Recommended metadata and the shared backdrop service. The overview
+  poster stays mounted until `CardGrid` actually acquires first-member focus; changing the preview
+  selection on poster Down before that handoff removes the focused node and briefly sends focus to
+  the drawer avatar. Recommended Collections' selected-card restoration must be an entry-only
+  operation: treating every temporary loss of grid focus as a new entry immediately steals focus
+  back from the active drawer item on first-card Left. Interior Similar Left/Right uses ordinary
+  LazyRow focus movement. The 2026-11-26
+  15:03 emulator ANR is preserved in `C:/Projects/mosaic-diagnostics/collections/phase2-anr-bugreport.zip`;
+  its main thread waited in `HardwareRenderer.syncAndDrawFrame` while emulator EGL/QEMU pipes were
+  active. The last recorded navigation before the ANR was to a Discover movie Details destination,
+  not the Collections grid. This is not evidence of a Collections-specific application loop;
+  attribution remains open.
+
+- Collections Details backdrops can use the already-loaded `CollectionDetailsData.backdropUrl`,
+  member `DiscoverItem.backDropUrl`, and Similar `CollectionDetailsData.backdropUrl`; the shared
+  `BackdropService` owns image transition, color caching, and stale item-key protection. On a missing
+  backdrop, clear it rather than stretching a portrait poster. `LaunchedEffect` tied to the active
+  section cancels superseded submissions, and a returning Details destination must resubmit its
+  saved section only when it is again the top navigation entry. The Seerr collection response has
+  no native genres, runtime, watched progress, or logo; its member `MovieResult` carries optional
+  date, genre IDs, vote average/count, and popularity. The redesign retains those optional
+  member values in `DiscoverItem` without changing the server contract or using popularity for
+  ranking/presentation. Multi-member collection genre and vote-count-weighted rating aggregates use
+  distinct released members and show only at two-thirds metadata coverage; unknown release dates
+  count against coverage but never contribute to either aggregate. Exactly one distinct member uses
+  that movie's valid genres/rating directly; invalid or unrated values remain absent. Automated tests
+  cover these single-member cases. The localized genre ID mapping needs one optional Seerr genre-list
+  read per session, never a per-focus metadata read; failed mapping leaves names absent. Do not infer
+  released counts from dates or Seerr availability: G29's authoritative count predicate is separate
+  from generic collection parts and includes a physical-library override.
+
+- The Collections Details entry-focus defect was a destination loading gap: the originating focus
+  target left composition while the destination's loading content had no persistent focus owner, so
+  the drawer avatar became eligible. Reuse `rememberCustomPageFocusOwner` on the collection page
+  boundary through loading, gate handoff on active destination/resumed lifecycle and actual target
+  readiness, and retain a focused Retry node invisibly during Retry-to-loading. Do not restore the
+  old repeated poster-focus loop. The operator accepted entry from Collections browsing, Movie
+  Details, and nested Recommended Collections. Temporary emulator tracing observed boundary-to-poster
+  focus with no avatar callback on all three entry paths; the final uninstrumented Debug APK also
+  passed bounded navigation/restoration checks. The cumulative candidate passed 1,239 JVM tests,
+  Fast validation, Debug assembly and diff checks. This is not physical-TV acceptance. Live
+  empty/error and missing-artwork acceptance remains limited. An earlier emulator ANR remains
+  unattributed and was not reproduced during later bounded testing; the previously reported
+  unspecified regression is still uncharacterized. No backend changes were made.
+
 - G29/D-029 investigation on `origin/main` `2aceaedc` found two distinct Seerr TMDb collection populations. `/library/collections` counts distinct member IDs when separately fetched TMDb movie status is `Released` **or** Seerr's existing physical-library override applies; the numerator counts strict global Seerr `AVAILABLE`, not current-user Jellyfin playability or watched state. Generic `GET /collection/:id` returns all TMDb parts and does not include the per-member TMDb status used by the count rule; Mosaic deduplicates and sorts all returned movie parts. The operator accepts James Bond's 10/26 badge but reports 27 detail members, including an unwanted Planned title. No request-correlated James Bond payload or physical-override state was captured. Do not repair this by client-side date math, by treating `mediaInfo.status` as TMDb release status, or by changing canonical TMDb membership. A Seerr-owned shared eligibility/detail contract with snapshot provenance must precede a dependent Mosaic member-list change. Movie-link and Similar destinations currently pass null counts; null is not zero. Mosaic's badge currently shows `0/N` or `Count unavailable`; the approved presentation is positive known `available/total` only. Seerr's `stale` flag can mean a healthy active refresh over last-good data, so the normal-screen technical sentence is independently removable without disabling error/partial reporting. Collection member `UNKNOWN` maps to full-opacity artwork and is not proof of current-user absence; explicit PENDING/PROCESSING/BLOCKLISTED/DELETED already dim. G29 and G28 remain partial, B07 is not authorized. Full source/evidence boundaries are in `C:/Projects/mosaic-diagnostics/D029_G29_TMDB_COLLECTIONS_ASSESSMENT.md`.
 
 - G29 follow-up: a second operator example, TMDb collection `1611146`, has a correct 1/1 badge but two detail parts; the extra `In Production` movie has a **nonempty** 2027 release date. The Bond Planned member has an empty one. `TmdbCollection.parts` is a summary type without movie production status; the existing detail response exposes only release date and optional Seerr media availability, not the count's production-status observation or physical-history class. The override includes both current `active` and retained `archived`, not just currently playable items. Therefore neither a Mosaic-only date filter nor `mediaInfo.status` can match the count. Reuse Seerr's existing predicate and expose an eligible-ID/detail contract while preserving canonical parts. Exact disputed IDs, deployed payloads and physical classes were not captured; no production URL was queried. G25 notice and G28 dimming remain separate.

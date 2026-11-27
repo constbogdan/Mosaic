@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.github.damontecres.wholphin.api.seerr.infrastructure.ClientException
 import com.github.damontecres.wholphin.data.model.DiscoverItem
 import com.github.damontecres.wholphin.data.model.RequestStatus
+import com.github.damontecres.wholphin.services.BackdropService
 import com.github.damontecres.wholphin.services.CollectionDetailsData
 import com.github.damontecres.wholphin.services.CollectionsSession
 import com.github.damontecres.wholphin.services.CollectionsSessionSource
@@ -47,6 +48,7 @@ internal data class CollectionDetailsState(
     val similarReadError: Boolean = false,
     val similarTriggerError: Boolean = false,
     val similarFocusedId: Int? = null,
+    val movieGenreNames: Map<Int, String> = emptyMap(),
 )
 
 @HiltViewModel
@@ -55,12 +57,14 @@ internal class SeerrCollectionDetailsViewModel
     constructor(
         source: CollectionsSessionSource,
         private val navigation: NavigationManager,
+        private val backdropService: BackdropService,
     ) : ViewModel() {
         val state = MutableStateFlow(CollectionDetailsState())
         private var session: CollectionsSession? = null
         private var expectedOwner: String? = null
         private var load: Job? = null
         private var eligibilityLoad: Job? = null
+        private var genreLoad: Job? = null
         private var similarLoad: Job? = null
         private var profileLoad: Job? = null
         private var submitJob: Job? = null
@@ -74,12 +78,23 @@ internal class SeerrCollectionDetailsViewModel
         private var screenVisible = false
         private val failedSimilarMetadataIds = mutableSetOf<Int>()
 
+        fun isCollectionTop(destination: Destination.SeerrCollection): Boolean = navigation.backStack.lastOrNull() == destination
+
+        suspend fun updateBackdrop(target: CollectionBackdropTarget?) {
+            if (target?.url.isNullOrBlank()) {
+                backdropService.clearBackdrop()
+            } else {
+                backdropService.submit(target.key, target.url)
+            }
+        }
+
         init {
             viewModelScope.launch {
                 source.sessions.collect { next ->
                     if (session?.owner == next?.owner && session?.epoch === next?.epoch) return@collect
                     load?.cancel()
                     eligibilityLoad?.cancel()
+                    genreLoad?.cancel()
                     similarLoad?.cancel()
                     similarGeneration++
                     entryGeneration++
@@ -138,6 +153,7 @@ internal class SeerrCollectionDetailsViewModel
             }
             load?.cancel()
             eligibilityLoad?.cancel()
+            genreLoad?.cancel()
             similarLoad?.cancel()
             similarGeneration++
             entryGeneration++
@@ -439,6 +455,7 @@ internal class SeerrCollectionDetailsViewModel
             if (active.owner != expectedOwner || !active.isCurrent()) return
             val token = ++generation
             load?.cancel()
+            genreLoad?.cancel()
             state.value = state.value.copy(loading = true, error = false, denied = false)
             load =
                 viewModelScope.launch {
@@ -459,6 +476,19 @@ internal class SeerrCollectionDetailsViewModel
                                 requestEligibility = emptyMap(),
                                 requestEligibilityLoading = true,
                             )
+                        genreLoad =
+                            viewModelScope.launch {
+                                try {
+                                    val names = active.backend.movieGenreNames()
+                                    if (token == generation && active.isCurrent() && state.value.collectionId == id) {
+                                        state.value = state.value.copy(movieGenreNames = names)
+                                    }
+                                } catch (cancel: CancellationException) {
+                                    throw cancel
+                                } catch (_: Exception) {
+                                    // A genre-name lookup is optional presentation data.
+                                }
+                            }
                         scanEligibility(active, details, token)
                     } catch (cancel: CancellationException) {
                         throw cancel

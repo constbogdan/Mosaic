@@ -37,7 +37,7 @@
     <string name="collections_partial">Some collections could not be loaded. Counts may be incomplete.</string>
     <string name="collections_count">%1$d/%2$d</string>
     <string name="collections_details_title">Collection</string>
-    <string name="collections_similar">Similar Collections</string>
+    <string name="collections_recommended">Recommended Collections</string>
     <string name="collections_similar_unavailable">Similar Collections could not be refreshed.</string>
     <string name="collections_request">Request Collection</string>
     <string name="collections_select_all">Select All</string>

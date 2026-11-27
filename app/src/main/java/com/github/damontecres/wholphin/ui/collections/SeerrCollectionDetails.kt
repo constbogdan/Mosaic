@@ -1,10 +1,8 @@
 package com.github.damontecres.wholphin.ui.collections
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.border
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,7 +15,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -30,21 +27,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorMatrixColorFilter
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -52,24 +50,34 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.Button
-import androidx.tv.material3.Card
-import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import coil3.compose.AsyncImage
 import com.github.damontecres.wholphin.R
 import com.github.damontecres.wholphin.data.model.SeerrAvailability
 import com.github.damontecres.wholphin.services.CollectionDetailsData
+import com.github.damontecres.wholphin.ui.AspectRatios
 import com.github.damontecres.wholphin.ui.cards.DiscoverItemCard
 import com.github.damontecres.wholphin.ui.components.LoadingPage
+import com.github.damontecres.wholphin.ui.components.rememberCustomPageFocusOwner
 import com.github.damontecres.wholphin.ui.detail.CardGrid
 import com.github.damontecres.wholphin.ui.discover.LocalQuickMovieRequest
 import com.github.damontecres.wholphin.ui.nav.Destination
+import com.github.damontecres.wholphin.ui.nav.LocalActiveDrawerFocusRequester
 import com.github.damontecres.wholphin.ui.tryRequestFocus
 
 internal enum class CollectionFocusSection { POSTER, MOVIES, SIMILAR }
 
+internal val collectionHeaderHeight = 226.dp
+internal val collectionOverviewPosterWidth = 115.dp
+
 internal fun collectionMovieUpTargetsPoster(section: CollectionFocusSection?): Boolean = section == CollectionFocusSection.MOVIES
+
+internal fun collectionEntryFocusSection(selection: CollectionPreviewSelection): CollectionFocusSection =
+    when (selection) {
+        CollectionPreviewSelection.Collection -> CollectionFocusSection.POSTER
+        is CollectionPreviewSelection.Movie -> CollectionFocusSection.MOVIES
+        is CollectionPreviewSelection.Similar -> CollectionFocusSection.SIMILAR
+    }
 
 internal fun collectionMovieDownTargetsSimilar(
     section: CollectionFocusSection?,
@@ -90,18 +98,28 @@ internal fun SeerrCollectionDetails(
 ) {
     val state = viewModel.state.collectAsState().value
     val quickMovieRequest = LocalQuickMovieRequest.current
+    val drawerFocusRequester = LocalActiveDrawerFocusRequester.current
     val gridFocus = remember { FocusRequester() }
     val posterFocus = remember { FocusRequester() }
     val similarFocus = remember { FocusRequester() }
+    val retryFocus = remember { FocusRequester() }
     val similarListState = rememberLazyListState()
     var requestWasOpen by remember { mutableStateOf(false) }
     var returnFocusPending by remember { mutableStateOf(false) }
+    var retryHadFocus by remember(destination.entryToken) { mutableStateOf(false) }
     var focusSection by remember(destination.entryToken) { mutableStateOf<CollectionFocusSection?>(null) }
     var backShortcutArmed by rememberSaveable(destination.entryToken) { mutableStateOf(state.similarFocusedId != null) }
     var lastSimilarFocusId by rememberSaveable(destination.entryToken) { mutableStateOf<Int?>(null) }
+    var similarEntryFocused by remember(destination.entryToken) { mutableStateOf(false) }
     var memberFocusEpoch by remember(destination.entryToken) { mutableStateOf(0L) }
     var similarFocusEpoch by remember(destination.entryToken) { mutableStateOf(0L) }
-    var entryFocusRestored by remember(destination.entryToken) { mutableStateOf(false) }
+    var overviewFocusEpoch by remember(destination.entryToken) { mutableStateOf(0L) }
+    var entryHandoffStarted by remember(destination.entryToken) { mutableStateOf(false) }
+    var previewFocus by rememberSaveable(destination.entryToken, destination.owner, stateSaver = CollectionPreviewFocusStateSaver) {
+        mutableStateOf(CollectionPreviewFocusState())
+    }
+    var browsingRequested by rememberSaveable(destination.entryToken) { mutableStateOf(false) }
+    var enteringMembers by remember(destination.entryToken) { mutableStateOf(false) }
     val entryLifecycleOwner = LocalLifecycleOwner.current
     var entryResumed by remember(destination.entryToken, entryLifecycleOwner) {
         mutableStateOf(entryLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
@@ -120,12 +138,71 @@ internal fun SeerrCollectionDetails(
             destination.totalMovies,
         )
     val unreleasedPosterFilter = remember { ColorMatrixColorFilter(collectionUnreleasedPosterMatrix()) }
+    val currentDetails = state.details?.takeIf { state.owner == destination.owner && state.collectionId == destination.collectionId }
+    val isTop = viewModel.isCollectionTop(destination)
+    val backdropTarget = currentDetails?.let { collectionBackdropTarget(it, state.similar, previewFocus.selection) }
+    LaunchedEffect(isTop, backdropTarget) {
+        if (isTop) viewModel.updateBackdrop(backdropTarget)
+    }
+    val preview =
+        currentDetails?.let { collectionPreviewData(it, state.similar, previewFocus.selection) }
+            ?: CollectionPreviewData(CollectionPreviewKind.COLLECTION, stringResource(R.string.collections_details_title), null, null)
+    val showingOverview = previewFocus.selection == CollectionPreviewSelection.Collection
+    val entryTarget = collectionEntryFocusSection(previewFocus.selection)
+    var memberTargetReady by remember(destination.entryToken, state.focusedKey) { mutableStateOf(false) }
+    var similarTargetReady by remember(destination.entryToken, state.similarFocusedId) { mutableStateOf(false) }
+    val entryTargetRequester =
+        if (state.error && currentDetails == null) {
+            retryFocus
+        } else {
+            when (entryTarget) {
+                CollectionFocusSection.POSTER -> posterFocus
+                CollectionFocusSection.MOVIES -> gridFocus
+                CollectionFocusSection.SIMILAR -> similarFocus
+            }
+        }
+    // Claim focus before collection data arrives. The loading screen otherwise has no
+    // content focus owner and the navigation drawer becomes the fallback target.
+    val pageFocusModifier =
+        rememberCustomPageFocusOwner(
+            isTop = isTop,
+            contentReady =
+                (state.error && currentDetails == null) ||
+                    (
+                        currentDetails != null &&
+                            when (entryTarget) {
+                                CollectionFocusSection.POSTER -> true
+                                CollectionFocusSection.MOVIES -> memberTargetReady
+                                CollectionFocusSection.SIMILAR -> similarTargetReady
+                            }
+                    ),
+            mayFocusGrid = entryResumed,
+            gridFocusRequester = entryTargetRequester,
+        )
+    val restoreOverview: () -> Unit = {
+        enteringMembers = false
+        browsingRequested = false
+        previewFocus = previewFocus.posterFocused()
+        overviewFocusEpoch++
+    }
+    val enterMembers: () -> Boolean = {
+        val first = currentDetails?.movies?.firstOrNull()
+        if (first == null) {
+            false
+        } else {
+            // Keep the overview focus target mounted until CardGrid owns focus.
+            // Removing the poster first lets navigation fall through to the drawer.
+            enteringMembers = true
+            viewModel.position(0)
+            memberFocusEpoch++
+            true
+        }
+    }
     LaunchedEffect(destination.collectionId, destination.owner, destination.entryToken) {
         viewModel.show(destination.collectionId, destination.owner, destination.entryToken)
     }
     LaunchedEffect(state.owner, state.details) {
         if (state.owner != destination.owner || state.details == null) {
-            entryFocusRestored = false
             focusSection = null
             lastSimilarFocusId = null
         }
@@ -139,7 +216,27 @@ internal fun SeerrCollectionDetails(
                 focusSection in setOf(CollectionFocusSection.MOVIES, CollectionFocusSection.SIMILAR) &&
                 state.owner == destination.owner && state.details != null && state.request == null,
     ) {
-        posterFocus.tryRequestFocus()
+        restoreOverview()
+    }
+    LaunchedEffect(overviewFocusEpoch) {
+        if (overviewFocusEpoch > 0) {
+            withFrameNanos { }
+            posterFocus.tryRequestFocus()
+        }
+    }
+    LaunchedEffect(state.details, state.similar.isNotEmpty(), destination.entryToken, entryResumed) {
+        if (!entryHandoffStarted && entryResumed && state.owner == destination.owner &&
+            state.collectionId == destination.collectionId && state.details != null
+        ) {
+            if (state.similarFocusedId != null && state.similar.isEmpty()) return@LaunchedEffect
+            entryHandoffStarted = true
+            val target = collectionEntryFocusSection(previewFocus.selection)
+            when (target) {
+                CollectionFocusSection.POSTER -> overviewFocusEpoch++
+                CollectionFocusSection.MOVIES -> memberFocusEpoch++
+                CollectionFocusSection.SIMILAR -> similarFocusEpoch++
+            }
+        }
     }
     LaunchedEffect(state.request, state.loading, state.requestEligibilityLoading, state.details, posterActionable) {
         if (state.request != null) {
@@ -151,11 +248,7 @@ internal fun SeerrCollectionDetails(
         }
         if (returnFocusPending && !state.loading && !state.requestEligibilityLoading) {
             returnFocusPending = false
-            if (posterActionable) {
-                posterFocus.tryRequestFocus()
-            } else if (state.details?.movies?.isNotEmpty() == true) {
-                gridFocus.tryRequestFocus()
-            }
+            if (state.details != null) restoreOverview()
         }
     }
     state.request?.let { request ->
@@ -170,91 +263,72 @@ internal fun SeerrCollectionDetails(
     Column(
         modifier
             .fillMaxSize()
+            .then(pageFocusModifier)
             .onPreviewKeyEvent {
-                if (it.type == KeyEventType.KeyDown &&
-                    it.key in setOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)
-                ) {
-                    backShortcutArmed = true
+                if (it.type == KeyEventType.KeyDown) {
+                    if (it.key in setOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)) {
+                        backShortcutArmed = true
+                    }
                 }
                 false
             },
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(start = 24.dp, top = 20.dp, end = 40.dp, bottom = 12.dp),
-        ) {
-            val posterModifier = Modifier.width(140.dp).height(190.dp)
-            val posterContent: @Composable () -> Unit = {
-                CollectionDetailsPosterContent(
-                    name = state.details?.name,
-                    image = state.details?.posterUrl ?: state.details?.backdropUrl,
+        if (showingOverview) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(collectionHeaderHeight)
+                        .padding(start = 24.dp, top = 20.dp, end = 40.dp, bottom = 12.dp)
+                        .testTag("collectionOverviewSection"),
+            ) {
+                val overviewName = currentDetails?.name ?: stringResource(R.string.collections_details_title)
+                val requestLabel = stringResource(R.string.collections_request)
+                CollectionCard(
+                    name = overviewName,
+                    posterUrl = currentDetails?.posterUrl ?: currentDetails?.backdropUrl,
                     available = counts?.available,
                     total = counts?.total,
-                    showCount = state.owner == destination.owner && state.details != null,
-                )
-            }
-            if (posterActionable) {
-                val requestLabel = stringResource(R.string.collections_request)
-                Card(
-                    onClick = viewModel::openRequest,
-                    modifier =
-                        posterModifier
+                    onClick = { if (posterActionable) viewModel.openRequest() },
+                    onLongClick = {},
+                    modifier = Modifier.width(collectionOverviewPosterWidth).testTag("collectionOverviewCard"),
+                    showTitles = false,
+                    cardModifier =
+                        Modifier
                             .focusRequester(posterFocus)
                             .onFocusChanged {
                                 if (it.isFocused) {
                                     focusSection = CollectionFocusSection.POSTER
+                                    previewFocus = previewFocus.posterFocused()
                                 } else if (focusSection == CollectionFocusSection.POSTER) {
                                     focusSection = null
                                 }
                             }.onPreviewKeyEvent {
-                                if (it.type == KeyEventType.KeyDown && it.key == Key.DirectionDown) {
-                                    memberFocusEpoch++
-                                    true
-                                } else {
-                                    false
-                                }
-                            }.semantics { contentDescription = requestLabel }
-                            .testTag("collectionRequestPoster"),
-                    colors = CardDefaults.colors(containerColor = Color.Transparent),
-                ) {
-                    posterContent()
-                }
-            } else {
-                var posterFocused by remember { mutableStateOf(false) }
-                Box(
-                    posterModifier
-                        .focusRequester(posterFocus)
-                        .onFocusChanged {
-                            posterFocused = it.isFocused
-                            if (it.isFocused) {
-                                focusSection = CollectionFocusSection.POSTER
-                            } else if (focusSection == CollectionFocusSection.POSTER) {
-                                focusSection = null
-                            }
-                        }.onPreviewKeyEvent {
-                            if (it.type == KeyEventType.KeyDown && it.key == Key.DirectionDown) {
-                                memberFocusEpoch++
-                                true
-                            } else {
-                                false
-                            }
-                        }.border(
-                            3.dp,
-                            if (posterFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
-                            RoundedCornerShape(8.dp),
-                        ).focusable()
-                        .testTag("collectionPoster"),
-                    contentAlignment = Alignment.Center,
-                ) { posterContent() }
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
-                Text(
-                    state.details?.name ?: stringResource(R.string.collections_details_title),
-                    style = MaterialTheme.typography.headlineMedium,
+                                it.type == KeyEventType.KeyDown && it.key == Key.DirectionDown && enterMembers()
+                            }.semantics { contentDescription = if (posterActionable) requestLabel else overviewName }
+                            .testTag(if (posterActionable) "collectionRequestPoster" else "collectionPoster"),
                 )
-                state.details?.overview?.let { Text(it, maxLines = 4, overflow = TextOverflow.Ellipsis) }
+                CollectionDetailsOverview(
+                    title = overviewName,
+                    overview = currentDetails?.overview,
+                    metadata = currentDetails?.movies?.let(::collectionMemberMetadata) ?: CollectionMemberMetadata(emptyList(), null),
+                    genreNames = state.movieGenreNames,
+                    modifier = Modifier.weight(1f),
+                )
             }
+        } else {
+            CollectionDetailsPreview(
+                preview = preview,
+                genreNames = state.movieGenreNames,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(collectionHeaderHeight)
+                        .padding(start = 24.dp, top = 20.dp, end = 40.dp, bottom = 12.dp)
+                        .testTag("collectionBrowsingPreview"),
+            )
         }
         when {
             state.owner == null -> {
@@ -275,7 +349,6 @@ internal fun SeerrCollectionDetails(
 
             state.error -> {
                 Text(stringResource(R.string.collections_unavailable), Modifier.padding(24.dp))
-                Button(onClick = viewModel::retry) { Text(stringResource(R.string.retry)) }
             }
 
             state.details?.movies?.isEmpty() == true -> {
@@ -287,36 +360,10 @@ internal fun SeerrCollectionDetails(
                 val hasAvailableReleasedMember = collectionHasAvailableReleasedMember(movies)
                 val columns = 6
                 val memberFocusKey =
-                    state.focusedKey?.takeIf { key -> movies.any { "tmdb:movie:${it.id}" == key } }
+                    (if (enteringMembers) null else state.focusedKey)?.takeIf { key -> movies.any { "tmdb:movie:${it.id}" == key } }
                         ?: movies.firstOrNull()?.let { "tmdb:movie:${it.id}" }
                 val similarFocusTargetId =
                     (state.similarFocusedId ?: lastSimilarFocusId)?.takeIf { id -> state.similar.any { it.id == id } }
-                LaunchedEffect(state.details, state.similar.isNotEmpty(), destination.entryToken, entryResumed) {
-                    if (!entryFocusRestored && entryResumed && state.owner == destination.owner &&
-                        state.collectionId == destination.collectionId
-                    ) {
-                        if (state.similarFocusedId != null && state.similar.isEmpty()) return@LaunchedEffect
-                        val target =
-                            if (state.similarFocusedId != null) CollectionFocusSection.SIMILAR else CollectionFocusSection.MOVIES
-                        if (target == CollectionFocusSection.SIMILAR) similarFocusEpoch++ else memberFocusEpoch++
-                        // A new nested entry can load before its navigation transition has
-                        // completed. Confirm focus actually moved; one request is not enough.
-                        repeat(45) { attempt ->
-                            withFrameNanos { }
-                            if (!entryResumed || focusSection != null) {
-                                entryFocusRestored = focusSection == target
-                                return@LaunchedEffect
-                            }
-                            if (attempt % 3 == 0) {
-                                if (target == CollectionFocusSection.SIMILAR) {
-                                    similarFocus.tryRequestFocus()
-                                } else {
-                                    gridFocus.tryRequestFocus()
-                                }
-                            }
-                        }
-                    }
-                }
                 CardGrid(
                     pager = movies,
                     totalItems = movies.size,
@@ -342,12 +389,26 @@ internal fun SeerrCollectionDetails(
                     positionCallback = { _, index ->
                         focusSection = CollectionFocusSection.MOVIES
                         viewModel.position(index)
+                        if (browsingRequested) {
+                            movies.getOrNull(index)?.let { previewFocus = previewFocus.memberFocused(it.id) }
+                        }
                     },
                     onGridFocusChanged = { hasFocus ->
+                        if (hasFocus && enteringMembers) {
+                            enteringMembers = false
+                            browsingRequested = true
+                            movies.firstOrNull()?.let { previewFocus = previewFocus.memberFocused(it.id) }
+                        }
                         if (!hasFocus && focusSection != CollectionFocusSection.POSTER) focusSection = null
                     },
+                    onFocusTargetReady = { memberTargetReady = true },
                     onFirstRowUp = {
-                        collectionMovieUpTargetsPoster(focusSection) && posterFocus.tryRequestFocus()
+                        if (collectionMovieUpTargetsPoster(focusSection)) {
+                            restoreOverview()
+                            true
+                        } else {
+                            false
+                        }
                     },
                     showJumpButtons = false,
                     showLetterButtons = false,
@@ -357,7 +418,9 @@ internal fun SeerrCollectionDetails(
                     useFooterAsFocusRestorer = state.similarFocusedId != null,
                     prepareFooterFocus = {
                         val targetIndex = state.similar.indexOfFirst { it.id == similarFocusTargetId }.coerceAtLeast(0)
-                        similarListState.scrollToItem(targetIndex)
+                        if (similarSelectionNeedsScroll(similarListState.firstVisibleItemIndex, columns, targetIndex)) {
+                            similarListState.scrollToItem(targetIndex)
+                        }
                     },
                     modifier =
                         Modifier
@@ -367,6 +430,9 @@ internal fun SeerrCollectionDetails(
                                 if (it.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                                 when {
                                     focusSection == CollectionFocusSection.SIMILAR && it.key == Key.DirectionUp -> {
+                                        (previewFocus.lastMemberId ?: movies.getOrNull(state.focusedIndex)?.id)?.let { memberId ->
+                                            previewFocus = previewFocus.returningToMember(memberId)
+                                        }
                                         memberFocusEpoch++
                                         true
                                     }
@@ -394,7 +460,7 @@ internal fun SeerrCollectionDetails(
                             item = item,
                             onClick = onClick,
                             onLongClick = onLongClick,
-                            modifier = cardModifier,
+                            modifier = cardModifier.testTag("collectionMemberCard"),
                             showOverlay = false,
                             showAvailableIndicator = false,
                             artworkAlpha =
@@ -419,18 +485,25 @@ internal fun SeerrCollectionDetails(
                                             collections = state.similar,
                                             selectedId = state.similarFocusedId,
                                             focusTargetId = similarFocusTargetId,
-                                            restoreSelectedFocus = focusSection == null && state.similarFocusedId != null,
+                                            restoreSelectedFocus =
+                                                !similarEntryFocused && focusSection == null && state.similarFocusedId != null,
                                             focusRequester = similarFocus,
                                             listState = similarListState,
+                                            columns = columns,
+                                            drawerFocusRequester = drawerFocusRequester,
                                             onFocus = {
+                                                similarEntryFocused = true
+                                                browsingRequested = true
                                                 focusSection = CollectionFocusSection.SIMILAR
                                                 lastSimilarFocusId = it
                                                 viewModel.focusSimilar(it)
+                                                previewFocus = previewFocus.similarFocused(it)
                                             },
                                             onOpen = {
                                                 backShortcutArmed = true
                                                 viewModel.openSimilar(it)
                                             },
+                                            onFocusTargetReady = { similarTargetReady = true },
                                         )
                                     }
                                     if (state.similarLoading && state.similar.isEmpty()) {
@@ -447,24 +520,19 @@ internal fun SeerrCollectionDetails(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun CollectionDetailsPosterContent(
-    name: String?,
-    image: String?,
-    available: Int?,
-    total: Int?,
-    showCount: Boolean,
-) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        if (image != null) {
-            AsyncImage(model = image, contentDescription = name, modifier = Modifier.fillMaxSize())
-        } else {
-            Text(stringResource(R.string.collections_no_artwork))
+        // Keep the focused Retry node mounted, but invisible and without layout space,
+        // while a retry loads. Removing it before the poster is ready would let focus
+        // fall through to the drawer's avatar.
+        if (state.error || (retryHadFocus && focusSection == null)) {
+            Button(
+                onClick = viewModel::retry,
+                modifier =
+                    Modifier
+                        .focusRequester(retryFocus)
+                        .onFocusChanged { if (it.isFocused) retryHadFocus = true }
+                        .then(if (state.error) Modifier else Modifier.height(0.dp).alpha(0f)),
+            ) { Text(stringResource(R.string.retry)) }
         }
-        if (showCount) CollectionCompletionBadge(available, total, Modifier.align(Alignment.TopEnd))
     }
 }
 
@@ -482,54 +550,78 @@ private fun SimilarCollectionsRow(
     restoreSelectedFocus: Boolean,
     focusRequester: FocusRequester,
     listState: LazyListState,
+    columns: Int,
+    drawerFocusRequester: FocusRequester?,
     onFocus: (Int) -> Unit,
     onOpen: (Int) -> Unit,
+    onFocusTargetReady: () -> Unit,
 ) {
     var initialSelectionRestored by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(selectedId, collections) {
         val index = collections.indexOfFirst { it.id == selectedId }
         if (!initialSelectionRestored && index >= 0) {
-            listState.scrollToItem(index)
+            if (similarSelectionNeedsScroll(listState.firstVisibleItemIndex, columns, index)) {
+                listState.scrollToItem(index)
+            }
             initialSelectionRestored = true
         }
     }
-    Column(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 24.dp)) {
-        Text(
-            stringResource(R.string.collections_similar),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp),
-        )
-        LazyRow(
-            state = listState,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(start = 8.dp, end = 8.dp),
-            modifier = Modifier.fillMaxWidth().height(235.dp),
-        ) {
-            items(collections, key = { it.id }) { item ->
-                if (restoreSelectedFocus && selectedId == item.id) {
-                    // Entry restoration only. A selected card must not reclaim focus during Similar -> member traversal.
-                    LaunchedEffect(item.id) { focusRequester.tryRequestFocus() }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val spacing = 16.dp
+        val cardWidth = similarPosterWidth(maxWidth, columns, spacing)
+        // CardGrid already spaces its footer from the last member row by 16.dp.
+        Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+            Text(
+                stringResource(R.string.collections_recommended),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+            LazyRow(
+                state = listState,
+                horizontalArrangement = Arrangement.spacedBy(spacing),
+                contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth().height(cardWidth / AspectRatios.TALL + 72.dp),
+            ) {
+                items(collections, key = { it.id }) { item ->
+                    if (restoreSelectedFocus && selectedId == item.id) {
+                        // Entry restoration only. A selected card must not reclaim focus during Similar -> member traversal.
+                        LaunchedEffect(item.id) { focusRequester.tryRequestFocus() }
+                    }
+                    CollectionCard(
+                        name = item.name,
+                        posterUrl = item.posterUrl,
+                        available = item.availableMovies,
+                        total = item.totalMovies,
+                        onClick = { onOpen(item.id) },
+                        onLongClick = {},
+                        modifier = Modifier.width(cardWidth).testTag("similarCollectionCard"),
+                        cardModifier =
+                            Modifier
+                                .then(
+                                    if (item.id == collections.first().id && drawerFocusRequester != null) {
+                                        Modifier.focusProperties { left = drawerFocusRequester }
+                                    } else {
+                                        Modifier
+                                    },
+                                ).then(
+                                    if (focusTargetId == item.id ||
+                                        (focusTargetId == null && item.id == collections.first().id)
+                                    ) {
+                                        Modifier.focusRequester(focusRequester)
+                                    } else {
+                                        Modifier
+                                    },
+                                ).then(
+                                    if (focusTargetId == item.id ||
+                                        (focusTargetId == null && item.id == collections.first().id)
+                                    ) {
+                                        Modifier.onGloballyPositioned { onFocusTargetReady() }
+                                    } else {
+                                        Modifier
+                                    },
+                                ).onFocusChanged { if (it.isFocused) onFocus(item.id) },
+                    )
                 }
-                CollectionCard(
-                    name = item.name,
-                    posterUrl = item.posterUrl,
-                    available = item.availableMovies,
-                    total = item.totalMovies,
-                    onClick = { onOpen(item.id) },
-                    onLongClick = {},
-                    modifier = Modifier.width(125.dp),
-                    cardModifier =
-                        Modifier
-                            .then(
-                                if (focusTargetId == item.id ||
-                                    (focusTargetId == null && item.id == collections.first().id)
-                                ) {
-                                    Modifier.focusRequester(focusRequester)
-                                } else {
-                                    Modifier
-                                },
-                            ).onFocusChanged { if (it.isFocused) onFocus(item.id) },
-                )
             }
         }
     }

@@ -4,6 +4,7 @@ import com.github.damontecres.wholphin.api.seerr.SeerrApiClient
 import com.github.damontecres.wholphin.api.seerr.model.LibraryCollectionsResponse
 import com.github.damontecres.wholphin.api.seerr.model.MovieDetails
 import com.github.damontecres.wholphin.api.seerr.model.MovieDetailsCollection
+import com.github.damontecres.wholphin.api.seerr.model.MovieResult
 import com.github.damontecres.wholphin.api.seerr.model.PublicSettings
 import com.github.damontecres.wholphin.api.seerr.model.User
 import com.github.damontecres.wholphin.data.model.DiscoverItem
@@ -47,12 +48,32 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
+import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CollectionDetailsTest {
+    @Test fun collectionMapperRetainsOptionalCatalogMetadata() {
+        val backend = SeerrCollectionsBackend(mockk(relaxed = true), mockk(relaxed = true))
+        val movie =
+            backend.movie(
+                MovieResult(
+                    id = 11,
+                    mediaType = "movie",
+                    genreIds = listOf(12, 28),
+                    voteAverage = BigDecimal("7.4"),
+                    voteCount = 145165,
+                    popularity = BigDecimal("8.82694"),
+                ),
+            )
+        assertEquals(listOf(12, 28), movie.genreIds)
+        assertEquals(7.4, movie.voteAverage!!, 0.0)
+        assertEquals(145165, movie.voteCount)
+        assertEquals(8.82694, movie.popularity!!, 0.00001)
+    }
+
     @Test fun collectionSectionTraversalDoesNotSkipMoviesFromSimilar() {
         // CardGrid can retain movie index zero while its Similar footer owns focus.
         assertFalse(collectionMovieUpTargetsPoster(CollectionFocusSection.SIMILAR))
@@ -342,7 +363,7 @@ class CollectionDetailsTest {
                 val sessions = MutableStateFlow<CollectionsSession?>(session("old", oldBackend))
                 val source = mockk<CollectionsSessionSource>()
                 every { source.sessions } returns sessions
-                val vm = SeerrCollectionDetailsViewModel(source, mockk(relaxed = true))
+                val vm = SeerrCollectionDetailsViewModel(source, mockk(relaxed = true), mockk(relaxed = true))
                 vm.show(7, "old")
                 runCurrent()
                 sessions.value = session("new", newBackend)
@@ -371,7 +392,7 @@ class CollectionDetailsTest {
                 val sessions = MutableStateFlow<CollectionsSession?>(session("one", backend))
                 val source = mockk<CollectionsSessionSource>()
                 every { source.sessions } returns sessions
-                val vm = SeerrCollectionDetailsViewModel(source, mockk(relaxed = true))
+                val vm = SeerrCollectionDetailsViewModel(source, mockk(relaxed = true), mockk(relaxed = true))
                 hideScreen = { vm.onScreenHidden() }
                 vm.show(7, "one")
                 runCurrent()
@@ -418,7 +439,7 @@ class CollectionDetailsTest {
                 val source = mockk<CollectionsSessionSource>()
                 every { source.sessions } returns sessions
                 val navigation = mockk<NavigationManager>(relaxed = true)
-                val vm = SeerrCollectionDetailsViewModel(source, navigation)
+                val vm = SeerrCollectionDetailsViewModel(source, navigation, mockk(relaxed = true))
                 hideScreen = { vm.onScreenHidden() }
                 vm.show(7, "one")
                 runCurrent()
@@ -447,7 +468,7 @@ class CollectionDetailsTest {
                 val sessions = MutableStateFlow<CollectionsSession?>(session("one", backend))
                 val source = mockk<CollectionsSessionSource>()
                 every { source.sessions } returns sessions
-                val vm = SeerrCollectionDetailsViewModel(source, mockk(relaxed = true))
+                val vm = SeerrCollectionDetailsViewModel(source, mockk(relaxed = true), mockk(relaxed = true))
                 hideScreen = { vm.onScreenHidden() }
                 vm.show(7, "one")
                 runCurrent()

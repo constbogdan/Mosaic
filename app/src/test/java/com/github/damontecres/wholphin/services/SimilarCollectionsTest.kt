@@ -107,7 +107,7 @@ class SimilarCollectionsTest {
     ): SeerrCollectionDetailsViewModel {
         val source = mockk<CollectionsSessionSource>()
         every { source.sessions } returns sessions
-        return SeerrCollectionDetailsViewModel(source, navigation)
+        return SeerrCollectionDetailsViewModel(source, navigation, mockk(relaxed = true))
     }
 
     @Test fun verifiedIdsPreserveServerOrderWithoutDuplicatesOrOrigin() {
