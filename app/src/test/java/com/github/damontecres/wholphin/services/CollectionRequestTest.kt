@@ -125,7 +125,7 @@ class CollectionRequestTest {
     private fun viewModel(sessions: MutableStateFlow<CollectionsSession?>): SeerrCollectionDetailsViewModel {
         val source = mockk<CollectionsSessionSource>()
         every { source.sessions } returns sessions
-        return SeerrCollectionDetailsViewModel(source, mockk(relaxed = true))
+        return SeerrCollectionDetailsViewModel(source, mockk(relaxed = true), mockk(relaxed = true))
     }
 
     private fun session(

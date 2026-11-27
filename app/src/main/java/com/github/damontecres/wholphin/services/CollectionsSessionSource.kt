@@ -22,7 +22,10 @@ import com.github.damontecres.wholphin.ui.detail.discover.SeerrRequestData
 import com.github.damontecres.wholphin.ui.toLocalDate
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.jellyfin.sdk.model.api.ImageType
+import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -105,6 +108,9 @@ internal interface CollectionsBackend {
 
     suspend fun detail(id: Int): CollectionDetailsData
 
+    /** Localized names are fetched once per Seerr session, never when focus changes. */
+    suspend fun movieGenreNames(): Map<Int, String> = emptyMap()
+
     /** Presentation-only reuse; opening a Collection Details entry still refreshes its normal data. */
     suspend fun similarDetail(id: Int): CollectionDetailsData = detail(id)
 
@@ -174,6 +180,20 @@ internal class SeerrCollectionsBackend(
     private val current: CurrentSeerr,
     private val seerrService: SeerrService? = null,
 ) : CollectionsBackend {
+    private val genreMutex = Mutex()
+    private var cachedMovieGenreNames: Map<Int, String>? = null
+
+    override suspend fun movieGenreNames(): Map<Int, String> =
+        genreMutex.withLock {
+            cachedMovieGenreNames ?: client.tmdbApi
+                .genresMovieGet(language = Locale.getDefault().toLanguageTag())
+                .mapNotNull { genre ->
+                    val name = genre.name?.takeIf { it.isNotBlank() }
+                    if (genre.id != null && name != null) genre.id to name else null
+                }.toMap()
+                .also { cachedMovieGenreNames = it }
+        }
+
     private val detailsCache =
         object : LinkedHashMap<Int, CollectionDetailsData>(32, .75f, true) {
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, CollectionDetailsData>): Boolean = size > 32
@@ -298,5 +318,9 @@ internal class SeerrCollectionsBackend(
             logoUrl = null,
             // Seerr availability is not proof of a playable current-user Jellyfin destination.
             jellyfinItemId = null,
+            genreIds = part.genreIds,
+            voteAverage = part.voteAverage?.toDouble()?.takeIf { it.isFinite() },
+            voteCount = part.voteCount,
+            popularity = part.popularity?.toDouble()?.takeIf { it.isFinite() },
         )
 }

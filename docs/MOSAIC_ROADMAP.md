@@ -75,6 +75,11 @@ Downloads, Discover, Watchlist, Collections, and Suggestions. See
 
 - Combine locally available and unavailable collection items.
 - Reuse TMDB collection identity where appropriate.
+- Completed and operator-accepted Collections Details redesign (Phases 1-5): a collection
+  overview leads into a focus-driven member and Recommended Collections browser with stable grid
+  geometry, dynamic backdrops, authoritative availability, and exact Details-return restoration.
+  Collection-level genres and rating are derived conservatively from loaded members; no backend
+  change or focus-driven metadata request is required. Physical-TV acceptance remains outstanding.
 - Explore broader franchise relationships and release/chronological viewing orders.
 
 ### Discover

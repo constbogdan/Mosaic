@@ -105,6 +105,11 @@ data class DiscoverItem(
     val backDropUrl: String?,
     val logoUrl: String?,
     val jellyfinItemId: UUID?,
+    /** Optional catalog metadata retained from list responses; never implies Jellyfin ownership. */
+    val genreIds: List<Int>? = null,
+    val voteAverage: Double? = null,
+    val voteCount: Int? = null,
+    val popularity: Double? = null,
 ) : CardGridItem {
     override val gridId: String get() = id.toString()
     override val playable: Boolean = false
